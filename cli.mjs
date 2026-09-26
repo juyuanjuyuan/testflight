@@ -4,9 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { audit, analyze, newRunDir } from './src/audit.mjs';
 import { readTrace } from './src/contracts.mjs';
-import { fixSite } from './src/fix/fixer.mjs';
-import { compareRuns } from './src/report/compare.mjs';
-import { writeReport } from './src/report/build.mjs';
+import { runFix, runRerun } from './src/fix/commands.mjs';
 import { scoreRun, scoreTable } from './eval/score.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -43,26 +41,11 @@ async function main() {
     const { report } = await analyze({ trace, goal: need('goal'), meta: { replayOf: args.trace }, runDir, judgeEnabled: !args['no-judge'], log: console.error });
     summary(report); console.log(`→ ${runDir}/report.json`);
   } else if (cmd === 'fix') {
-    const runDir = need('run');
-    const meta = readJSON(path.join(runDir, 'meta.json'));
-    const findings = readJSON(path.join(runDir, 'findings.json'));
-    const originalDir = args.site || meta.site || need('site');
-    const patchedDir = args.patched || path.join(path.dirname(originalDir), 'patched');
-    const fixes = await fixSite({ findings, originalDir, patchedDir });
-    fs.writeFileSync(path.join(runDir, 'fixes.json'), JSON.stringify(fixes, null, 2));
-    fs.writeFileSync(path.join(runDir, 'findings.json'), JSON.stringify(findings, null, 2)); // now with .fix
+    const { fixes, patchedDir } = await runFix(args);
     for (const f of fixes) console.log(`${f.finding}: applied ${f.applied}${f.errors.length ? ' · errors: ' + f.errors.join('; ') : ''}`);
     console.log(`→ patched site in ${patchedDir}`);
   } else if (cmd === 'rerun') {
-    const runDir = need('run');
-    const meta = readJSON(path.join(runDir, 'meta.json'));
-    const url = args.url || meta.url.replace('/original/', '/patched/');
-    const after = await audit({ url, goal: meta.goal, out, label: 'rerun', judgeEnabled: !args['no-judge'], log: console.log });
-    const before = readJSON(path.join(runDir, 'report.json'));
-    const cmp = compareRuns(before, after.report);
-    before.rerun = { runDir: after.runDir, ...cmp };
-    writeReport(runDir, before);
-    console.log(JSON.stringify(cmp, null, 2));
+    console.log(JSON.stringify(await runRerun(args, console.log), null, 2));
   } else if (cmd === 'score') {
     const res = scoreRun({ runDir: need('run'), groundtruth: need('groundtruth'), tool: args.tool || 'ours' });
     console.log(scoreTable([res]));
@@ -71,4 +54,4 @@ async function main() {
     process.exit(cmd ? 2 : 0);
   }
 }
-main().catch((e) => { console.error(process.env.DEBUG ? e : `error: ${e.message.split('\n')[0]}` + ' (DEBUG=1 for details)'); process.exit(1); });
+main().catch((e) => { console.error(process.env.DEBUG ? e : `error: ${e.message.split('\n')[0]}` + ' (DEBUG=1 for details)'); process.exit(e.exitCode || 1); });
