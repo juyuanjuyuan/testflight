@@ -87,3 +87,10 @@ LLM 验收（`LLM_CACHE=off`，`--no-judge`，改 prompt 后三组都重跑）�
 
 用 `runs/2026-09-26T23-11-55-accept-fixed-3/trace.jsonl` 的 `t` 算相邻步间隔：步骤 0→7 每步 1.0–2.8 s；**7→8 用了 64.9 s**。第 8 步就是 planner 判断"done"的那一次调用。整次运行记录的 LLM 总用时只有 9.9 s（`stats.ms`），因为 `llm.mjs` 只统计成功的那次尝试，超时和报错的尝试既不计时也不记录。planner 的超时是 20 s，每个模型重试 2 次后换备用模型。64.9 s ≈ 3 次 20 s 超时 + 1 次约 5 s 的成功调用，所以结论是：**Sciforium 上 DeepSeek 偶发超时，被静默重试掩盖**，不是浏览器的问题。第二轮验收里同样出现过（fixed 原 goal 第 1 次：第 5 步 29 s，`stats.ms` 35.7 s）。因为失败的尝试没有日志，没法逐次确认，这个结论是推断。
 **后续建议**（`src/agent/llm.mjs` 不在本计划范围内）：把失败的尝试记进 `stats`（如 `stats.llmRetries`、`stats.llmErrors`），否则违反 CODING_STANDARDS §3 的"降级要写进输出"；也可以考虑把 planner 的超时从 20 s 降到 8–10 s，让重试更早发生。
+
+### 补充（第三轮）：LLM 重试不再静默
+
+- `chatJSON` 每次尝试都记进 `stats`：`llmAttempts`（尝试次数）、`llmFailures`（失败次数）、`llmTimeouts`（超时次数）、`llmFailedMs`（失败尝试耗费的时间）、`llmErrorTypes`（按类型计数：`timeout` / `http-<状态码>` / `connection` / `parse`）。原有的 `calls`/`ms` 仍只统计成功的调用。这些字段随 `stats` 写进 `report.json`，都是新增字段。
+- 超时改为 `contracts.mjs` 里的 `LLM_TIMEOUT_MS`：planner 8 s，judge/fixer/vision 60 s。
+- 回退的模型列表先去重：planner 和 judge 配同一个模型时，只在这个模型上试 2 次，而不是 4 次。之前最坏情况 4×20 s = 80 s，现在是 2×8 s = 16 s。
+- `test/llm.test.mjs` 用假 client 测试（先写的失败测试）：超时和解析失败会被记录并分类，同一个模型不会重复尝试，各角色的超时值正确。实跑一次 fixed：`{"llmAttempts":8,"calls":8,"ms":8362}`（那次没有失败）。

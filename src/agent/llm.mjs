@@ -6,8 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CACHE_DIR } from '../paths.mjs';
-
-const TIMEOUTS = { planner: 20_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
+import { LLM_TIMEOUT_MS } from '../contracts.mjs';
 
 function routes() {
   const p = process.env.MODEL_PLANNER, j = process.env.MODEL_JUDGE;
@@ -39,6 +38,24 @@ export function parseJSON(text) {
   throw new Error('no JSON object in model output');
 }
 
+function errorType(e) {
+  if (e instanceof OpenAI.APIConnectionTimeoutError) return 'timeout';
+  if (e?.status) return `http-${e.status}`;
+  if (e instanceof OpenAI.APIConnectionError) return 'connection';
+  if (e instanceof SyntaxError || /JSON/.test(e?.message)) return 'parse';
+  return e?.name || 'error';
+}
+
+// Failed attempts are retried, so they never surface as errors; record them so slow or flaky runs are explainable.
+function recordFailure(stats, e, ms) {
+  if (!stats) return;
+  const type = errorType(e);
+  stats.llmFailures = (stats.llmFailures || 0) + 1;
+  stats.llmFailedMs = (stats.llmFailedMs || 0) + ms;
+  if (type === 'timeout') stats.llmTimeouts = (stats.llmTimeouts || 0) + 1;
+  stats.llmErrorTypes = { ...stats.llmErrorTypes, [type]: (stats.llmErrorTypes?.[type] || 0) + 1 };
+}
+
 const cacheMode = () => process.env.LLM_CACHE || 'readwrite';
 const keyOf = (model, messages) => crypto.createHash('sha256').update(JSON.stringify({ model, messages })).digest('hex');
 
@@ -52,11 +69,14 @@ function cachePut(k, v) {
 }
 
 /**
- * @param {{role:'planner'|'judge'|'fixer'|'vision', system:string, user:string|object[], stats?:object}} args
+ * @param {{role:'planner'|'judge'|'fixer'|'vision', system:string, user:string|object[], stats?:object, client?:object}} args
+ *   `client` replaces the OpenAI client (tests only).
+ *   stats gains calls/ms (successes) and llmAttempts/llmFailures/llmTimeouts/llmFailedMs/llmErrorTypes (every attempt).
  * @returns {Promise<{data:any, model:string, cached:boolean, ms:number}>}
  */
-export async function chatJSON({ role, system, user, stats }) {
-  const models = (routes()[role] || []).filter(Boolean);
+export async function chatJSON({ role, system, user, stats, client: fake }) {
+  // dedupe: when planner and judge use the same model, "falling back" to it would just repeat the same call
+  const models = [...new Set((routes()[role] || []).filter(Boolean))];
   if (!models.length) throw new Error(`no model configured for role "${role}" (see .env.example)`);
   const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
   const mode = cacheMode();
@@ -71,10 +91,11 @@ export async function chatJSON({ role, system, user, stats }) {
     }
     for (let attempt = 0; attempt < 2; attempt++) {
       const t0 = Date.now();
+      if (stats) stats.llmAttempts = (stats.llmAttempts || 0) + 1;
       try {
-        const r = await client(role).chat.completions.create(
+        const r = await (fake || client(role)).chat.completions.create(
           { model, messages, temperature: 0 },
-          { timeout: TIMEOUTS[role] ?? 60_000 },
+          { timeout: LLM_TIMEOUT_MS[role] ?? 60_000 },
         );
         const data = parseJSON(r.choices?.[0]?.message?.content);
         const ms = Date.now() - t0;
@@ -82,6 +103,7 @@ export async function chatJSON({ role, system, user, stats }) {
         if (mode === 'readwrite') cachePut(k, { data, model, role });
         return { data, model, cached: false, ms };
       } catch (e) {
+        recordFailure(stats, e, Date.now() - t0);
         lastErr = e;
       }
     }

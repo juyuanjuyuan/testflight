@@ -7,6 +7,8 @@ export const SETTLE_MS = 300;           // minimum quiet time before we observe
 export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown
 export const BASELINE_MS = 2000;        // watch the page idle after load so carousels/countdowns reveal themselves
 export const LOAD_TIMEOUT_MS = 10_000;   // max wait for 'load' after a navigation; exceeding it is recorded as loadTimeout
+// per-attempt LLM timeout by role. The planner is short: a stalled call is cheaper to retry than to wait out.
+export const LLM_TIMEOUT_MS = { planner: 8_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
 
 export const ALLOWED_KEYS = [
   'Tab', 'Shift+Tab', 'Enter', 'Space', 'Escape',
