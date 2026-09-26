@@ -19,9 +19,10 @@
 ## 验收
 
 ```bash
-python3 -m http.server 8090   # 在仓库根目录；或者用任意静态服务器
-# 打开 http://localhost:8090/viewer/index.html?run=../fixtures/testpage-original/
-# 打开 http://localhost:8090/viewer/index.html?run=../fixtures/testpage-fixed/
+npm run serve   # sites/ 加上只读的 /viewer、/runs、/fixtures，端口 8080
+# 打开 http://localhost:8080/viewer/?run=/fixtures/testpage-original/
+# 打开 http://localhost:8080/viewer/?run=/fixtures/testpage-fixed/
+# 真实运行：http://localhost:8080/viewer/?run=/runs/<运行目录>/
 ```
 
 - original：顶部显示读屏用户“不能完成”、block 数；左栏有每步按键和 reason，出问题的步骤标红；中栏截图上画出 `focusRect` 和 `seen[].rect`；右栏显示 `heard`。
@@ -34,7 +35,7 @@ python3 -m http.server 8090   # 在仓库根目录；或者用任意静态服务
 
 **截图：** `viewer/screenshots/original-step7.png`（不能完成、step 7 听到 (nothing)）、`fixed-step4.png`（能完成、画出 focus/seen 框）、`sample-fix-rerun.png`（fix diff + rerun + axe unavailable）。
 
-**手写测试数据：** `viewer/sample/report.json`（`meta.note` 标明是手写的），覆盖 `fix.edits`、`rerun`、`fixes[].errors`、`axeViolations: null`、`screenshot: null`、`userImpact`。打开：`viewer/index.html?run=sample/`。
+**手写测试数据：** `viewer/sample/report.json`（`meta.note` 标明是手写的），覆盖 `fix.edits`、`rerun`、`fixes[].errors`、`axeViolations: null`、`screenshot: null`、`userImpact`。打开：http://localhost:8080/viewer/?run=/viewer/sample/。
 
 **report / fixture 的缺口（交给对应计划，本计划没改 `src/`）：**
 1. `fixtures/testpage-original/report.json` 是旧版 build 生成的：`seen` 是字符串数组、没有 `focusRect`，所以 original 的截图上画不出框（fixed 的 fixture 是新格式，能画）。当前 `build.mjs` 输出是对的（replay 验证过）。需要重新跑 `node cli.mjs audit --url http://localhost:8080/testpage/original/ ... --no-judge` 并把 report.json + shots 覆盖到 fixture（replay 不行：会丢掉 axe 结果）。viewer 两种格式都兼容。

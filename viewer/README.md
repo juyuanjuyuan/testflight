@@ -11,7 +11,8 @@ Layout (the demo's main frame):
 - Bottom: `findings[]` (block first) with WCAG, `userImpact`, and `fix.edits` as a diff; per-finding `rerun.status[]` → resolved/persists,
   overall `rerun.after.screenReaderUserCanComplete` → "passes after fix".
 
-Serve it from the repo root so relative paths work, e.g. `viewer/index.html?run=../fixtures/testpage-original/`.
+Open it through `npm run serve`, which also mounts `/viewer`, `/runs` and `/fixtures` read-only:
+`http://localhost:8080/viewer/?run=/fixtures/testpage-original/` (or `?run=/runs/<run-dir>/`).
 
 Keys: ← → (or j k) step through the timeline; `#step=N` in the URL opens a given step.
-`sample/report.json` is hand-written test data (fix diff, rerun, axe unavailable, missing screenshot): `viewer/index.html?run=sample/`.
+`sample/report.json` is hand-written test data (fix diff, rerun, axe unavailable, missing screenshot): `http://localhost:8080/viewer/?run=/viewer/sample/`.

@@ -117,8 +117,8 @@ const svg = (tag, attrs) => {
 
 function showError(msg) {
   app.replaceChildren(h('div', { class: 'panel error' }, h('h1', null, 'Cannot show report'), h('p', null, msg),
-    h('p', { class: 'muted' }, 'Usage: serve the repo root (e.g. ', h('code', null, 'python3 -m http.server 8090'),
-      ') and open ', h('code', null, 'viewer/index.html?run=../fixtures/testpage-original/'))));
+    h('p', { class: 'muted' }, 'Usage: run ', h('code', null, 'npm run serve'),
+      ' and open ', h('code', null, 'http://localhost:8080/viewer/?run=/fixtures/testpage-original/'))));
 }
 
 function actionLabel(a) {
