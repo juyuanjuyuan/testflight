@@ -9,6 +9,25 @@ import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS } from '../contracts.mjs';
 
 const RECORDER = fs.readFileSync(new URL('./recorder.js', import.meta.url), 'utf8');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const LOAD_TIMEOUT_MS = 10_000;
+
+/** Enable the CDP accessibility domain; without it every focus read is wrong, so fail loudly. */
+export async function enableAX(cdp) {
+  try { await cdp.send('Accessibility.enable'); } catch (e) { throw new Error(`CDP Accessibility.enable failed: ${e.message}`); }
+}
+
+/** Screenshot to runDir/rel. Returns rel, or null if it failed (the step records screenshot: null). */
+export async function screenshotOrNull(page, runDir, rel) {
+  try { await page.screenshot({ path: path.join(runDir, rel) }); return rel; } catch { return null; }
+}
+
+/** Wait for 'load' after a navigation. A timeout is recorded as loadTimeout; any other error propagates. */
+export async function waitForLoad(page) {
+  try { await page.waitForLoadState('load', { timeout: LOAD_TIMEOUT_MS }); return { loadTimeout: false }; } catch (e) {
+    if (e.name === 'TimeoutError') return { loadTimeout: true };
+    throw e;
+  }
+}
 
 /**
  * @param {{url:string, runDir:string, mode?:'local'|'real', cdp?:string, headless?:boolean, axe?:boolean}} o
@@ -28,7 +47,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     page = await ctx.newPage();
   }
   const cdpSession = await page.context().newCDPSession(page);
-  await cdpSession.send('Accessibility.enable').catch(() => {});
+  await enableAX(cdpSession);
 
   let loads = 0;
   page.on('domcontentloaded', () => { loads++; });
@@ -38,21 +57,22 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
   let current = null;
 
   async function snapshot(extra) {
-    const shot = `shots/${String(i).padStart(4, '0')}.png`;
-    await page.screenshot({ path: path.join(runDir, shot) }).catch(() => {});
+    const shot = await screenshotOrNull(page, runDir, `shots/${String(i).padStart(4, '0')}.png`);
     return { url: page.url(), title: await page.title(), modalOpen: await page.evaluate(() => window.__a11yRec?.modalOpen() ?? false),
       focusVisible: null, screenshot: shot, ...extra };
   }
 
   async function settle(loadsBefore) {
     await sleep(SETTLE_MS);
-    if (loads !== loadsBefore) await page.waitForLoadState('load', { timeout: 10_000 }).catch(() => {});
+    const { loadTimeout } = loads !== loadsBefore ? await waitForLoad(page) : { loadTimeout: false };
     const t0 = Date.now();
     while (Date.now() - t0 < CHANGE_WINDOW_MS) {  // until 300ms quiet, capped at the attribution window
+      // evaluate throws when a navigation destroys the context mid-poll: treat as quiet, the step records pageLoad anyway
       const q = await page.evaluate(() => window.__a11yRec?.quietFor() ?? 1e9).catch(() => 1e9);
       if (q >= SETTLE_MS) break;
       await sleep(100);
     }
+    return loadTimeout;
   }
 
   return {
@@ -73,17 +93,17 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       const loadsBefore = loads;
       await page.evaluate(() => window.__a11yRec?.mark());
       if (action.kind === 'press' || action.kind === 'type') await act(page, action);
-      await settle(loadsBefore);
+      const loadTimeout = await settle(loadsBefore);
       const pageLoad = loads !== loadsBefore;
       const changes = pageLoad ? [] : await page.evaluate((w) => window.__a11yRec.collect(w), CHANGE_WINDOW_MS);
       const focusAfter = await focusInfo(page, cdpSession);
       const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, spoken: [], pageLoad,
-        pageText: pageLoad ? await pageText(cdpSession) : null, ...(await snapshot()) };
+        pageText: pageLoad ? await pageText(cdpSession) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
       if (axe && (pageLoad || changes.length)) axeRuns.push(await runAxe(page));
       current = focusAfter; i++;
       return step;
     },
     axeResults: () => mergeAxe(axeRuns),
-    async close() { if (owned) await browser.close(); else await cdpSession.detach().catch(() => {}); },
+    async close() { if (owned) await browser.close(); else await cdpSession.detach().catch(() => {}); }, // cleanup only: the run is already recorded, and a tab the human closed can't be detached
   };
 }

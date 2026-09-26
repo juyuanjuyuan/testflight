@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, insideDir } from '../src/paths.mjs';
 import { mergeAxe } from '../src/runner/axe.mjs';
+import { enableAX, screenshotOrNull, waitForLoad } from '../src/runner/session.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { applyEdits } from '../src/fix/apply.mjs';
 import { readTrace } from '../src/contracts.mjs';
@@ -32,4 +33,25 @@ test('applyEdits validates LLM output shape at the boundary', () => {
   const dir = fs.mkdtempSync('/tmp/site-');
   assert.match(applyEdits(dir, null).errors[0], /array/);
   assert.match(applyEdits(dir, [{ file: 'index.html' }]).errors[0], /invalid edit shape/);
+});
+
+test('runner: Accessibility.enable failure is an error, not silently ignored', async () => {
+  const cdp = { send: async () => { throw new Error('boom'); } };
+  await assert.rejects(enableAX(cdp), /Accessibility\.enable.*boom/);
+});
+
+test('runner: a failed screenshot is recorded as null, not a dangling path', async () => {
+  const page = { screenshot: async () => { throw new Error('target closed'); } };
+  assert.equal(await screenshotOrNull(page, '/run', 'shots/0001.png'), null);
+  const ok = { screenshot: async () => {} };
+  assert.equal(await screenshotOrNull(ok, '/run', 'shots/0001.png'), 'shots/0001.png');
+});
+
+test('runner: a load that never finishes is recorded as loadTimeout', async () => {
+  const slow = { waitForLoadState: async () => { throw Object.assign(new Error('Timeout 10000ms exceeded'), { name: 'TimeoutError' }); } };
+  assert.deepEqual(await waitForLoad(slow), { loadTimeout: true });
+  const fast = { waitForLoadState: async () => {} };
+  assert.deepEqual(await waitForLoad(fast), { loadTimeout: false });
+  const broken = { waitForLoadState: async () => { throw new Error('page crashed'); } };
+  await assert.rejects(waitForLoad(broken), /page crashed/);
 });
