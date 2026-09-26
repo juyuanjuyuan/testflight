@@ -4,8 +4,8 @@
 export const MAX_STEPS = 25;
 export const CHANGE_WINDOW_MS = 1500;   // changes later than this after an action are not attributed to it
 export const SETTLE_MS = 300;           // minimum quiet time before we observe
-export const NOISE_REPEAT = 3;
-export const BASELINE_MS = 2000;         // watch the page idle after load so carousels/countdowns reveal themselves          // same element changing >= this often without input = carousel/countdown
+export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown
+export const BASELINE_MS = 2000;        // watch the page idle after load so carousels/countdowns reveal themselves
 
 export const ALLOWED_KEYS = [
   'Tab', 'Shift+Tab', 'Enter', 'Space', 'Escape',
@@ -33,7 +33,12 @@ export const INTERACTIVE_ROLES = [
  * @property {string|null} barrierId  nearest ancestor-or-self [data-barrier] (eval only; null on real sites)
  * @property {boolean}  isBody        focus is on <body>/document root
  * @property {boolean}  inModal       focus is inside an open dialog
+ * @property {Rect|null=} rect         viewport box of the focused element (viewer draws it); null on body
+ * @property {string|null=} inputHints type/name/id/autocomplete of the element (guard.mjs checks sensitive fields)
+ * @property {string=}  axError       CDP could not resolve the AX node; role is 'unknown' (degradation, kept for diagnosis)
  */
+
+/** @typedef {{x:number, y:number, w:number, h:number}} Rect */
 
 /**
  * @typedef {Object} Change  — new visible text that appeared after an action (recorder.js)
@@ -47,6 +52,7 @@ export const INTERACTIVE_ROLES = [
  * @property {string[]} referencedBy  selectors of elements whose aria-describedby/aria-errormessage points here
  * @property {boolean}  focusMovedInto focus moved into this element (or its ancestor) during this step
  * @property {number}   repeatCount   times this element changed with NO user input (noise signal)
+ * @property {Rect=}    rect          viewport box of the changed element (viewer draws it)
  */
 
 /**
@@ -56,6 +62,7 @@ export const INTERACTIVE_ROLES = [
  * @property {string=}  text    for type
  * @property {string}   reason  planner's rationale (shown in the viewer's left column)
  * @property {boolean=} probe   inserted by the runner (e.g. Escape after a Tab cycle), not by the planner
+ * @property {boolean=} plannerError  stuck because the planner failed or kept producing invalid actions
  */
 
 /**
@@ -73,7 +80,10 @@ export const INTERACTIVE_ROLES = [
  * @property {string|null} pageText  AX-tree text snapshot (headings/landmarks/static text), only when pageLoad; truncated
  * @property {boolean}  modalOpen
  * @property {boolean|null} focusVisible  null = not checked
- * @property {string|null} screenshot relative path inside the run dir
+ * @property {string|null} screenshot relative path inside the run dir; null if the screenshot failed
+ * @property {boolean=} loadTimeout  a navigation started but 'load' did not fire in time; observed anyway
+ * @property {{selector:string, barrierId:string|null, text:string}[]=} unreachableClickables
+ *                                   only on a 'stuck' step: visible clickables keyboard can never reach (D6)
  */
 
 /**
