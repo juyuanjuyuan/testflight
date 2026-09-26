@@ -10,6 +10,7 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 
 ## Read first
 - `docs/plans/README.md` — ordered plan list, dependencies, deadlines.
+- `docs/CODING_STANDARDS.md` — code rules (layering, validation, no silent catch, root-anchored paths, tests, commits). Follow it for every change.
 - `docs/ARCHITECTURE.md` — module map, frozen contracts, detector rules, milestones.
 - `src/contracts.mjs` — the ONLY interface between modules. Do not change a field without telling the team;
   if you must, update `fixtures/`, `docs/ARCHITECTURE.md` §3 and make `npm test` pass.
@@ -26,6 +27,10 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 5. **Secrets**: keys only in `.env` (gitignored). Never print keys in logs.
 6. ESM JavaScript, Node ≥ 20. Allowed deps: playwright, axe-core, openai, dotenv, yaml. Ask before adding others.
 7. Keep `main` green: run `npm test` before pushing. Judges read `main` at 14:00 Sunday.
+8. No silent failures: every `catch` rethrows or records the degradation in the output (see CODING_STANDARDS §3).
+9. Library code under `src/` never uses `console.*` and never uses `process.cwd()`; use a `log` callback and `src/paths.mjs`.
+10. Every bug fix starts with a failing regression test.
+11. Do NOT follow `docs/process-template/` (archived enterprise process: no ADRs, changelogs, work-package docs).
 
 ## Handy commands
 ```bash

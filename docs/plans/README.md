@@ -5,8 +5,8 @@
 ## 怎么用
 
 1. 领取：在下表里找第一个"依赖已完成"且未勾选的计划，在群里说一声"我做 NN"。
-2. 交给 Claude Code：`读 docs/plans/NN-xxx.md 并执行。只改计划里"可以改"列出的文件。每一步做完跑验收命令。`
-3. 完成：验收全部通过后，在本表勾选，与代码放在同一个 commit 里，然后 push。
+2. 交给 Claude Code：`读 docs/plans/NN-xxx.md 和 docs/CODING_STANDARDS.md 并执行。只改计划里"可以改"列出的文件。每一步做完跑验收命令。`
+3. 完成：验收全部通过，并对照 `docs/CODING_STANDARDS.md` 自查后，在本表勾选，与代码放在同一个 commit 里，然后 push。
 4. 卡住或需要改计划：直接改对应的 plan 文件并 commit，别只在聊天里说。
 
 所有计划都要遵守 `AGENTS.md` 的硬规则（尤其是信息隔离），并保证 `npm test` 通过；动了 `src/runner/` 还要跑 `npm run smoke`（01 完成后才有）。

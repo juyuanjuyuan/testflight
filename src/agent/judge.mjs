@@ -38,7 +38,7 @@ function outcomeOf(trace) {
 }
 
 /** Labels candidates. Can never add a finding that no detector produced. */
-export async function judge({ goal, trace, candidates, enabled = true, stats }) {
+export async function judge({ goal, trace, candidates, enabled = true, stats = {}, log = () => {} }) {
   const withIds = (fs) => fs.map((f, n) => ({ ...f, id: `F${n + 1}`, candidateId: f.id }));
   if (!enabled || candidates.length === 0) return withIds(candidates.map((c) => toFinding(c)));
   const steps = {};
@@ -52,7 +52,8 @@ export async function judge({ goal, trace, candidates, enabled = true, stats }) 
         user: JSON.stringify({ goal, outcome: outcomeOf(trace), candidates: batch, steps }) });
       verdicts = Array.isArray(data?.verdicts) ? data.verdicts : [];
     } catch (e) {
-      console.warn(`[judge] failed, using defaults: ${e.message}`);
+      stats.judgeErrors = [...(stats.judgeErrors || []), e.message]; // findings keep judged:false
+      log(`[judge] failed, using defaults: ${e.message}`);
     }
     const byId = new Map(verdicts.map((v) => [v.id, v]));
     for (const c of batch) findings.push(toFinding(c, byId.get(c.id) || null));

@@ -6,7 +6,7 @@ const val = (p) => (p && p.value != null ? String(p.value) : '');
 export async function focusInfo(page, cdp) {
   const dom = await page.evaluate(() => window.__a11yRec?.describeActive() ?? null);
   if (!dom || dom.isBody) return { role: 'body', name: '', description: '', selector: 'body', barrierId: null, isBody: true, inModal: false, rect: null };
-  let role = '', name = '', description = '';
+  let role = '', name = '', description = '', axError;
   try {
     const { result } = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement', objectGroup: 'a11y-focus' });
     const { node } = await cdp.send('DOM.describeNode', { objectId: result.objectId });
@@ -16,8 +16,9 @@ export async function focusInfo(page, cdp) {
     await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'a11y-focus' });
   } catch (e) {
     role = 'unknown';
+    axError = e.message; // kept in the trace so a bad run is diagnosable
   }
-  return { role, name, description, ...dom };
+  return { role, name, description, ...dom, ...(axError ? { axError } : {}) };
 }
 
 const PAGE_ROLES = new Set(['heading', 'link', 'button', 'textbox', 'searchbox', 'combobox', 'checkbox', 'radio', 'img',

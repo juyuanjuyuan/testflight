@@ -2,7 +2,7 @@
 // Guard: an edit may add text (aria-label="Add to cart") but may not remove any visible text or string literal,
 // so the fixer cannot "fix" an unannounced error by deleting the error message.
 import fs from 'node:fs';
-import path from 'node:path';
+import { insideDir } from '../paths.mjs';
 
 export function textTokens(src) {
   const toks = [];
@@ -22,10 +22,13 @@ export function checkEdit(e) {
 export function applyEdits(siteDir, edits) {
   const errors = [];
   let applied = 0;
-  const root = path.resolve(siteDir);
-  for (const e of edits || []) {
-    const file = path.resolve(root, e.file);
-    if (!file.startsWith(root + path.sep)) { errors.push(`${e.file}: outside site dir`); continue; }
+  if (!Array.isArray(edits)) return { applied: 0, errors: ['edits must be an array'] };
+  for (const e of edits) {
+    if (typeof e?.file !== 'string' || typeof e.old !== 'string' || typeof e.new !== 'string' || !e.old) {
+      errors.push(`invalid edit shape: ${JSON.stringify(e).slice(0, 120)}`); continue;
+    }
+    let file;
+    try { file = insideDir(siteDir, e.file); } catch { errors.push(`${e.file}: outside site dir`); continue; }
     if (!fs.existsSync(file)) { errors.push(`${e.file}: not found`); continue; }
     const src = fs.readFileSync(file, 'utf8');
     const count = src.split(e.old).length - 1;

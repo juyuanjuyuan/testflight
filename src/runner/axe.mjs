@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const AXE_PATH = require.resolve('axe-core/axe.min.js');
 
-/** Run axe-core on the current page state. Returns [] on CSP/injection failure (real sites). */
+/** Run axe-core on the current page state. @returns {Promise<{violations:object[]}|{error:string}>} */
 export async function runAxe(page) {
   try {
     if (!(await page.evaluate(() => !!window.axe))) await page.addScriptTag({ path: AXE_PATH });
@@ -11,16 +11,19 @@ export async function runAxe(page) {
       return r.violations.map((v) => ({ id: v.id, impact: v.impact, tags: v.tags, help: v.help,
         nodes: v.nodes.map((n) => ({ target: n.target.map(String) })) }));
     });
-    return res;
+    return { violations: res };
   } catch (e) {
-    return [];
+    // e.g. CSP on real sites. Reported as unavailable, never as "0 violations".
+    return { error: e.message.split('\n')[0] };
   }
 }
 
-/** Merge violations across page states by rule id + target. */
+/** Merge violations across page states by rule id + target. Any failed state makes the whole result unavailable. */
 export function mergeAxe(runs) {
+  const failed = runs.find((r) => r.error);
+  if (failed) return { violations: [], error: failed.error };
   const byKey = new Map();
-  for (const v of runs.flat()) {
+  for (const v of runs.flatMap((r) => r.violations)) {
     for (const n of v.nodes) {
       const k = `${v.id}|${n.target.join(' ')}`;
       if (!byKey.has(k)) byKey.set(k, { ...v, nodes: [n] });

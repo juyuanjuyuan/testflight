@@ -5,8 +5,8 @@ import OpenAI from 'openai';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { CACHE_DIR } from '../paths.mjs';
 
-const CACHE_DIR = path.resolve('.cache/llm');
 const TIMEOUTS = { planner: 20_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
 
 function routes() {
@@ -33,7 +33,7 @@ function client(role) {
 
 export function parseJSON(text) {
   const t = String(text ?? '').replace(/```(?:json)?/gi, '').trim();
-  try { return JSON.parse(t); } catch {}
+  try { return JSON.parse(t); } catch { /* fall through: model wrapped JSON in prose */ }
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
   throw new Error('no JSON object in model output');

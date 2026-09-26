@@ -22,7 +22,7 @@ function relevantFiles(files, finding) {
  * Fix every block finding on a COPY of the site. Original stays untouched so the demo can be repeated.
  * @returns {Promise<{finding:string, applied:number, errors:string[], rationale?:string}[]>}
  */
-export async function fixSite({ findings, originalDir, patchedDir, stats }) {
+export async function fixSite({ findings, originalDir, patchedDir, stats = {} }) {
   fs.rmSync(patchedDir, { recursive: true, force: true });
   fs.cpSync(originalDir, patchedDir, { recursive: true });
   const results = [];

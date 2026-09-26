@@ -7,6 +7,7 @@ import { NOISE_REPEAT } from '../contracts.mjs';
 /** report.json is the ONLY file the viewer reads. */
 export function buildReport({ meta, trace, findings, axe = null, rerun = null, fixes = null, stats = null }) {
   const isWcag = (v) => (v.tags || []).some((t) => /^wcag\d/.test(t));
+  const axeOk = axe && !axe.error;
   const axeSelectors = new Set((axe?.violations || []).flatMap((v) => v.nodes.map((n) => n.target.join(' '))));
   for (const f of findings) f.axeAlsoFound = axeSelectors.has(f.evidence.selector);
   const shown = findings.filter((f) => f.impact !== 'none');
@@ -18,8 +19,8 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
       block: shown.filter((f) => f.impact === 'block').length,
       degrade: shown.filter((f) => f.impact === 'degrade').length,
       filteredOut: findings.length - shown.length,
-      axeViolations: axe ? axe.violations.filter(isWcag).length : null,          // WCAG rules only (the fair comparison)
-      axeBestPractice: axe ? axe.violations.filter((v) => !isWcag(v)).length : null,
+      axeViolations: axeOk ? axe.violations.filter(isWcag).length : null,        // WCAG rules only; null = axe unavailable
+      axeBestPractice: axeOk ? axe.violations.filter((v) => !isWcag(v)).length : null,
     },
     timeline: trace.map((s) => ({
       i: s.i, action: s.action, url: s.url, focus: describeFocus(s.focusAfter), focusRect: s.focusAfter.rect ?? null,
@@ -29,7 +30,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
       screenshot: s.screenshot, findingIds: shown.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
     })),
     findings: shown.sort((a, b) => order[a.impact] - order[b.impact]),
-    axe: axe ? { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) } : null,
+    axe: !axe ? null : axe.error ? { error: axe.error } : { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) },
     fixes, rerun, stats,
   };
 }
@@ -40,7 +41,7 @@ export function reportMarkdown(r) {
     `## Task audit: ${r.meta.goal}`,
     `- Screen-reader user can complete: **${yn(r.verdicts.screenReaderUserCanComplete)}**`,
     `- Structure-only AI agent can complete: **${yn(r.verdicts.agentCanComplete)}** (outcome: ${r.verdicts.outcome})`,
-    `- Blocking: ${r.counts.block} · Degrading: ${r.counts.degrade}` + (r.counts.axeViolations != null ? ` · axe WCAG violations: ${r.counts.axeViolations} (+${r.counts.axeBestPractice} best-practice)` : ''),
+    `- Blocking: ${r.counts.block} · Degrading: ${r.counts.degrade}` + (r.counts.axeViolations != null ? ` · axe WCAG violations: ${r.counts.axeViolations} (+${r.counts.axeBestPractice} best-practice)` : r.axe?.error ? ` · axe unavailable: ${r.axe.error}` : ''),
     '', '| id | impact | detector | WCAG | summary |', '|---|---|---|---|---|',
     ...r.findings.map((f) => `| ${f.id} | ${f.impact} | ${f.detector} | ${f.wcag.join(', ')} | ${f.summary.replace(/\|/g, '\\|')} |`),
   ];

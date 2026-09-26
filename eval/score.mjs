@@ -8,6 +8,7 @@ function normalize(runDir, tool) {
   if (tool === 'axe') {
     // axe gives selectors only; barrier ids come from the runner-side lookup file if present
     const axe = JSON.parse(fs.readFileSync(path.join(runDir, 'axe.json'), 'utf8'));
+    if (axe.error) throw new Error(`axe was unavailable in ${runDir}: ${axe.error}`);
     return axe.violations.filter((v) => v.tags.some((t) => /^wcag\d/.test(t))).flatMap((v) => v.nodes.map((n) => ({ barrierId: n.barrierId ?? null, selector: n.target.join(' '), wcag: v.tags.filter((t) => /^wcag\d{3,4}$/.test(t)).map((t) => t.slice(4).split('').join('.')) })));
   }
   const findings = JSON.parse(fs.readFileSync(path.join(runDir, 'findings.json'), 'utf8'));

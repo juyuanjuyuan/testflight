@@ -29,18 +29,18 @@ const USAGE = `usage:
   node cli.mjs score  --run <runDir> --groundtruth eval/groundtruth/shop.yaml [--tool ours|axe]`;
 
 async function main() {
-  const out = args.out || 'runs';
+  const out = args.out || undefined; // default: <repo>/runs
   if (cmd === 'audit') {
     const script = args.script ? readJSON(args.script) : null;
     const { runDir, report } = await audit({ url: need('url'), goal: need('goal'), out, script, mode: args.mode, cdp: args.cdp,
-      judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label });
+      judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label, log: console.log });
     summary(report); console.log(`→ ${runDir}/report.json`);
     if (args['fail-on'] === 'block' && report.counts.block > 0) process.exit(1);
   } else if (cmd === 'replay') {
     const trace = readTrace(fs.readFileSync(need('trace'), 'utf8'));
     const runDir = newRunDir(out, 'replay');
     fs.copyFileSync(args.trace, path.join(runDir, 'trace.jsonl'));
-    const { report } = await analyze({ trace, goal: need('goal'), meta: { replayOf: args.trace }, runDir, judgeEnabled: !args['no-judge'] });
+    const { report } = await analyze({ trace, goal: need('goal'), meta: { replayOf: args.trace }, runDir, judgeEnabled: !args['no-judge'], log: console.error });
     summary(report); console.log(`→ ${runDir}/report.json`);
   } else if (cmd === 'fix') {
     const runDir = need('run');
@@ -57,7 +57,7 @@ async function main() {
     const runDir = need('run');
     const meta = readJSON(path.join(runDir, 'meta.json'));
     const url = args.url || meta.url.replace('/original/', '/patched/');
-    const after = await audit({ url, goal: meta.goal, out, label: 'rerun', judgeEnabled: !args['no-judge'] });
+    const after = await audit({ url, goal: meta.goal, out, label: 'rerun', judgeEnabled: !args['no-judge'], log: console.log });
     const before = readJSON(path.join(runDir, 'report.json'));
     const cmp = compareRuns(before, after.report);
     before.rerun = { runDir: after.runDir, ...cmp };
@@ -71,4 +71,4 @@ async function main() {
     process.exit(cmd ? 2 : 0);
   }
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(process.env.DEBUG ? e : `error: ${e.message.split('\n')[0]}` + ' (DEBUG=1 for details)'); process.exit(1); });
