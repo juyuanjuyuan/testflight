@@ -5,14 +5,13 @@ import { chromium } from 'playwright';
 import { focusInfo, pageText } from './observe.mjs';
 import { act } from './act.mjs';
 import { runAxe, mergeAxe } from './axe.mjs';
-import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS } from '../contracts.mjs';
+import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS } from '../contracts.mjs';
 
 const RECORDER = fs.readFileSync(new URL('./recorder.js', import.meta.url), 'utf8');
 /** Thresholds the in-page recorder needs; injected as window.__A11Y_CONFIG before recorder.js runs. */
 export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS };
 const CONFIG_SCRIPT = `window.__A11Y_CONFIG = ${JSON.stringify(RECORDER_CONFIG)};`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const LOAD_TIMEOUT_MS = 10_000;
 
 /** Enable the CDP accessibility domain; without it every focus read is wrong, so fail loudly. */
 export async function enableAX(cdp) {
