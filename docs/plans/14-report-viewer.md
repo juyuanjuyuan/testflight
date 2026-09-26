@@ -33,12 +33,12 @@ npm run serve   # sites/ 加上只读的 /viewer、/runs、/fixtures，端口 80
 
 完成于 2026-09-26。`viewer/index.html` 单文件、无外部请求；← → / j k 切换步骤，`#step=N` 可直接定位某一步。
 
-**截图：** `viewer/screenshots/original-step7.png`（不能完成、step 7 听到 (nothing)）、`fixed-step4.png`（能完成、画出 focus/seen 框）、`sample-fix-rerun.png`（fix diff + rerun + axe unavailable）。
+**截图：** `viewer/screenshots/original-step2.png`（不能完成、step 2 听到 (nothing)、截图上有 focus/seen 框）、`fixed-step4.png`（能完成、画出 focus/seen 框）、`sample-fix-rerun.png`（fix diff + rerun + axe unavailable）。
 
 **手写测试数据：** `viewer/sample/report.json`（`meta.note` 标明是手写的），覆盖 `fix.edits`、`rerun`、`fixes[].errors`、`axeViolations: null`、`screenshot: null`、`userImpact`。打开：http://localhost:8080/viewer/?run=/viewer/sample/。
 
 **report / fixture 的缺口（交给对应计划，本计划没改 `src/`）：**
-1. `fixtures/testpage-original/report.json` 是旧版 build 生成的：`seen` 是字符串数组、没有 `focusRect`，所以 original 的截图上画不出框（fixed 的 fixture 是新格式，能画）。当前 `build.mjs` 输出是对的（replay 验证过）。需要重新跑 `node cli.mjs audit --url http://localhost:8080/testpage/original/ ... --no-judge` 并把 report.json + shots 覆盖到 fixture（replay 不行：会丢掉 axe 结果）。viewer 两种格式都兼容。
+1. ~~`fixtures/testpage-original/report.json` 是旧版 build 生成的：`seen` 是字符串数组、没有 `focusRect`，所以 original 的截图上画不出框（fixed 的 fixture 是新格式，能画）。当前 `build.mjs` 输出是对的（replay 验证过）。需要重新跑 `node cli.mjs audit --url http://localhost:8080/testpage/original/ ... --no-judge` 并把 report.json + shots 覆盖到 fixture（replay 不行：会丢掉 axe 结果）。viewer 两种格式都兼容。~~ 已解决（2026-09-26）：用当前代码按 `eval/keys.testpage.json` 重跑并覆盖了 fixture，smoke 4/4、0 误报。
 2. `viewer/README.md` 原来写 “`rerun.status` → passes after fix”，但 `rerun.status` 是逐条 finding 的数组；整体结论在 `rerun.after.screenReaderUserCanComplete` / `rerun.closedLoop`。viewer 按后者显示，README 已改。
 3. `seen[].rect` / `focusRect` 是 1280×800 视口坐标；viewer 按截图原始尺寸缩放。如果以后截整页（fullPage）或 DPR≠1，框会错位，需要在 report 里带上截图的视口尺寸和滚动位置。
 4. `userImpact` 在 judge 关闭时是空字符串，viewer 直接隐藏；demo 若想显示用户影响，需要开 judge 跑。
