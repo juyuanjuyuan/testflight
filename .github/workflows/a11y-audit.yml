@@ -18,7 +18,7 @@ jobs:
       - name: Audit checkout flow (fails the check on any blocking barrier)
         run: |
           node cli.mjs audit --url http://localhost:8080/testpage/fixed/ --goal "Buy the canvas tote bag" \
-            --script eval/keys.testpage.json --no-judge --label ci --fail-on block
+            --script eval/keys.testpage.fixed.json --no-judge --label ci --fail-on block
       - name: Report in job summary
         if: always()
         run: cat runs/*/report.md >> "$GITHUB_STEP_SUMMARY"

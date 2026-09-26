@@ -15,8 +15,8 @@
 2. **拆出 fix/rerun**：把 `cli.mjs` 里 `fix` 和 `rerun` 两个分支的逻辑原样移到 `src/fix/commands.mjs`，导出 `runFix(args)` 和 `runRerun(args)`；`cli.mjs` 只负责解析参数和转发。**行为不变**，这一步只是为了让修复相关的改动有自己的文件。
 3. **`npm run smoke`**：新建 `scripts/smoke.mjs`，依次：
    - 在子进程里启动 `scripts/serve.mjs`（端口可用 `PORT` 环境变量指定，默认 8080），等它能访问；
-   - 分别对 `testpage/original` 和 `testpage/fixed` 跑 `audit --script eval/keys.testpage.json --no-judge`（直接 import `audit()`，不要再起 CLI 进程）；
-   - 用 `eval/score.mjs` 的 `scoreRun` 断言：original 对 `eval/groundtruth/testpage.yaml` 检出 4/4、0 误报；fixed 对 `testpage-fixed.yaml` 0 误报；
+   - 用 `audit --no-judge` 跑 `testpage/original`（`--script eval/keys.testpage.json`）和 `testpage/fixed`（`--script eval/keys.testpage.fixed.json`，用 16 位卡号完成购买）。直接 import `audit()`，不要再起 CLI 进程；
+   - 用 `eval/score.mjs` 的 `scoreRun` 断言：original 对 `eval/groundtruth/testpage.yaml` 检出 4/4、0 误报；fixed 对 `testpage-fixed.yaml` 0 误报，并且 `report.verdicts.screenReaderUserCanComplete === true`；
    - 无论成功失败都关掉服务器；失败时退出码非 0，并打印哪一条没过。
    - `package.json` 加 `"smoke": "node scripts/smoke.mjs"`。
 

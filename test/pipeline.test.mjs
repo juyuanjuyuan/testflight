@@ -68,3 +68,8 @@ test('parseJSON tolerates fences and chatter', () => {
   assert.deepEqual(parseJSON('```json\n{"kind":"press","key":"Tab","reason":"x"}\n```'), { kind: 'press', key: 'Tab', reason: 'x' });
   assert.deepEqual(parseJSON('Sure! {"a":1} hope that helps'), { a: 1 });
 });
+
+test('fixed page: a screen-reader user can complete the purchase', async () => {
+  const findings = await judge({ goal: 'buy', trace: fixed, candidates: runDetectors(fixed), enabled: false });
+  assert.equal(computeVerdicts(fixed, findings).screenReaderUserCanComplete, true);
+});
