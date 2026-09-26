@@ -39,6 +39,14 @@ test('INFORMATION BARRIER: planner never sees an unannounced error', () => {
   assert.ok(JSON.stringify(buildObservation('buy', fixed.slice(0, kf + 1))).includes('Card number is invalid'), 'announced text must reach planner');
 });
 
+test('planner hears the text it already typed into the focused field (type appends)', () => {
+  // A screen reader reads a textbox's value on focus; without it the planner retyped and doubled the card number.
+  assert.equal(buildObservation('buy', fixed.slice(0, 6)).focusValue, '4242 4242'); // after step 5
+  assert.equal(buildObservation('buy', fixed.slice(0, 7)).focusValue, null);        // focus on Pay
+  assert.equal(buildObservation('buy', fixed.slice(0, 14)).focusValue, '4242 4242'); // back in the field
+  assert.equal(buildObservation('buy', fixed.slice(0, 15)).focusValue, '4242 4242 4242 4242');
+});
+
 test('trap: Escape that leaves the cycle is not a trap', () => {
   assert.equal(runDetectors(fixed).filter((c) => c.detector === 'trap').length, 0);
   const t = runDetectors(original).find((c) => c.detector === 'trap');

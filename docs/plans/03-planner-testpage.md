@@ -6,7 +6,7 @@
 
 **先读：** `AGENTS.md`（信息隔离）、`docs/ARCHITECTURE.md` §4、`src/agent/observation.mjs`、`src/agent/planner.mjs`、`src/agent/prompts/planner.md`、`src/audit.mjs`、`sites/testpage/*/index.html`
 
-**可以改：** `src/agent/planner.mjs`、`src/agent/prompts/planner.md`、`src/agent/observation.mjs`（不能破坏信息隔离测试）
+**可以改：** `src/agent/planner.mjs`、`src/agent/prompts/planner.md`、`src/agent/observation.mjs`（不能破坏信息隔离测试）、`test/pipeline.test.mjs`（执行时补充：CODING_STANDARDS §6 要求修 bug 先加回归测试）
 **不要改：** `src/contracts.mjs`、`src/runner/**`、`src/detect/**`
 
 ## 步骤
@@ -38,4 +38,22 @@
 
 ## 结果
 
-（完成后填写：每个版本的成功次数、平均步数、平均耗时）
+2026-09-26，DeepSeek 做 planner，`--no-judge`，`LLM_CACHE=off`，goal 为步骤 1 中的命令。耗时是整条命令的墙钟时间（含浏览器启动、axe）。
+
+| 版本 | 次 | outcome | SR 用户能完成 | 步数 | 耗时 | LLM 调用 / 用时 |
+|---|---|---|---|---|---|---|
+| fixed | 1 | done | true | 8 | 18 s | 8 / 9.6 s |
+| fixed | 2 | done | true | 8 | 16 s | 8 / 8.5 s |
+| fixed | 3 | done | true | 8 | 80 s | 8 / 9.9 s |
+| original | 1 | stuck | false | 11 | 26 s | 11 / 16.2 s |
+| original | 2 | stuck | false | 10 | 25 s | 10 / 15.5 s |
+| original | 3 | stuck | false | 10 | 24 s | 10 / 15.7 s |
+
+- **fixed：** 3/3 次 done，平均 8 步，平均 38 s（不算第 3 次约 17 s）。第 3 次 LLM 用时正常，多出的约 60 s 在 LLM 之外（浏览器启动或关闭），没有复现，先记在这里。
+- **original：** 3/3 次 `screenReaderUserCanComplete: false`，平均 10.3 步，约 25 s。3 次都靠猜按了 🛒（符合预期），然后 Checkout → 输入卡号 → Pay。Pay 后焦点落到 body，"Order confirmed"没有播报，于是报 stuck，理由是"按了 Pay 但没听到确认"。
+- 注意：`--no-judge` 下 block 数是 0，original 的 false 来自 outcome=stuck，不是 block finding。
+
+改了什么（都是通用规则，不含 testpage 元素名）：
+1. **bug：** `type` 是追加输入（`keyboard.type`），planner 又听不到输入框里已有的内容，所以把卡号输了两遍，结果卡号无效，fixed 上失败。修复：`buildObservation` 新增 `focusValue`，内容是 planner 自己此前在当前焦点字段里输入的文字（从它自己的 action 推出，不读 `changes`，对应读屏在聚焦时读出的值）。先加了回归测试。prompt 说明 type 会追加，每个值只输一次。
+2. original 最初在 🛒 没反馈后就报 stuck，到不了付款。改为：中间步骤同一控件最多按两次，之后继续往下走。
+3. original 在 Pay 后焦点落到 body，又从头重做了一遍流程，把 25 步用完。改为：完成目标的最后一步没听到确认，直接报 stuck，不回头重做之前的步骤。
