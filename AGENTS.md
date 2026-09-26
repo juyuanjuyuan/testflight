@@ -3,7 +3,13 @@
 This is a 26-hour hackathon project. Ship working vertical slices; no ADRs, changelogs, or phase gates.
 (The generic enterprise process spec that used to live here is in `docs/process-template/` for later.)
 
+## Work from plans
+Remaining work is split into `docs/plans/NN-*.md`. When asked to execute a plan: read it fully, read its "先读" list,
+change ONLY the files under "可以改", run its acceptance commands, then tick it in `docs/plans/README.md` in the same commit.
+If the plan is wrong or blocked, edit the plan file and say so instead of improvising outside its scope.
+
 ## Read first
+- `docs/plans/README.md` — ordered plan list, dependencies, deadlines.
 - `docs/ARCHITECTURE.md` — module map, frozen contracts, detector rules, milestones.
 - `src/contracts.mjs` — the ONLY interface between modules. Do not change a field without telling the team;
   if you must, update `fixtures/`, `docs/ARCHITECTURE.md` §3 and make `npm test` pass.

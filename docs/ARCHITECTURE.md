@@ -114,6 +114,8 @@ score  --run <runDir> --groundtruth … [--tool ours|axe]
 
 ## 11. 里程碑（修订）
 
+具体任务、依赖和验收标准见 `docs/plans/README.md`，以那里为准。
+
 | 时间 | 集成点 |
 |---|---|
 | 周六 16:00 | 合并本骨架，所有人在 `fixtures/` 上并行开发 |
