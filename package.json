@@ -9,7 +9,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "node scripts/serve.mjs",
-    "replay:fixture": "node cli.mjs replay --trace fixtures/trace.sample.jsonl --goal \"Buy a canvas tote bag\" --no-judge --out runs/"
+    "replay:fixture": "node cli.mjs replay --trace fixtures/testpage-original/trace.jsonl --goal \"Buy the canvas tote bag\" --no-judge"
   },
   "dependencies": {
     "axe-core": "^4.13.0",

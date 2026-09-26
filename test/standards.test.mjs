@@ -63,3 +63,13 @@ test('recorder thresholds come from contracts.mjs, not literals in the page scri
   assert.match(src, /__A11Y_CONFIG/);
   assert.deepEqual(RECORDER_CONFIG, { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS });
 });
+
+test('package.json scripts only reference files that exist', () => {
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  for (const [name, cmd] of Object.entries(scripts)) {
+    for (const ref of cmd.match(/\b(?:fixtures|eval|scripts|test)\/[\w./-]+\.\w+/g) || []) {
+      if (ref.includes('*')) continue;
+      assert.ok(fs.existsSync(path.join(ROOT, ref)), `npm run ${name}: ${ref} does not exist`);
+    }
+  }
+});
