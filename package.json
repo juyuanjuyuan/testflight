@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "node scripts/serve.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "replay:fixture": "node cli.mjs replay --trace fixtures/testpage-original/trace.jsonl --goal \"Buy the canvas tote bag\" --no-judge"
   },
   "dependencies": {

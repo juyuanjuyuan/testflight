@@ -1,0 +1,59 @@
+// End-to-end smoke test with a real browser, no LLM: serve sites/, audit testpage original + fixed, score both.
+// Uses its own port (default 8090, override with PORT) so it doesn't collide with a dev `npm run serve` on 8080.
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { audit } from '../src/audit.mjs';
+import { ROOT } from '../src/paths.mjs';
+import { scoreRun } from '../eval/score.mjs';
+
+const port = Number(process.env.PORT || 8090);
+const SERVER_READY_MS = 10_000;
+const GOAL = 'Buy the canvas tote bag';
+const readJSON = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+
+// Resolve only on the server's own "serving" line: polling the URL could hit some other process already on the port.
+function startServer() {
+  const child = spawn(process.execPath, [path.join(ROOT, 'scripts/serve.mjs')], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', (d) => { stderr += d; });
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`server did not start on port ${port} within ${SERVER_READY_MS}ms`)), SERVER_READY_MS);
+    child.stdout.on('data', (d) => { if (String(d).includes('serving sites/')) { clearTimeout(timer); resolve(); } });
+    child.on('exit', (code) => { clearTimeout(timer); reject(new Error(`server exited (code ${code}) before listening on port ${port}: ${stderr.split('\n').find((l) => /Error/.test(l)) || stderr.trim().split('\n').pop() || 'no output'}`)); });
+  });
+  return { child, ready };
+}
+
+const CASES = [
+  { name: 'testpage/original', script: 'eval/keys.testpage.json', groundtruth: 'eval/groundtruth/testpage.yaml',
+    check: (s) => [s.hits === s.planted && s.planted === 4 || `detected ${s.hits}/${s.planted}, expected 4/4 (missed: ${s.misses.join(' ')})`,
+      s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`] },
+  { name: 'testpage/fixed', script: 'eval/keys.testpage.fixed.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
+    check: (s, r) => [s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`,
+      r.verdicts.screenReaderUserCanComplete === true || `screenReaderUserCanComplete is ${r.verdicts.screenReaderUserCanComplete}, expected true`] },
+];
+
+async function runCase(c) {
+  const { runDir, report } = await audit({ url: `http://localhost:${port}/${c.name}/`, goal: GOAL, script: readJSON(c.script),
+    judgeEnabled: false, site: `sites/${c.name}`, label: `smoke-${c.name.replace('/', '-')}` });
+  const score = scoreRun({ runDir, groundtruth: path.join(ROOT, c.groundtruth) });
+  const failures = c.check(score, report).filter((x) => x !== true);
+  console.log(`${failures.length ? 'FAIL' : 'ok  '} ${c.name}: detected ${score.hits}/${score.planted} · false positives ${score.falsePositives} · SR user can complete ${report.verdicts.screenReaderUserCanComplete} · ${path.relative(ROOT, runDir)}`);
+  for (const f of failures) console.log(`       ✗ ${f}`);
+  return failures.length === 0;
+}
+
+const server = startServer();
+let passed = false;
+try {
+  await server.ready;
+  const results = [];
+  for (const c of CASES) results.push(await runCase(c));
+  passed = results.every(Boolean);
+} catch (e) {
+  console.error(process.env.DEBUG ? e : `smoke error: ${e.message.split('\n')[0]} (DEBUG=1 for details)`);
+} finally {
+  server.child.kill();
+}
+process.exit(passed ? 0 : 1);
