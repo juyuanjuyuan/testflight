@@ -8,6 +8,10 @@ Layout (the demo's main frame):
 - Left: `timeline[].action` (key + `reason` = the planner's thinking), step list, red if `findingIds` non-empty.
 - Middle **what the screen showed**: `timeline[].screenshot`, draw boxes from `seen[].rect` and `focusRect`.
 - Right **what assistive tech conveyed**: `timeline[].focus` + `timeline[].heard` — show "(nothing)" when empty.
-- Bottom: `findings[]` (block first) with WCAG, `userImpact`, and `fix.edits` as a diff; `rerun.status` → "passes after fix".
+- Bottom: `findings[]` (block first) with WCAG, `userImpact`, and `fix.edits` as a diff; per-finding `rerun.status[]` → resolved/persists,
+  overall `rerun.after.screenReaderUserCanComplete` → "passes after fix".
 
 Serve it from the repo root so relative paths work, e.g. `viewer/index.html?run=../fixtures/testpage-original/`.
+
+Keys: ← → (or j k) step through the timeline; `#step=N` in the URL opens a given step.
+`sample/report.json` is hand-written test data (fix diff, rerun, axe unavailable, missing screenshot): `viewer/index.html?run=sample/`.

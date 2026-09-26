@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testflight report</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #fff; --ink: #16181d; --muted: #5d6470; --line: #dde1e7;
+  --bad: #c62828; --bad-bg: #fdecec; --warn: #b26a00; --warn-bg: #fff4e0;
+  --ok: #1b7f3b; --ok-bg: #e7f6ec; --focus: #1565c0; --seen: #e08a00; --sel: #e8f0fe;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317; --panel: #1a1d23; --ink: #e8eaee; --muted: #9aa2ae; --line: #2c313a;
+    --bad: #ff6b6b; --bad-bg: #3a1c1f; --warn: #ffb74d; --warn-bg: #3a2c14; --ok: #5fd08a; --ok-bg: #15301f;
+    --focus: #64a8ff; --seen: #ffb74d; --sel: #1f2a3d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: .92em; }
+.wrap { max-width: 1680px; margin: 0 auto; padding: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.muted { color: var(--muted); }
+.error { padding: 24px; border-left: 4px solid var(--bad); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 18px; margin-bottom: 14px; }
+header.top h1 { font-size: 20px; margin: 0; flex: 1 1 320px; }
+header.top h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.verdict { display: flex; flex-direction: column; padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 17px; }
+.verdict small { font-size: 12px; font-weight: 400; opacity: .85; }
+.yes { background: var(--ok-bg); color: var(--ok); }
+.no { background: var(--bad-bg); color: var(--bad); }
+.stat { font-size: 14px; }
+.stat b { font-size: 20px; }
+
+main.cols { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; align-items: start; }
+.detail { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { main.cols, .detail { grid-template-columns: 1fr; } .steps { position: static; max-height: 40vh; } }
+.steps { max-height: calc(100vh - 150px); overflow: auto; padding: 6px; position: sticky; top: 12px; }
+.steps button { display: block; width: 100%; text-align: left; border: 0; border-left: 4px solid transparent; background: none; color: inherit;
+  font: inherit; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.steps button:hover { background: var(--bg); }
+.steps button[aria-current="step"] { background: var(--sel); }
+.steps button.has-finding { border-left-color: var(--warn); }
+.steps button.has-block { border-left-color: var(--bad); background: var(--bad-bg); }
+.steps button[aria-current="step"].has-block { outline: 2px solid var(--bad); }
+.steps .act { font-weight: 600; }
+.steps .why { display: block; font-size: 13px; color: var(--muted); }
+.steps .ids { float: right; font-size: 12px; color: var(--bad); font-weight: 600; }
+
+.stepbar { grid-column: 1 / -1; padding: 10px 16px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.stepbar .act { font-size: 18px; font-weight: 700; }
+.stepbar .why { color: var(--muted); font-style: italic; }
+.stepbar .nav { margin-left: auto; font-size: 12px; }
+.col { padding: 14px 16px; min-height: 300px; }
+.col h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.shot { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
+.shot img { display: block; width: 100%; height: auto; }
+.shot svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.placeholder { aspect-ratio: 1280 / 800; display: grid; place-items: center; color: var(--muted); border: 2px dashed var(--line); border-radius: 6px; }
+.legend { font-size: 12px; margin: 6px 0 10px; color: var(--muted); }
+.sw { display: inline-block; width: 10px; height: 10px; border: 2px solid; margin: 0 4px 0 10px; vertical-align: -1px; }
+.seen-list, .heard-list { list-style: none; margin: 0; padding: 0; }
+.seen-list li { padding: 6px 10px; margin-bottom: 6px; border-left: 4px solid var(--seen); background: var(--warn-bg); border-radius: 4px; font-size: 17px; }
+.focus-now { font-size: 20px; font-weight: 600; padding: 10px 12px; border: 2px solid var(--focus); border-radius: 6px; margin-bottom: 14px; }
+.heard-list li { padding: 8px 12px; margin-bottom: 8px; border-left: 4px solid var(--focus); background: var(--sel); border-radius: 4px; font-size: 20px; }
+.nothing { font-size: 22px; font-weight: 600; color: var(--bad); padding: 10px 12px; border: 2px dashed var(--bad); border-radius: 6px; }
+.noise { font-size: 12px; margin-top: 8px; }
+.step-findings { margin-top: 14px; }
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; margin-right: 4px; }
+.chip.block { background: var(--bad); color: #fff; }
+.chip.degrade { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.plain { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+
+section.bottom { margin-top: 14px; padding: 14px 18px; }
+section.bottom h2 { margin: 0 0 10px; font-size: 18px; }
+.finding { border-top: 1px solid var(--line); padding: 12px 0; }
+.finding h3 { margin: 0 0 4px; font-size: 16px; }
+.finding a { color: var(--focus); cursor: pointer; }
+.diff { margin: 8px 0 0; border: 1px solid var(--line); border-radius: 6px; overflow: auto; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+.diff .file { padding: 4px 10px; background: var(--bg); color: var(--muted); border-bottom: 1px solid var(--line); }
+.diff pre { margin: 0; padding: 2px 10px; white-space: pre-wrap; word-break: break-word; }
+.diff .del { background: var(--bad-bg); color: var(--bad); }
+.diff .add { background: var(--ok-bg); color: var(--ok); }
+.rerun { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-weight: 600; font-size: 17px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: .9em; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="muted">Loading report…</p></div>
+<script>
+'use strict';
+// Reads <run>/report.json (built by src/report/build.mjs) and renders it. No network beyond that file and its shots/.
+const app = document.getElementById('app');
+const state = { report: null, base: '', step: 0 };
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : String(kid));
+  return el;
+}
+const svg = (tag, attrs) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+};
+
+function showError(msg) {
+  app.replaceChildren(h('div', { class: 'panel error' }, h('h1', null, 'Cannot show report'), h('p', null, msg),
+    h('p', { class: 'muted' }, 'Usage: serve the repo root (e.g. ', h('code', null, 'python3 -m http.server 8090'),
+      ') and open ', h('code', null, 'viewer/index.html?run=../fixtures/testpage-original/'))));
+}
+
+function actionLabel(a) {
+  if (a.kind === 'press') return `⌨ ${a.key}`;
+  if (a.kind === 'type') return `⌨ type "${a.text}"`;
+  return { start: '▶ start', done: '✔ done', stuck: '✖ stuck' }[a.kind] || a.kind;
+}
+// report.seen items are {text, rect}; older reports stored plain strings.
+const seenItem = (s) => (typeof s === 'string' ? { text: s, rect: null } : s);
+
+function renderHeader(r) {
+  const { verdicts: v, counts: c } = r;
+  const verdict = (ok, label) => h('div', { class: `verdict ${ok ? 'yes' : 'no'}` }, h('small', null, label), ok ? '✔ can complete' : '✖ cannot complete');
+  const axe = c.axeViolations == null
+    ? h('span', { class: 'stat' }, 'axe: ', h('b', null, 'unavailable'), r.axe?.error ? h('span', { class: 'muted' }, ` (${r.axe.error})`) : null)
+    : h('span', { class: 'stat' }, 'axe: ', h('b', null, c.axeViolations), ' WCAG issues', h('span', { class: 'muted' }, ` (+${c.axeBestPractice} best-practice)`));
+  return h('header', { class: 'top panel' },
+    h('h1', null, `Goal: ${r.meta.goal}`, h('small', null, `${r.meta.url} · outcome: ${v.outcome}${r.meta.judge ? '' : ' · judge off'}`)),
+    verdict(v.screenReaderUserCanComplete, 'Screen-reader user'),
+    verdict(v.agentCanComplete, 'Structure-only AI agent'),
+    h('div', null, axe, h('br'), h('span', { class: 'stat' }, 'we: ', h('b', { style: c.block ? 'color:var(--bad)' : null }, c.block), ' blocking',
+      h('span', { class: 'muted' }, ` · ${c.degrade} degrading`))));
+}
+
+function renderSteps(r) {
+  const blockIds = new Set(r.findings.filter((f) => f.impact === 'block').map((f) => f.id));
+  return h('nav', { class: 'steps panel', 'aria-label': 'Steps' }, r.timeline.map((s, idx) => {
+    const cls = [s.findingIds.length && 'has-finding', s.findingIds.some((id) => blockIds.has(id)) && 'has-block'].filter(Boolean).join(' ');
+    return h('button', { class: cls, 'aria-current': idx === state.step ? 'step' : null, onclick: () => select(idx) },
+      s.findingIds.length ? h('span', { class: 'ids' }, s.findingIds.join(' ')) : null,
+      h('span', { class: 'act' }, `${s.i}. ${actionLabel(s.action)}`), h('span', { class: 'why' }, s.action.reason || ''));
+  }));
+}
+
+function renderShot(s) {
+  if (!s.screenshot) return h('div', { class: 'placeholder' }, 'no screenshot for this step');
+  const overlay = svg('svg', { preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+  const img = h('img', { src: state.base + s.screenshot, alt: `Screenshot after step ${s.i}` });
+  const box = (rect, color, dash) => overlay.append(svg('rect', { x: rect.x, y: rect.y, width: rect.w, height: rect.h, fill: 'none',
+    stroke: color, 'stroke-width': 4, 'stroke-dasharray': dash, rx: 3 }));
+  img.addEventListener('load', () => {
+    // rects are CSS px in the 1280x800 viewport; the viewBox maps them onto the scaled image
+    overlay.setAttribute('viewBox', `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
+    const css = getComputedStyle(document.documentElement);
+    for (const it of s.seen.map(seenItem)) if (it.rect) box(it.rect, css.getPropertyValue('--seen').trim(), '10 6');
+    if (s.focusRect) box(s.focusRect, css.getPropertyValue('--focus').trim(), '');
+  });
+  img.addEventListener('error', () => img.parentElement.replaceWith(h('div', { class: 'placeholder' }, `screenshot not found: ${s.screenshot}`)));
+  return h('div', { class: 'shot' }, img, overlay);
+}
+
+function renderStepFindings(r, s) {
+  const fs = r.findings.filter((f) => s.findingIds.includes(f.id));
+  if (!fs.length) return null;
+  return h('div', { class: 'step-findings' }, fs.map((f) =>
+    h('div', null, h('span', { class: `chip ${f.impact}` }, `${f.id} ${f.impact}`), ' ', f.summary)));
+}
+
+function renderDetail(r) {
+  const s = r.timeline[state.step];
+  const seen = s.seen.map(seenItem);
+  const bar = h('div', { class: 'stepbar panel' }, h('span', { class: 'act' }, `Step ${s.i}: ${actionLabel(s.action)}`),
+    h('span', { class: 'why' }, s.action.reason ? `“${s.action.reason}”` : ''),
+    h('span', { class: 'nav muted' }, h('kbd', null, '←'), ' ', h('kbd', null, '→'), ' step'));
+  const screen = h('section', { class: 'col panel' }, h('h2', null, 'What the screen showed'), renderShot(s),
+    h('div', { class: 'legend' }, h('span', { class: 'sw', style: 'border-color:var(--focus)' }), 'focus',
+      h('span', { class: 'sw', style: 'border-color:var(--seen);border-style:dashed' }), 'new text on screen'),
+    seen.length ? h('ul', { class: 'seen-list' }, seen.map((it) => h('li', null, it.text)))
+      : h('p', { class: 'muted' }, 'No new text appeared.'),
+    s.seenNoise?.length ? h('div', { class: 'noise muted' }, `Ignored as repeating noise: ${s.seenNoise.join(' · ')}`) : null);
+  const at = h('section', { class: 'col panel' }, h('h2', null, 'What assistive tech conveyed'),
+    h('div', { class: 'focus-now' }, h('span', { class: 'muted', style: 'font-size:13px;font-weight:400;display:block' }, 'Focus'), s.focus),
+    h('h2', null, 'Heard'),
+    s.heard.length ? h('ul', { class: 'heard-list' }, s.heard.map((t) => h('li', null, t))) : h('div', { class: 'nothing' }, '(nothing)'),
+    renderStepFindings(r, s));
+  return h('div', { class: 'detail' }, bar, screen, at);
+}
+
+function renderDiff(edits) {
+  return edits.map((e) => h('div', { class: 'diff' }, h('div', { class: 'file' }, e.file),
+    e.old.split('\n').map((l) => h('pre', { class: 'del' }, `- ${l}`)),
+    e.new.split('\n').map((l) => h('pre', { class: 'add' }, `+ ${l}`))));
+}
+
+function renderFindings(r) {
+  const rerunOf = new Map((r.rerun?.status || []).map((x) => [x.id, x.status]));
+  const items = r.findings.map((f) => {
+    const st = rerunOf.get(f.id) || f.rerunStatus;
+    return h('div', { class: 'finding' },
+      h('h3', null, h('span', { class: `chip ${f.impact}` }, f.impact), `${f.id} · ${f.summary}`),
+      h('div', null,
+        h('span', { class: 'chip plain' }, f.detector), f.wcag.map((w) => h('span', { class: 'chip plain' }, `WCAG ${w}`)),
+        f.axeAlsoFound ? h('span', { class: 'chip plain' }, 'axe also found') : h('span', { class: 'chip plain' }, 'axe missed'),
+        f.judged ? null : h('span', { class: 'chip plain' }, 'not judged'),
+        st ? h('span', { class: `chip ${st === 'resolved' ? 'ok' : 'block'}` }, `after fix: ${st}`) : null,
+        ' steps ', f.steps.map((i) => [h('a', { href: `#step=${i}`, onclick: (e) => { e.preventDefault(); jumpTo(i); } }, `#${i}`), ' '])),
+      f.userImpact ? h('p', null, h('b', null, 'User impact: '), f.userImpact) : null,
+      f.evidence?.selector ? h('div', { class: 'muted' }, 'Element: ', h('code', null, f.evidence.selector)) : null,
+      f.fix?.edits?.length ? [f.fix.rationale ? h('p', null, h('b', null, 'Fix: '), f.fix.rationale) : null, renderDiff(f.fix.edits)] : null);
+  });
+  return h('section', { class: 'bottom panel' }, h('h2', null, `Findings (${r.findings.length})`),
+    r.findings.length ? items : h('p', { class: 'muted' }, 'No findings.'));
+}
+
+function renderRerun(r) {
+  const rr = r.rerun;
+  if (!rr) return null;
+  const ok = rr.after?.screenReaderUserCanComplete;
+  return h('section', { class: 'bottom panel' }, h('h2', null, 'After fix'),
+    h('div', { class: `rerun ${ok ? 'yes' : 'no'}` }, ok ? '✔ passes after fix — screen-reader user can complete' : '✖ still fails after fix',
+      rr.closedLoop ? ' (loop closed: failed before, passes now)' : ''),
+    rr.introduced?.length ? h('p', { class: 'no' }, `New findings after fix: ${rr.introduced.map((x) => x.key).join(', ')}`) : null,
+    (r.fixes || []).filter((x) => x.errors?.length).map((x) => h('p', { class: 'no' }, `Fix for ${x.finding} had errors: ${x.errors.join('; ')}`)));
+}
+
+function render() {
+  const r = state.report;
+  app.replaceChildren(renderHeader(r), h('main', { class: 'cols' }, renderSteps(r), renderDetail(r)), renderFindings(r), renderRerun(r) || '');
+}
+
+function select(idx) {
+  if (idx < 0 || idx >= state.report.timeline.length) return;
+  state.step = idx;
+  history.replaceState(null, '', `#step=${state.report.timeline[idx].i}`);
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+  document.querySelector('.steps [aria-current="step"]')?.scrollIntoView({ block: 'nearest' });
+}
+
+function jumpTo(i) {
+  select(state.report.timeline.findIndex((s) => s.i === i));
+  document.querySelector('main.cols').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!state.report || e.altKey || e.ctrlKey || e.metaKey) return;
+  const d = { ArrowRight: 1, ArrowDown: 1, j: 1, ArrowLeft: -1, ArrowUp: -1, k: -1 }[e.key];
+  if (d) { e.preventDefault(); select(state.step + d); }
+});
+
+async function load() {
+  const run = new URLSearchParams(location.search).get('run');
+  if (!run) return showError('Missing ?run=<directory containing report.json>.');
+  state.base = run.endsWith('/') ? run : `${run}/`;
+  let res;
+  try { res = await fetch(`${state.base}report.json`); } catch (err) {
+    return showError(`Could not fetch ${state.base}report.json (${err.message}). Opening the file directly (file://) does not work; serve it over http.`);
+  }
+  if (!res.ok) return showError(`${state.base}report.json: HTTP ${res.status}`);
+  try { state.report = await res.json(); } catch (err) { return showError(`${state.base}report.json is not valid JSON: ${err.message}`); }
+  if (!Array.isArray(state.report.timeline) || !state.report.verdicts) return showError('report.json has no timeline/verdicts; is this a report built by src/report/build.mjs?');
+  document.title = `Testflight · ${state.report.meta.goal}`;
+  const want = Number(new URLSearchParams(location.hash.slice(1)).get('step'));
+  const idx = state.report.timeline.findIndex((s) => s.i === want);
+  state.step = idx >= 0 ? idx : 0;
+  render();
+}
+load();
+</script>
+</body>
+</html>

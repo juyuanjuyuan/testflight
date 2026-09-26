@@ -26,7 +26,7 @@
 | [ ] | [09 judge 与噪音调优](09-judge-and-noise.md) | 03、05、08 | 1.5 小时 | 周日 10:00 |
 | [ ] | [10 评测流水线](10-eval-pipeline.md) | 05、09 | 1.5 小时 | 周日 10:00 |
 | [ ] | [11 假站闭环与 CI](11-shop-loop-and-ci.md) | 04、05 | 1 小时 | 周日 11:00 |
-| [ ] | [14 报告 viewer](14-report-viewer.md) | 01 | 1.5 小时 | 周六 22:00 |
+| [x] | [14 报告 viewer](14-report-viewer.md) | 01 | 1.5 小时 | 周六 22:00 |
 | [ ] | [12 demo 回放与演练](12-demo-rehearsal.md) | 以上全部（含 14） | 1 小时 | 周日 12:30 |
 | [ ] | [13 （可选）视觉层检查](13-optional-vision.md) | 12 | — | 仅当主线全部完成 |
 
