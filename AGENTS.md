@@ -31,6 +31,9 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 9. Library code under `src/` never uses `console.*` and never uses `process.cwd()`; use a `log` callback and `src/paths.mjs`.
 10. Every bug fix starts with a failing regression test.
 11. Do NOT follow `docs/process-template/` (archived enterprise process: no ADRs, changelogs, work-package docs).
+12. Frontend is owned by teammates. Never modify `viewer/` or `sites/shop/`. The only interface to the frontend is `report.json`
+    (built by `src/report/build.mjs`): changes to it must be additive only — never rename or remove a field.
+    If a backend change needs a frontend change, write it down in the relevant plan's results section instead of doing it.
 
 ## Handy commands
 ```bash
