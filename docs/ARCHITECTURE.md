@@ -24,17 +24,17 @@ flowchart LR
 
 执行阶段每步调用一次 LLM（planner）；分析阶段对候选问题批量调用 judge（每批 12 条）。
 
-## 2. 目录与负责人
+## 2. 目录
 
-| 目录 | 内容 | 负责人 |
-|---|---|---|
-| `src/runner/` | `session`（启动/接管浏览器、单步执行）、`recorder.js`（页面内注入）、`observe`（CDP 焦点、AX 文本）、`act`、`axe`、`guard`（真实网站安全限制） | 浏览器/基础设施 |
-| `src/agent/` | `observation`（**信息隔离**）、`llm`、`planner`、`judge`、`prompts/` | AI/模型 |
-| `src/fix/` | `fixer`（LLM）、`apply`（应用 edits + 保护） | AI/模型 |
-| `src/detect/` | D1–D6，纯函数 | 检测/评测 |
-| `eval/`、`sites/shop/` | 标准答案、打分、按键脚本、假电商站 | 检测/评测 |
-| `src/report/`、`viewer/`、README | report 生成、三栏界面、叙事 | 报告/叙事 |
-| `src/audit.mjs`、`cli.mjs` | 编排与命令行 | 基础设施 |
+| 目录 | 内容 |
+|---|---|
+| `src/runner/` | `session`（启动/接管浏览器、单步执行）、`recorder.js`（页面内注入）、`observe`（CDP 焦点、AX 文本）、`act`、`axe`、`guard`（真实网站安全限制） |
+| `src/agent/` | `observation`（**信息隔离**）、`llm`、`planner`、`judge`、`prompts/` |
+| `src/fix/` | `fixer`（LLM）、`apply`（应用 edits + 保护） |
+| `src/detect/` | D1–D6，纯函数 |
+| `eval/`、`sites/shop/` | 标准答案、打分、按键脚本、假电商站 |
+| `src/report/`、`viewer/`、README | report 生成、三栏界面、叙事 |
+| `src/audit.mjs`、`cli.mjs` | 编排与命令行 |
 
 ## 3. 冻结的数据契约（`src/contracts.mjs`）
 

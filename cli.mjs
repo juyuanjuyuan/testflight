@@ -26,7 +26,7 @@ const USAGE = `usage:
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
   node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched]
   node cli.mjs rerun  --run <runDir> [--url <patched url>]                                  # same goal on the patched site
-  node cli.mjs score  --run <runDir> --groundtruth eval/groundtruth/shop.yaml [--tool ours|axe]`;
+  node cli.mjs score  --run <runDir> --groundtruth eval/groundtruth/shop-main.yaml [--tool ours|axe]`;
 
 async function main() {
   const out = args.out || undefined; // default: <repo>/runs

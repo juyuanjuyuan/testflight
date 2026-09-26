@@ -4,7 +4,7 @@
 
 **依赖：** 01　**预计：** 2 小时
 
-**先读：** `sites/shop/README.md`（约定）、`eval/groundtruth/shop.yaml`（模板）、`sites/testpage/*`（参考写法）、`docs/ARCHITECTURE.md` §5（检测器能抓什么）
+**先读：** `sites/shop/README.md`（约定）、`eval/groundtruth/shop-main.yaml`（模板）、`sites/testpage/*`（参考写法）、`docs/ARCHITECTURE.md` §5（检测器能抓什么）
 
 **可以改：** `sites/shop/original/**`、`sites/shop/fixed/**`、`eval/groundtruth/shop*.yaml`、新建 `eval/keys.shop*.json`
 **不要改：** `src/**`
@@ -25,19 +25,23 @@
 ## 步骤
 
 1. 先写 `sites/shop/fixed/`（正确的无障碍版本），确认用键盘能完成两条任务流。
-2. 复制成 `sites/shop/original/`，逐个埋入障碍。每个障碍元素（或其容器）加 `data-barrier="B<n>"`，并在 `shop.yaml` 登记：`id`、`kind`、`wcag`、`impact`、`flow`（main/second）、`detectable`（`ours` / `vision-only`）。
+2. 复制成 `sites/shop/original/`，逐个埋入障碍。每个障碍元素（或其容器）加 `data-barrier="B<n>"`，并按所属流程登记到 `shop-main.yaml` 或 `shop-second.yaml`：`id`、`kind`、`wcag`、`impact`、`flow`（main/second）、`detectable`（`ours` / `vision-only`）。两条流程分开计分：`score.mjs` 不按流程过滤，所以一个文件只放一条流程的障碍。
 3. 加一个一直在轮播的促销横幅（噪音，不是障碍，不登记）。
 4. 为两条任务流各写一个预录按键脚本 `eval/keys.shop.main.json`、`eval/keys.shop.second.json`，先在 fixed 上确认能走到终点。
-5. 建 `eval/groundtruth/shop-fixed.yaml`（`barriers: []`）。
+5. 建 `eval/groundtruth/shop-second.yaml`（格式同 `shop-main.yaml`，`flow: second`，goal 与第二流程一致）和 `eval/groundtruth/shop-fixed.yaml`（`barriers: []`，两条流程的 fixed 都用它）。
 
 ## 验收
 
 ```bash
 node cli.mjs audit --url http://localhost:8080/shop/original/ --goal "<主流程 goal>" --script eval/keys.shop.main.json --no-judge --label shop-main
-node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop.yaml
+node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop-main.yaml
+node cli.mjs audit --url http://localhost:8080/shop/original/ --goal "<第二流程 goal>" --script eval/keys.shop.second.json --no-judge --label shop-second
+node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop-second.yaml
+# fixed：两条流程各跑一次，都对 shop-fixed.yaml 计分
+node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop-fixed.yaml
 ```
 
-- original：所有 `detectable: ours` 且属于该流程的障碍都被检出（D5、D6 相关的等 06、07 完成后再算）。
+- original：每条流程对自己的标准答案文件，所有 `detectable: ours` 的障碍都被检出（D5、D6 相关的等 06、07 完成后再算；`vision-only` 算作漏检）。
 - fixed：两条流程 0 误报。
 - original 和 fixed 的可见文案完全一致（fixer 不允许改文案，参考答案也不能改）。
 

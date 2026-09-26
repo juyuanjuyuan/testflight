@@ -1,0 +1,14 @@
+# Ground truth for sites/shop/original, MAIN flow only (see docs/plans/05-fake-shop.md).
+# The second flow has its own file (shop-second.yaml): blocking barriers stop the planner, so each flow is scored separately.
+# The element (or its container) MUST carry data-barrier="<id>" in the HTML so scoring is exact.
+# Ideally planted WITHOUT the detector author looking (reduces overfitting claims).
+# detectable: ours = our detectors should catch it; vision-only = only a visual check can (counted as a miss unless plan 13 is done).
+site: sites/shop/original
+variant: original
+flow: main
+goal: "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
+barriers:
+  - { id: B1, kind: weak-name,   wcag: ["4.1.2"],          impact: block,   flow: main, detectable: ours,        note: "add-to-cart button named only 🛒" }
+  - { id: B2, kind: unannounced, wcag: ["4.1.3"],          impact: degrade, flow: main, detectable: ours,        note: "'Added to cart' toast not announced" }
+  - { id: B3, kind: unannounced, wcag: ["4.1.3", "3.3.1"], impact: block,   flow: main, detectable: ours,        note: "'Card declined' not announced / not associated" }
+  - { id: B4, kind: text-in-image, wcag: ["1.4.5"],        impact: degrade, flow: main, detectable: vision-only, note: "promo price printed on an image" }

@@ -11,13 +11,14 @@
 
 ## 步骤
 
-1. **暂停等人**：real 模式下，`start()` 之后打印"处理完验证码/cookie 弹窗后按回车开始"，等终端回车再进入 agent 循环（用 `node:readline`）。**cookie 弹窗不要替它关**：它本身就是测试对象。
+1. **暂停等人**：`audit()` 新增可选参数 `waitForUser`（返回 Promise 的回调）。real 模式下 `start()` 之后先 `await o.waitForUser?.()`，再进入 agent 循环。`src/` 不读终端、不打印：提示语“处理完验证码/cookie 弹窗后按回车开始”和 `node:readline` 交互只写在 `cli.mjs` 里，由 cli 作为回调传入。**cookie 弹窗不要替它关**：它本身就是测试对象。
+   同时让 real 模式下的 `--url` 变成可选：`cli.mjs` 只在 local 模式下要求 `--url`；real 模式没有传时，用接管的标签页当前 URL（`meta.url` 记录实际 URL）。
 2. **启动 Chrome**：写 `scripts/real-chrome.sh`，用单独的用户目录启动带远程调试的 Chrome：
    ```bash
    google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/a11y-real-profile
    ```
    在 WSL 里通过 WSLg 显示窗口；如果 WSL 里没装 Chrome，按脚本注释安装。
-3. **连通测试**：`node cli.mjs audit --mode real --cdp http://localhost:9222 --goal "Search for a tote bag and add it to the cart"`，确认能接管已打开的标签页、按回车后开始、到结账页自动停止。
+3. **连通测试**（real 模式不需要 `--url`）：`node cli.mjs audit --mode real --cdp http://localhost:9222 --goal "Search for a tote bag and add it to the cart"`，确认能接管已打开的标签页、按回车后开始、到结账页自动停止。
 4. **验证安全限制**：确认 `guard.mjs` 会拒绝在卡号、CVV、密码框里输入，URL 或标题出现 checkout/payment 时自动结束。
 5. **预跑**：挑 3–5 个公开电商网站（避开 Glasswing portfolio 公司），goal 只到"加入购物车"为止。结果统一放 `runs/real/`（已 gitignore），挑结果最清晰、流程最稳定的一个作为 demo 用，在本文件"结果"一节记下选了哪个、为什么（**不要写公司名**，用"候选 1/2/3"代替）。
 

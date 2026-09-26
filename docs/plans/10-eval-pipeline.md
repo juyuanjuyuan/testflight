@@ -4,7 +4,7 @@
 
 **依赖：** 05、09　**预计：** 1.5 小时
 
-**先读：** `docs/ARCHITECTURE.md` §9、`eval/score.mjs`、`eval/groundtruth/*.yaml`、`src/audit.mjs`（`analyze()` 可以对已有 trace 重跑检测和 judge）
+**先读：** `docs/ARCHITECTURE.md` §9、`eval/score.mjs`、`eval/groundtruth/*.yaml`（假站两条流程分别是 `shop-main.yaml`、`shop-second.yaml`，fixed 用 `shop-fixed.yaml`）、`src/audit.mjs`（`analyze()` 可以对已有 trace 重跑检测和 judge）
 
 **可以改：** `eval/**`、新建 `sites/bad/`（W3C BAD 的本地副本）、`README.md` 的 Results 一节
 **不要改：** `src/**`（发现检测器问题就在对应计划里记下来，不要在这里顺手改）

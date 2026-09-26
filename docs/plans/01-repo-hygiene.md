@@ -23,9 +23,9 @@
 ## 验收
 
 ```bash
-npm test                      # 9/9 通过
+npm test                      # 13/13 通过
 npm run smoke                 # 打印两行结果，退出码 0
-node cli.mjs fix --help 2>&1 | head -3   # CLI 仍能正常打印用法
+node cli.mjs; echo $?          # 不带参数时打印用法，退出码 0
 git status --short            # 没有 runs/ 或 patched/ 出现
 ```
 

@@ -6,7 +6,7 @@
 
 **先读：** `src/detect/focus.mjs`（`detectPointerOnly` 已写好，等 runner 提供数据）、`src/runner/session.mjs`、`src/runner/recorder.js`、`src/contracts.mjs`
 
-**可以改：** `src/runner/recorder.js`、`src/runner/session.mjs`、`src/detect/focus.mjs`、`src/contracts.mjs`（只加可选字段的注释）、`sites/testpage/original/index.html`、`eval/groundtruth/testpage.yaml`、`eval/keys.testpage.json`、`fixtures/testpage-*`、`test/`
+**可以改：** `src/runner/recorder.js`、`src/runner/session.mjs`、`src/detect/focus.mjs`、`src/contracts.mjs`（只加可选字段的注释）、`sites/testpage/original/index.html`、`eval/groundtruth/testpage.yaml`、`eval/keys.testpage.json`、`fixtures/testpage-*`、`test/`、`scripts/smoke.mjs`
 **不要改：** `sites/testpage/fixed/`
 
 ## 步骤

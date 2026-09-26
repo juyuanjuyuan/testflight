@@ -2,7 +2,7 @@
 
 **目标：** 检出"键盘焦点落在元素上，但屏幕上看不出来"的问题（WCAG 2.4.7）。
 
-**依赖：** 01　**预计：** 1 小时
+**依赖：** 06（06 和 07 都改 testpage original、fixture 和数量断言，必须先后做）　**预计：** 1 小时
 
 **先读：** `src/runner/session.mjs`、`src/detect/focus.mjs`（`detectFocusVisible` 已写好，读 `step.focusVisible`）、`src/contracts.mjs`
 

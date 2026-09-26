@@ -1,4 +1,4 @@
-# Report viewer (报告/叙事 role)
+# Report viewer
 
 One static `index.html` that reads a single `report.json` (see `src/report/build.mjs`) plus the `shots/` next to it. No backend.
 Develop against `fixtures/testpage-original/report.json` right now; the shop run will have the same shape.
