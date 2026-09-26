@@ -1,8 +1,11 @@
 // Injected with page.addInitScript BEFORE page scripts (otherwise init-time changes are missed).
 // Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen().
+// Thresholds come from contracts.mjs via window.__A11Y_CONFIG, which session.mjs injects first.
 (() => {
   if (window.__a11yRec) return;
-  const NOISE_GAP_MS = 1500;
+  const CFG = window.__A11Y_CONFIG;
+  if (!CFG) throw new Error('a11y recorder: window.__A11Y_CONFIG missing (inject it before recorder.js)');
+  const { NOISE_GAP_MS } = CFG;
   let lastInputAt = 0;
   let markAt = null;
   let beforeLines = new Set();
@@ -100,7 +103,7 @@
       return true;
     },
     quietFor() { return performance.now() - lastMutationAt; },
-    collect(windowMs = 1500) {
+    collect(windowMs = CFG.CHANGE_WINDOW_MS) {
       inAction = false;
       if (markAt === null) return [];
       const byEl = new Map();

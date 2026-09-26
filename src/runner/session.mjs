@@ -8,6 +8,9 @@ import { runAxe, mergeAxe } from './axe.mjs';
 import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS } from '../contracts.mjs';
 
 const RECORDER = fs.readFileSync(new URL('./recorder.js', import.meta.url), 'utf8');
+/** Thresholds the in-page recorder needs; injected as window.__A11Y_CONFIG before recorder.js runs. */
+export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS };
+const CONFIG_SCRIPT = `window.__A11Y_CONFIG = ${JSON.stringify(RECORDER_CONFIG)};`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const LOAD_TIMEOUT_MS = 10_000;
 
@@ -38,11 +41,14 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     browser = await chromium.connectOverCDP(cdp || process.env.CDP_ENDPOINT);
     page = browser.contexts()[0].pages()[0]; // tab the human already opened and cleared captcha/login on
     owned = false;
+    await page.context().addInitScript(CONFIG_SCRIPT);
     await page.context().addInitScript(RECORDER);
+    await page.evaluate(CONFIG_SCRIPT);
     await page.evaluate(RECORDER);
   } else {
     browser = await chromium.launch({ headless, executablePath: process.env.CHROME_BIN || undefined });
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.addInitScript(CONFIG_SCRIPT);
     await ctx.addInitScript(RECORDER);
     page = await ctx.newPage();
   }

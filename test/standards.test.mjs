@@ -5,10 +5,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, insideDir } from '../src/paths.mjs';
 import { mergeAxe } from '../src/runner/axe.mjs';
-import { enableAX, screenshotOrNull, waitForLoad } from '../src/runner/session.mjs';
+import { enableAX, screenshotOrNull, waitForLoad, RECORDER_CONFIG } from '../src/runner/session.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { applyEdits } from '../src/fix/apply.mjs';
-import { readTrace } from '../src/contracts.mjs';
+import { readTrace, CHANGE_WINDOW_MS } from '../src/contracts.mjs';
 
 const trace = readTrace(fs.readFileSync(path.join(ROOT, 'fixtures/testpage-original/trace.jsonl'), 'utf8'));
 
@@ -54,4 +54,11 @@ test('runner: a load that never finishes is recorded as loadTimeout', async () =
   assert.deepEqual(await waitForLoad(fast), { loadTimeout: false });
   const broken = { waitForLoadState: async () => { throw new Error('page crashed'); } };
   await assert.rejects(waitForLoad(broken), /page crashed/);
+});
+
+test('recorder thresholds come from contracts.mjs, not literals in the page script', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src/runner/recorder.js'), 'utf8');
+  assert.ok(!/\b1500\b/.test(src), 'recorder.js hard-codes 1500');
+  assert.match(src, /__A11Y_CONFIG/);
+  assert.deepEqual(RECORDER_CONFIG, { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS });
 });
