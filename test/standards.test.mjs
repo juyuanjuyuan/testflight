@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { ROOT, insideDir } from '../src/paths.mjs';
 import { mergeAxe } from '../src/runner/axe.mjs';
@@ -30,7 +31,7 @@ test('axe failure is reported as unavailable, never as 0 violations', () => {
 });
 
 test('applyEdits validates LLM output shape at the boundary', () => {
-  const dir = fs.mkdtempSync('/tmp/site-');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'site-'));
   assert.match(applyEdits(dir, null).errors[0], /array/);
   assert.match(applyEdits(dir, [{ file: 'index.html' }]).errors[0], /invalid edit shape/);
 });

@@ -2,6 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ROOT } from '../src/paths.mjs';
 import { readTrace } from '../src/contracts.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
 import { buildObservation } from '../src/agent/observation.mjs';
@@ -11,7 +14,7 @@ import { buildReport } from '../src/report/build.mjs';
 import { checkEdit, applyEdits } from '../src/fix/apply.mjs';
 import { parseJSON } from '../src/agent/llm.mjs';
 
-const load = (v) => readTrace(fs.readFileSync(`fixtures/testpage-${v}/trace.jsonl`, 'utf8'));
+const load = (v) => readTrace(fs.readFileSync(path.join(ROOT, `fixtures/testpage-${v}/trace.jsonl`), 'utf8'));
 const original = load('original');
 const fixed = load('fixed');
 
@@ -58,7 +61,7 @@ test('fix guard: cannot delete the error message, can add aria', () => {
 });
 
 test('applyEdits requires a unique match and stays inside the site dir', () => {
-  const dir = fs.mkdtempSync('/tmp/site-');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'site-'));
   fs.writeFileSync(`${dir}/index.html`, '<p id="a">x</p><p id="a">x</p>');
   assert.match(applyEdits(dir, [{ file: 'index.html', old: '<p id="a">', new: '<p id="a" role="status">' }]).errors[0], /2 times/);
   assert.match(applyEdits(dir, [{ file: '../etc/passwd', old: 'x', new: 'y' }]).errors[0], /outside/);
