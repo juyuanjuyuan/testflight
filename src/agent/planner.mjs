@@ -14,7 +14,7 @@ export async function nextAction({ goal, trace, stats }) {
     try {
       const { data } = await chatJSON({ role: 'planner', system: SYSTEM, user, stats });
       const err = validateAction(data, { plannerOnly: true });
-      if (!err) return { kind: data.kind, key: data.key, text: data.text, reason: String(data.reason).slice(0, 200) };
+      if (!err) return { kind: data.kind, key: data.key, text: data.text, ...(data.replace ? { replace: true } : {}), reason: String(data.reason).slice(0, 200) };
       user = JSON.stringify({ ...obs, previousReplyWasInvalid: err });
     } catch (e) {
       if (attempt === 1) return { kind: 'stuck', reason: `planner error: ${e.message}`, plannerError: true };

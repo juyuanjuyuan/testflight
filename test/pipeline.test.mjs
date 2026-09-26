@@ -5,7 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/paths.mjs';
-import { readTrace } from '../src/contracts.mjs';
+import { readTrace, validateAction } from '../src/contracts.mjs';
+import { blockAction } from '../src/runner/guard.mjs';
+import { focusInfo } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
 import { buildObservation } from '../src/agent/observation.mjs';
 import { judge } from '../src/agent/judge.mjs';
@@ -39,12 +41,38 @@ test('INFORMATION BARRIER: planner never sees an unannounced error', () => {
   assert.ok(JSON.stringify(buildObservation('buy', fixed.slice(0, kf + 1))).includes('Card number is invalid'), 'announced text must reach planner');
 });
 
-test('planner hears the text it already typed into the focused field (type appends)', () => {
-  // A screen reader reads a textbox's value on focus; without it the planner retyped and doubled the card number.
-  assert.equal(buildObservation('buy', fixed.slice(0, 6)).focusValue, '4242 4242'); // after step 5
-  assert.equal(buildObservation('buy', fixed.slice(0, 7)).focusValue, null);        // focus on Pay
-  assert.equal(buildObservation('buy', fixed.slice(0, 14)).focusValue, '4242 4242'); // back in the field
-  assert.equal(buildObservation('buy', fixed.slice(0, 15)).focusValue, '4242 4242 4242 4242');
+test('focusValue is the AX value of the focused field, not what the planner typed', () => {
+  // A screen reader reads a textbox's value on focus; the runner records it from the AX tree as focusAfter.value.
+  const withValue = (steps, value) => steps.map((s, n) => (n === steps.length - 1 ? { ...s, focusAfter: { ...s.focusAfter, value } } : s));
+  assert.equal(buildObservation('buy', withValue(fixed.slice(0, 6), '4242 4242')).focusValue, '4242 4242');
+  assert.equal(buildObservation('buy', withValue(fixed.slice(0, 6), '')).focusValue, '');
+  assert.equal(buildObservation('buy', fixed.slice(0, 6)).focusValue, null, 'no AX value recorded → null, never inferred from typed text');
+});
+
+test('Action: type accepts optional boolean replace, nothing else does', () => {
+  assert.equal(validateAction({ kind: 'type', text: '4242', replace: true, reason: 'fix' }, { plannerOnly: true }), null);
+  assert.equal(validateAction({ kind: 'type', text: '4242', replace: false, reason: 'x' }, { plannerOnly: true }), null);
+  assert.match(validateAction({ kind: 'type', text: '4242', replace: 'yes', reason: 'x' }), /replace/);
+  assert.match(validateAction({ kind: 'press', key: 'Tab', replace: true, reason: 'x' }), /replace/);
+});
+
+test('guard: real-site mode refuses typing into sensitive fields, with or without replace', () => {
+  const card = { role: 'textbox', name: 'Card number', inputHints: 'text card cc-number' };
+  const search = { role: 'searchbox', name: 'Search', inputHints: 'search q' };
+  assert.match(blockAction({ kind: 'type', text: '4242', reason: 'x' }, card), /sensitive/);
+  assert.match(blockAction({ kind: 'type', text: '4242', replace: true, reason: 'x' }, card), /sensitive/);
+  assert.equal(blockAction({ kind: 'type', text: 'tote', replace: true, reason: 'x' }, search), null);
+  assert.equal(blockAction({ kind: 'press', key: 'Enter', reason: 'x' }, card), null);
+});
+
+test('focusInfo records the AX value of the focused node', async () => {
+  const page = { evaluate: async () => ({ selector: '#card', barrierId: null, isBody: false, inModal: true, rect: null }) };
+  const ax = { role: { value: 'textbox' }, name: { value: 'Card number' }, value: { value: '4242' }, backendDOMNodeId: 7 };
+  const cdp = { send: async (m) => ({ 'Runtime.evaluate': { result: { objectId: 'o' } }, 'DOM.describeNode': { node: { backendNodeId: 7 } },
+    'Accessibility.getPartialAXTree': { nodes: [ax] } })[m] || {} };
+  assert.equal((await focusInfo(page, cdp)).value, '4242');
+  delete ax.value;
+  assert.equal('value' in (await focusInfo(page, cdp)), false, 'nodes without a value (buttons) get no value field');
 });
 
 test('trap: Escape that leaves the cycle is not a trap', () => {

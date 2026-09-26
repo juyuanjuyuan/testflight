@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openSession } from './runner/session.mjs';
-import { blockType, reachedBoundary } from './runner/guard.mjs';
+import { blockAction, reachedBoundary } from './runner/guard.mjs';
 import { nextAction } from './agent/planner.mjs';
 import { runDetectors } from './detect/index.mjs';
 import { judge } from './agent/judge.mjs';
@@ -10,7 +10,7 @@ import { buildReport, writeReport } from './report/build.mjs';
 import { MAX_STEPS, validateStep } from './contracts.mjs';
 import { RUNS_DIR } from './paths.mjs';
 
-const describeAction = (a) => `${a.kind}${a.key ? ' ' + a.key : ''}${a.text ? ` "${a.text}"` : ''}`;
+const describeAction = (a) => `${a.kind}${a.replace ? ' (replace)' : ''}${a.key ? ' ' + a.key : ''}${a.text ? ` "${a.text}"` : ''}`;
 
 export function newRunDir(out = RUNS_DIR, label = 'run') {
   const id = `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${label}`;
@@ -57,7 +57,7 @@ export async function audit(o) {
       const cur = trace[trace.length - 1];
       if (o.mode === 'real') {
         if (reachedBoundary(cur.url, cur.title)) action = { kind: 'done', reason: 'reached checkout boundary (real-site safety stop)' };
-        else if (action.kind === 'type') { const why = blockType(cur.focusAfter); if (why) action = { kind: 'stuck', reason: why }; }
+        else { const why = blockAction(action, cur.focusAfter); if (why) action = { kind: 'stuck', reason: why }; }
       }
       push(await s.step(action)); // done/stuck steps are recorded too (no key pressed) so the trace ends with the outcome
       if (action.kind === 'done' || action.kind === 'stuck') break;

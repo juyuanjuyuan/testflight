@@ -6,19 +6,20 @@ const val = (p) => (p && p.value != null ? String(p.value) : '');
 export async function focusInfo(page, cdp) {
   const dom = await page.evaluate(() => window.__a11yRec?.describeActive() ?? null);
   if (!dom || dom.isBody) return { role: 'body', name: '', description: '', selector: 'body', barrierId: null, isBody: true, inModal: false, rect: null };
-  let role = '', name = '', description = '', axError;
+  let role = '', name = '', description = '', value, axError;
   try {
     const { result } = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement', objectGroup: 'a11y-focus' });
     const { node } = await cdp.send('DOM.describeNode', { objectId: result.objectId });
     const { nodes } = await cdp.send('Accessibility.getPartialAXTree', { backendNodeId: node.backendNodeId, fetchRelatives: false });
     const ax = nodes.find((n) => n.backendDOMNodeId === node.backendNodeId) || nodes[0];
     role = val(ax?.role); name = val(ax?.name); description = val(ax?.description);
+    if (ax?.value) value = val(ax.value); // what a screen reader reads for a field; Chrome masks password values
     await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'a11y-focus' });
   } catch (e) {
     role = 'unknown';
     axError = e.message; // kept in the trace so a bad run is diagnosable
   }
-  return { role, name, description, ...dom, ...(axError ? { axError } : {}) };
+  return { role, name, description, ...(value !== undefined ? { value } : {}), ...dom, ...(axError ? { axError } : {}) };
 }
 
 const PAGE_ROLES = new Set(['heading', 'link', 'button', 'textbox', 'searchbox', 'combobox', 'checkbox', 'radio', 'img',

@@ -44,6 +44,7 @@ flowchart LR
 2. **Change** 用 `referencedBy: string[]` 替换 `associatedWithFocus`：记录哪些元素通过 describedby/errormessage 引用了这条变化。这样 D1（播报）和 D1b（关联）可以分开判断。
 3. **Action** 新增 `start`（页面初次加载，由 runner 产生）；`done`/`stuck` 同样写入 trace，trace 的最后一步就是任务结果。
 4. **Candidate**（检测器输出）和 **Finding**（judge 输出）分开定义。Finding 新增 `layer`（presence/association/announcement/operation）、`judged` 和 `candidateId`；`fix` 改为 `{edits:[{file,old,new}], rationale}`。
+5. **Action** 的 `type` 新增可选 `replace: boolean`：为 true 时 runner 先全选（Control/Meta+A）再输入，用来更正输入框内容；real 模式下 guard 对它同样拒绝敏感输入框。**FocusInfo** 新增可选 `value`：焦点节点在 AX 树里的 value（读屏器聚焦输入框时读出的内容，密码框由浏览器遮蔽为 •），planner 的 `focusValue` 只来自它。
 
 ## 4. 信息隔离（最重要的设计改动）
 

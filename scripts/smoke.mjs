@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { audit } from '../src/audit.mjs';
 import { ROOT } from '../src/paths.mjs';
+import { readTrace } from '../src/contracts.mjs';
+import { heardInStep } from '../src/agent/observation.mjs';
 import { scoreRun } from '../eval/score.mjs';
 
 const port = Number(process.env.PORT || 8090);
@@ -32,14 +34,28 @@ const CASES = [
   { name: 'testpage/fixed', script: 'eval/keys.testpage.fixed.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
     check: (s, r) => [s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`,
       r.verdicts.screenReaderUserCanComplete === true || `screenReaderUserCanComplete is ${r.verdicts.screenReaderUserCanComplete}, expected true`] },
+  // type with replace:true overwrites the rejected short card; the AX value the screen reader reads is recorded
+  { name: 'testpage/fixed', label: 'replace', script: 'eval/keys.testpage.replace.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
+    check: (s, r, trace) => [heardInStep(trace[11]).includes('Order confirmed') || `after Pay heard ${JSON.stringify(heardInStep(trace[11]))}, expected "Order confirmed"`,
+      trace[5].focusAfter.value === '4242 4242' || `AX value after first type is ${JSON.stringify(trace[5].focusAfter.value)}, expected "4242 4242"`,
+      trace[9].focusAfter.value === '4242 4242 4242 4242' || `AX value after replace is ${JSON.stringify(trace[9].focusAfter.value)}, expected the 16-digit number only`] },
+  // a password field's AX value is masked, so the planner never hears the secret
+  { name: 'password', url: `data:text/html,<label>Password <input type=password></label>`, goal: 'log in',
+    script: [{ kind: 'press', key: 'Tab', reason: 'find field' }, { kind: 'type', text: 'hunter2', reason: 'type' }, { kind: 'stuck', reason: 'end' }],
+    check: (s, r, trace) => [typeof trace[2].focusAfter.value === 'string' || 'no AX value recorded for the password field',
+      !String(trace[2].focusAfter.value).includes('hunter2') || 'password value leaked into focusAfter.value'] },
 ];
 
 async function runCase(c) {
-  const { runDir, report } = await audit({ url: `http://localhost:${port}/${c.name}/`, goal: GOAL, script: readJSON(c.script),
-    judgeEnabled: false, site: `sites/${c.name}`, label: `smoke-${c.name.replace('/', '-')}` });
-  const score = scoreRun({ runDir, groundtruth: path.join(ROOT, c.groundtruth) });
-  const failures = c.check(score, report).filter((x) => x !== true);
-  console.log(`${failures.length ? 'FAIL' : 'ok  '} ${c.name}: detected ${score.hits}/${score.planted} · false positives ${score.falsePositives} · SR user can complete ${report.verdicts.screenReaderUserCanComplete} · ${path.relative(ROOT, runDir)}`);
+  const name = c.label ? `${c.name} (${c.label})` : c.name;
+  const { runDir, report } = await audit({ url: c.url || `http://localhost:${port}/${c.name}/`, goal: c.goal || GOAL,
+    script: Array.isArray(c.script) ? c.script : readJSON(c.script), judgeEnabled: false, site: c.url ? null : `sites/${c.name}`,
+    label: `smoke-${[c.name, c.label].filter(Boolean).join('-').replace('/', '-')}` });
+  const trace = readTrace(fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8'));
+  const score = c.groundtruth ? scoreRun({ runDir, groundtruth: path.join(ROOT, c.groundtruth) }) : null;
+  const failures = c.check(score, report, trace).filter((x) => x !== true);
+  const detail = score ? `detected ${score.hits}/${score.planted} · false positives ${score.falsePositives} · ` : '';
+  console.log(`${failures.length ? 'FAIL' : 'ok  '} ${name}: ${detail}SR user can complete ${report.verdicts.screenReaderUserCanComplete} · ${path.relative(ROOT, runDir)}`);
   for (const f of failures) console.log(`       ✗ ${f}`);
   return failures.length === 0;
 }

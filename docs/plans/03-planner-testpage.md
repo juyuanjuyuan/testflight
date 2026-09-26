@@ -57,3 +57,33 @@
 1. **bug：** `type` 是追加输入（`keyboard.type`），planner 又听不到输入框里已有的内容，所以把卡号输了两遍，结果卡号无效，fixed 上失败。修复：`buildObservation` 新增 `focusValue`，内容是 planner 自己此前在当前焦点字段里输入的文字（从它自己的 action 推出，不读 `changes`，对应读屏在聚焦时读出的值）。先加了回归测试。prompt 说明 type 会追加，每个值只输一次。
 2. original 最初在 🛒 没反馈后就报 stuck，到不了付款。改为：中间步骤同一控件最多按两次，之后继续往下走。
 3. original 在 Pay 后焦点落到 body，又从头重做了一遍流程，把 25 步用完。改为：完成目标的最后一步没听到确认，直接报 stuck，不回头重做之前的步骤。
+
+### 补充（2026-09-26，第二个 commit）：可替换输入 + focusValue 改读 AX 树
+
+本次按要求超出了上面"可以改"的范围：`src/contracts.mjs`、`src/runner/{act,observe,guard}.mjs`、`src/audit.mjs`、`scripts/smoke.mjs`、`eval/keys.testpage.replace.json`、`docs/ARCHITECTURE.md` §3。
+
+1. **replace：** Action 的 `type` 新增可选 `replace: boolean`，`validateAction` 只在 type 上接受布尔值。`act.mjs` 在输入前先按 `ControlOrMeta+A`。guard 新增 `blockAction(action, focus)`，audit 的 real 模式改用它，所有 type（含 replace）遇到敏感输入框一律拒绝。prompt 新增通用规则：需要更正或换掉内容时用 `"replace":true`。终端日志里显示为 `type (replace)`。
+2. **focusValue 改读 AX 树：** `observe.mjs` 把 AX 节点的 `value` 写进 FocusInfo（新增可选字段 `value`，没有 value 的节点，如按钮，不写这个字段）。`buildObservation` 的 `focusValue` 只取 `focusAfter.value`，删掉了之前的"planner 自己输入过什么"推断。smoke 验证了密码框的值被 Chrome 遮蔽为 `•••••••`。
+3. **测试（先写的失败测试）：** `npm test` 新增 4 条（validateAction 的 replace、guard 的 replace、focusInfo 读 AX value、focusValue 只来自 AX value）。`npm run smoke` 新增 2 个用例：fixed 上用脚本先输短卡号、被拒后用 replace 换成 16 位并听到"Order confirmed"，每步 AX value 与预期一致；密码框 value 已记录且不含明文。
+
+LLM 验收（`LLM_CACHE=off`，`--no-judge`，改 prompt 后三组都重跑）：
+
+| 用例 | 次 | outcome | SR 用户能完成 | 步数 | 耗时 | LLM 调用 / 用时 |
+|---|---|---|---|---|---|---|
+| fixed，先短卡后 16 位¹ | 1 | done | true | 13 | 29 s | 13 / 18.8 s |
+| 同上 | 2 | done | true | 14 | 36 s | 14 / 23.3 s |
+| 同上 | 3 | done | true | 13 | 27 s | 13 / 15.1 s |
+| fixed，原 goal | 1 | done | true | 8 | 44 s | 8 / 35.7 s |
+| fixed，原 goal | 2 | done | true | 8 | 21 s | 8 / 13.3 s |
+| fixed，原 goal | 3 | done | true | 8 | 15 s | 8 / 7.1 s |
+| original，原 goal | 1 | stuck | false | 10 | 21 s | 10 / 11.9 s |
+| original，原 goal | 2 | stuck | false | 10 | 42 s | 10 / 33.2 s |
+| original，原 goal | 3 | stuck | false | 10 | 21 s | 10 / 11.7 s |
+
+¹ goal：`Buy the canvas tote bag. First try card number 4242 4242. If that card is rejected, pay with card number 4242 4242 4242 4242.`
+3 次都是：输入 `4242 4242` → Pay → 听到"Card number is invalid" → Shift+Tab 回到输入框 → `replace` 换成 16 位（AX value 正好是 `4242 4242 4242 4242`）→ Pay → 听到"Order confirmed"。其中 2 次在 replace 后又原样 replace 了一次（多 1 步，因为 replace 是幂等的，所以无害）。
+
+### fixed 第 3 次运行 80 s 的原因
+
+用 `runs/2026-09-26T23-11-55-accept-fixed-3/trace.jsonl` 的 `t` 算相邻步间隔：步骤 0→7 每步 1.0–2.8 s；**7→8 用了 64.9 s**。第 8 步就是 planner 判断"done"的那一次调用。整次运行记录的 LLM 总用时只有 9.9 s（`stats.ms`），因为 `llm.mjs` 只统计成功的那次尝试，超时和报错的尝试既不计时也不记录。planner 的超时是 20 s，每个模型重试 2 次后换备用模型。64.9 s ≈ 3 次 20 s 超时 + 1 次约 5 s 的成功调用，所以结论是：**Sciforium 上 DeepSeek 偶发超时，被静默重试掩盖**，不是浏览器的问题。第二轮验收里同样出现过（fixed 原 goal 第 1 次：第 5 步 29 s，`stats.ms` 35.7 s）。因为失败的尝试没有日志，没法逐次确认，这个结论是推断。
+**后续建议**（`src/agent/llm.mjs` 不在本计划范围内）：把失败的尝试记进 `stats`（如 `stats.llmRetries`、`stats.llmErrors`），否则违反 CODING_STANDARDS §3 的"降级要写进输出"；也可以考虑把 planner 的超时从 20 s 降到 8–10 s，让重试更早发生。

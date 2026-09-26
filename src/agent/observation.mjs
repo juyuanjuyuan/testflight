@@ -34,21 +34,6 @@ export function heardInStep(step) {
 }
 
 /**
- * Text the agent itself typed into the focused field since the last page load, or null if focus is not on one.
- * Stands in for the value a screen reader reads on focus; derived only from the agent's own actions, never from `changes`.
- */
-export function typedIntoFocus(trace) {
-  const f = trace[trace.length - 1].focusAfter;
-  if (!f || f.isBody) return null;
-  let value = null;
-  for (const s of trace) {
-    if (s.pageLoad) value = null;
-    if (s.action.kind === 'type' && s.focusBefore?.selector === f.selector) value = (value || '') + s.action.text;
-  }
-  return value;
-}
-
-/**
  * Build the planner's observation from the trace so far.
  * @param {string} goal
  * @param {import('../contracts.mjs').Step[]} trace
@@ -57,7 +42,7 @@ export function buildObservation(goal, trace) {
   const cur = trace[trace.length - 1];
   const lastLoad = [...trace].reverse().find((s) => s.pageLoad && s.pageText);
   const history = trace.slice(-6, -1).map((s) => ({
-    did: s.action.kind === 'press' ? `press ${s.action.key}` : s.action.kind === 'type' ? `type "${clip(s.action.text, 40)}"` : s.action.kind,
+    did: s.action.kind === 'press' ? `press ${s.action.key}` : s.action.kind === 'type' ? `${s.action.replace ? 'replace with' : 'type'} "${clip(s.action.text, 40)}"` : s.action.kind,
     focus: describeFocus(s.focusAfter),
     heard: heardInStep(s).slice(0, 3),
   }));
@@ -68,7 +53,8 @@ export function buildObservation(goal, trace) {
     url: cur.url,
     pageTitle: cur.title,
     focus: describeFocus(cur.focusAfter),
-    focusValue: typedIntoFocus(trace),
+    // the field's content as the screen reader reads it (AX value; passwords masked); null when not a field
+    focusValue: cur.focusAfter?.value ?? null,
     heardThisStep: heardInStep(cur),
     // page content a screen-reader user could read after a navigation (AX tree only, no pixels)
     pageText: lastLoad ? clip(lastLoad.pageText, 2500) : null,

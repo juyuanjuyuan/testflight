@@ -1,0 +1,14 @@
+[
+  {"kind":"press","key":"Tab","reason":"find add-to-cart"},
+  {"kind":"press","key":"Enter","reason":"add to cart"},
+  {"kind":"press","key":"Tab","reason":"find checkout"},
+  {"kind":"press","key":"Enter","reason":"open checkout"},
+  {"kind":"type","text":"4242 4242","reason":"enter card (short on purpose, to hear the error)"},
+  {"kind":"press","key":"Tab","reason":"go to Pay"},
+  {"kind":"press","key":"Enter","reason":"pay"},
+  {"kind":"press","key":"Shift+Tab","reason":"back to the card field"},
+  {"kind":"type","text":"4242 4242 4242 4242","replace":true,"reason":"replace the rejected card number"},
+  {"kind":"press","key":"Tab","reason":"go to Pay"},
+  {"kind":"press","key":"Enter","reason":"pay"},
+  {"kind":"done","reason":"heard 'Order confirmed'"}
+]

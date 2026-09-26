@@ -36,6 +36,8 @@ export const INTERACTIVE_ROLES = [
  * @property {boolean}  inModal       focus is inside an open dialog
  * @property {Rect|null=} rect         viewport box of the focused element (viewer draws it); null on body
  * @property {string|null=} inputHints type/name/id/autocomplete of the element (guard.mjs checks sensitive fields)
+ * @property {string=}  value         AX value of the focused node (what a screen reader reads for a field; passwords masked).
+ *                                   Absent when the node has none (buttons, links) or on body
  * @property {string=}  axError       CDP could not resolve the AX node; role is 'unknown' (degradation, kept for diagnosis)
  */
 
@@ -61,6 +63,7 @@ export const INTERACTIVE_ROLES = [
  * @property {'start'|'press'|'type'|'done'|'stuck'} kind
  * @property {string=}  key     for press, one of ALLOWED_KEYS
  * @property {string=}  text    for type
+ * @property {boolean=} replace for type: select the field's current content first so `text` replaces it (default: append)
  * @property {string}   reason  planner's rationale (shown in the viewer's left column)
  * @property {boolean=} probe   inserted by the runner (e.g. Escape after a Tab cycle), not by the planner
  * @property {boolean=} plannerError  stuck because the planner failed or kept producing invalid actions
@@ -120,6 +123,7 @@ export function validateAction(a, { plannerOnly = false } = {}) {
   if (!kinds.includes(a.kind)) return `kind must be one of ${kinds.join('|')}`;
   if (a.kind === 'press' && !ALLOWED_KEYS.includes(a.key)) return `key must be one of ${ALLOWED_KEYS.join(', ')}`;
   if (a.kind === 'type' && (!isStr(a.text) || a.text.length === 0)) return 'type needs non-empty text';
+  if (a.replace !== undefined && (a.kind !== 'type' || typeof a.replace !== 'boolean')) return 'replace must be a boolean and only on type';
   if (!isStr(a.reason)) return 'reason must be a string';
   return null;
 }
