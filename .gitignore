@@ -12,7 +12,7 @@ node_modules/
 # run artifacts, LLM cache, generated patched site (never commit real-site results)
 runs/
 .cache/
-sites/shop/patched/
+sites/*/patched/
 
 # os and editors
 .DS_Store
