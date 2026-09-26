@@ -23,7 +23,7 @@
 ## 验收
 
 ```bash
-npm test                      # 13/13 通过
+npm test                      # 19/19 通过
 npm run smoke                 # 打印两行结果，退出码 0
 node cli.mjs; echo $?          # 不带参数时打印用法，退出码 0
 git status --short            # 没有 runs/ 或 patched/ 出现
