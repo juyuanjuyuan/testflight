@@ -26,12 +26,13 @@
   - axe 无法运行 → 报告里 `axe.error`，数量为 `null`，**绝不能显示成"0 个问题"**；
   - planner 失败 → 输出 stuck 并标 `plannerError: true`；
   - CDP 解析焦点失败 → 焦点信息带 `axError`。
+- 例外：只做清理的 catch（`close()`、`detach()` 这类，结果已经产出，失败也不影响输出）可以忽略错误，但必须写注释说明为什么可以忽略。
 - 面向用户的错误只打印一行原因；设置 `DEBUG=1` 时才打印完整堆栈。
 
 ## 4. 路径与文件
 
 - 所有路径都从 `src/paths.mjs` 的 `ROOT` 推出，**不依赖 `process.cwd()`**。从任何目录运行命令，结果都应该一样。
-- 只写这几个位置：`runs/`、`.cache/`、`sites/*/patched/`。三者都已 gitignore。
+- 只写这几个位置：`runs/`、`.cache/`、`sites/*/patched/`。三者都应被 gitignore（`sites/*/patched/` 这条在计划 01 完成后生效，此前 `.gitignore` 只覆盖 `sites/shop/patched/`）。
 - 来自用户或 LLM 的路径一律经过 `insideDir()`，防止路径穿越。
 - 用 `path.join` 拼路径，代码里不写任何本机绝对路径。
 

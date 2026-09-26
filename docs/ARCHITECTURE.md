@@ -5,8 +5,8 @@
 ## 0. 现状（Sat Sep 26 下午）
 
 - 骨架已能端到端运行：Playwright 驱动真实 Chromium → recorder 记录 → CDP 读取焦点 → 检测器 → 报告。在 `sites/testpage` 上用预录按键跑通：**原版检出 4/4 个埋入障碍、0 误报；axe 检出 0/4（WCAG 规则）；修复版 0 误报**。结果存放在 `fixtures/testpage-*`。
-- 已实现：`contracts`、`runner/*`、`detect/*`、`agent/observation`、`agent/llm`（路由、缓存、回退）、`planner`/`judge`（代码与 prompt 草稿，**尚未连接 Sciforium 测试**）、`fix/apply`（search/replace + 文案保护）、`report/build`、`eval/score`、`cli`、CI workflow、9 个测试。
-- 未做：真实假电商站（`sites/shop`）、viewer 界面、fixer 的真实调用、虚拟读屏器 `spoken`、焦点可见性 D5（接入 keyboard-a11y-tester）、D6。
+- 已实现：`contracts`、`runner/*`、`detect/*`、`agent/observation`、`agent/llm`（路由、缓存、回退）、`planner`/`judge`（代码与 prompt 草稿，**尚未连接 Sciforium 测试**）、`fix/apply`（search/replace + 文案保护）、`report/build`、`eval/score`、`cli`、CI workflow、`test/` 下的回归测试（数量以 `npm test` 输出为准）。
+- 未做：真实假电商站（`sites/shop`）、viewer 界面、fixer 的真实调用、虚拟读屏器 `spoken`、焦点可见性 D5（计划 07 方案 A：计算样式对比）、D6。
 
 ## 1. 流水线
 
@@ -68,7 +68,7 @@ flowchart LR
 | D2 | `trap` | 焦点序列出现循环（尾部至少重复两整轮），且循环中不经过 body；之后按 Escape 仍留在循环内、弹窗仍打开。hint 分三种：`trap`（没有任何键盘出口，2.1.2）、`esc-only`（有 Close/Cancel 按钮，只是 Esc 不起作用，按 degrade 处理）、`esc-untested`（没试过 Esc，交给 judge 判断） | 原文档的规则是"6 次 Tab 落在不超过 3 个元素上"，会漏掉真实的支付弹窗。另外，只是 Esc 关不掉，并不违反 2.1.2 |
 | D3/D3b | `naming` | 控件无名称；名称少于 3 个字符或只含 emoji/符号；不同控件重名 | — |
 | D4 | `focus` | Enter/Space/Escape 之后焦点落到 body，且没有发生页面跳转 | — |
-| D5 | `focus` | `step.focusVisible === false`，由 runner 接入开源工具后填写 | runner 目前填 null |
+| D5 | `focus` | `step.focusVisible === false`。runner 在焦点元素旁插入一个不可聚焦的克隆体，比较两者的计算样式（outline、box-shadow、border、背景、颜色、下划线），全部相同即判为不可见（计划 07 方案 A，无新依赖） | runner 目前填 null |
 | D6 | `focus` | 结果为 stuck，且 runner 提供了 `unreachableClickables` | runner 尚未实现 |
 
 噪音处理：recorder 在页面加载后先空闲观察 2 秒（`BASELINE_MS`），然后累计"没有操作在进行时"发生的变化次数，写入 `repeatCount`。轮播在第一步之前就会被识别出来。剩下的噪音交给 judge 过滤。
@@ -90,7 +90,7 @@ flowchart LR
 
 - 不使用 unified diff（LLM 生成的行号不可靠），改用 `{file, old, new}` 形式的 search/replace；`old` 必须在文件中恰好出现一次。
 - 保护规则：edit 可以新增文字（例如 aria-label），但不能删除原有的文本节点或字符串字面量。这样 fixer 就没法靠删掉错误提示来"消除"问题。
-- 应用失败时，把错误信息回传给 fixer 重试一次。所有修改只写入 `sites/shop/patched/`，原版不动，demo 可以反复演示。
+- 应用失败时，把错误信息回传给 fixer 重试一次。所有修改只写入对应站点的 `sites/*/patched/`（已 gitignore），原版不动，demo 可以反复演示。
 - `rerun` 用同一个 goal 跑 patched 站点，再用 `compare` 对比前后结果，每个问题标为 resolved、persists 或 new。`closedLoop` 为 true 的条件是：修复前读屏用户无法完成，修复后可以完成。
 
 ## 9. 评测（`eval/`）
@@ -105,27 +105,16 @@ flowchart LR
 ```
 audit  --url --goal [--script keys.json] [--no-judge] [--mode real --cdp …] [--fail-on block]
 replay --trace --goal [--no-judge]           # 不开浏览器，只跑检测、judge 和报告
-fix    --run <runDir>                        # 生成 sites/shop/patched
+fix    --run <runDir> [--site …]             # 生成 sites/*/patched
 rerun  --run <runDir>                        # 用同一 goal 跑 patched，并写入 report.rerun
 score  --run <runDir> --groundtruth … [--tool ours|axe]
 ```
 
 `.github/workflows/a11y-audit.yml` 对应 operational fit：每次 push 或 PR 都会跑测试和一次审计，出现 block 级别问题时 check 失败，报告写进 job summary。周末版本使用预录按键，不需要在 CI 中配置密钥。
 
-## 11. 里程碑（修订）
+## 11. 里程碑
 
-具体任务、依赖和验收标准见 `docs/plans/README.md`，以那里为准。
-
-| 时间 | 集成点 |
-|---|---|
-| 周六 16:00 | 合并本骨架，所有人在 `fixtures/` 上并行开发 |
-| 周六 18:00 | **拿到 key 后先测**：延迟、JSON 输出是否稳定、DeepSeek 能否接收图像。planner 在 testpage 上自主跑完一次 |
-| 周六 20:00（离开办公室前） | 在假电商站原版上用 planner 端到端跑通；viewer 能读取 report.json |
-| 周日 10:00 | fix → rerun 闭环跑通；第一次完整评测；预跑 3–5 个真实网站并缓存结果 |
-| 周日 12:30 | 功能冻结；在 `LLM_CACHE=readonly` 下完整演练两遍 |
-| 周日 13:00 | 提交 submission PR（记得填写 `prior_work`） |
-
-planner 比原计划（周日 10:00）提前到今晚接入，因为它是评委最先看到的 AI 部分。
+任务、依赖、目标时间和验收标准以 `docs/plans/README.md` 为准，本文件不再维护时间表。
 
 ## 12. 已知限制（写进 README）
 
