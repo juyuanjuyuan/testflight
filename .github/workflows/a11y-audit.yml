@@ -1,0 +1,27 @@
+# Operational fit: the product runs as a PR check. Every front-end change re-runs the critical task flow.
+# Weekend version: deterministic key script + detectors (no LLM needed, no secrets in CI).
+# With SCIFORIUM_API_KEY set as a repo secret, drop --script/--no-judge to use the planner + judge.
+name: task-level a11y audit
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Serve demo sites
+        run: node scripts/serve.mjs & sleep 1
+      - name: Audit checkout flow (fails the check on any blocking barrier)
+        run: |
+          node cli.mjs audit --url http://localhost:8080/testpage/fixed/ --goal "Buy the canvas tote bag" \
+            --script eval/keys.testpage.json --no-judge --label ci --fail-on block
+      - name: Report in job summary
+        if: always()
+        run: cat runs/*/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: audit-run, path: runs/ }

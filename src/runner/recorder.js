@@ -1,0 +1,141 @@
+// Injected with page.addInitScript BEFORE page scripts (otherwise init-time changes are missed).
+// Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen().
+(() => {
+  if (window.__a11yRec) return;
+  const NOISE_GAP_MS = 1500;
+  let lastInputAt = 0;
+  let markAt = null;
+  let beforeLines = new Set();
+  let focusAtMark = null;
+  const touched = new Map();          // Element -> first mutation time since mark
+  const noise = new WeakMap();        // Element -> mutations with no recent user input
+  let lastMutationAt = 0;
+  let inAction = false;               // true between mark() and collect()
+
+  addEventListener('keydown', () => { lastInputAt = performance.now(); }, true);
+  addEventListener('mousedown', () => { lastInputAt = performance.now(); }, true);
+
+  const elOf = (n) => (n.nodeType === 1 ? n : n.parentElement);
+  const lines = (t) => (t || '').split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+  function onMutations(muts) {
+    const now = performance.now();
+    lastMutationAt = now;
+    // a mutation is 'unprompted' if no action is in flight, or the last key was long ago
+    const quiet = !inAction || now - lastInputAt > NOISE_GAP_MS;
+    for (const m of muts) {
+      const targets = m.type === 'childList' ? [...m.addedNodes].map(elOf) : [elOf(m.target)];
+      for (const el of targets) {
+        if (!el || el.closest('script,style,noscript,head')) continue;
+        if (quiet) noise.set(el, (noise.get(el) || 0) + 1);
+        if (markAt !== null && !touched.has(el)) touched.set(el, now);
+      }
+    }
+  }
+  const start = () => new MutationObserver(onMutations).observe(document.documentElement, {
+    childList: true, subtree: true, characterData: true, attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'open', 'aria-hidden', 'aria-expanded'],
+  });
+  if (document.documentElement) start(); else addEventListener('DOMContentLoaded', start);
+
+  function selectorOf(el) {
+    if (!el || el === document.body) return 'body';
+    if (el.id) return `#${CSS.escape(el.id)}`;
+    const parts = [];
+    for (let e = el, d = 0; e && e !== document.body && d < 5; e = e.parentElement, d++) {
+      if (e.id) { parts.unshift(`#${CSS.escape(e.id)}`); break; }
+      const same = e.parentElement ? [...e.parentElement.children].filter((c) => c.tagName === e.tagName) : [];
+      parts.unshift(same.length > 1 ? `${e.tagName.toLowerCase()}:nth-of-type(${same.indexOf(e) + 1})` : e.tagName.toLowerCase());
+    }
+    return parts.join(' > ');
+  }
+  const barrierOf = (el) => el?.closest?.('[data-barrier]')?.getAttribute('data-barrier') ?? null;
+  const rectOf = (el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
+  function isVisible(el) {
+    if (!el.isConnected) return false;
+    if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  function liveInfo(el) {
+    const lr = el.closest('[aria-live]:not([aria-live="off"]),[role="alert"],[role="status"],[role="log"],output');
+    if (!lr) return null;
+    const pol = lr.getAttribute('aria-live') || (lr.getAttribute('role') === 'alert' ? 'assertive' : 'polite');
+    return pol;
+  }
+  function referencedBy(el) {
+    const out = [];
+    for (const r of document.querySelectorAll('[aria-describedby],[aria-errormessage]')) {
+      const ids = `${r.getAttribute('aria-describedby') || ''} ${r.getAttribute('aria-errormessage') || ''}`.split(/\s+/).filter(Boolean);
+      if (ids.some((id) => { const t = document.getElementById(id); return t && (t === el || t.contains(el)); })) out.push(selectorOf(r));
+    }
+    return out;
+  }
+  function noiseOf(el) {
+    let n = 0;
+    for (let e = el, d = 0; e && d < 4; e = e.parentElement, d++) n = Math.max(n, noise.get(e) || 0);
+    return n;
+  }
+  // deepest descendant whose text still contains the line
+  function narrow(el, line) {
+    let cur = el;
+    for (;;) {
+      const child = [...cur.children].find((c) => (c.innerText || '').includes(line));
+      if (!child) return cur;
+      cur = child;
+    }
+  }
+  function isActiveBody() {
+    const a = document.activeElement;
+    return !a || a === document.body || a === document.documentElement;
+  }
+
+  window.__a11yRec = {
+    mark() {
+      markAt = performance.now();
+      inAction = true;
+      touched.clear();
+      beforeLines = new Set(lines(document.body?.innerText));
+      focusAtMark = document.activeElement;
+      return true;
+    },
+    quietFor() { return performance.now() - lastMutationAt; },
+    collect(windowMs = 1500) {
+      inAction = false;
+      if (markAt === null) return [];
+      const byEl = new Map();
+      const active = document.activeElement;
+      const focusMoved = active !== focusAtMark;
+      for (const [el, t] of touched) {
+        const dt = Math.round(t - markAt);
+        if (dt > windowMs || !isVisible(el)) continue;
+        for (const line of lines(el.innerText)) {
+          if (beforeLines.has(line)) continue;
+          const target = narrow(el, line);
+          const prev = byEl.get(target);
+          if (prev) { if (!prev.text.includes(line)) prev.text += ' ' + line; continue; }
+          const into = focusMoved && active && !isActiveBody() && (active === target || target.contains(active) || active.contains(target));
+          byEl.set(target, {
+            text: line.slice(0, 300), selector: selectorOf(target), barrierId: barrierOf(target), dtMs: dt,
+            visible: true, inLiveRegion: !!liveInfo(target), liveRegion: liveInfo(target),
+            referencedBy: referencedBy(target), focusMovedInto: !!into, repeatCount: noiseOf(target), rect: rectOf(target),
+          });
+        }
+      }
+      return [...byEl.values()];
+    },
+    describeActive() {
+      const a = document.activeElement;
+      const body = isActiveBody();
+      return {
+        selector: body ? 'body' : selectorOf(a), barrierId: body ? null : barrierOf(a), isBody: body,
+        inModal: !body && !!a.closest('dialog[open],[role="dialog"],[role="alertdialog"]'),
+        rect: body ? null : rectOf(a),
+        inputHints: body ? null : ['type', 'name', 'id', 'autocomplete'].map((k) => a.getAttribute(k) || '').join(' '),
+      };
+    },
+    modalOpen() {
+      return [...document.querySelectorAll('dialog[open],[role="dialog"],[role="alertdialog"],[aria-modal="true"]')].some(isVisible);
+    },
+  };
+})();

@@ -1,0 +1,9 @@
+# Tiny page used only by tests (sites/testpage). Not the demo shop.
+site: sites/testpage
+variant: original
+goal: "Buy the canvas tote bag"
+barriers:
+  - { id: T1, kind: weak-name,   wcag: ["4.1.2"] }
+  - { id: T2, kind: unannounced, wcag: ["4.1.3"] }
+  - { id: T3, kind: unannounced, wcag: ["4.1.3", "3.3.1"] }
+  - { id: T4, kind: trap,        wcag: ["2.1.2"] }

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tiny Shop</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:2rem;max-width:40rem}
+  .modal{position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center}
+  .modal.open{display:flex} .sheet{background:#fff;padding:1.5rem;border-radius:8px}
+  #toast{margin:.5rem 0;color:#060;min-height:1.2em} #carderr{color:#c00;min-height:1.2em}
+</style></head>
+<body>
+<h1>Tiny Shop</h1>
+<div id="promo">Free shipping over $50</div>
+<h2>Canvas Tote Bag</h2><p>$24.00</p>
+<button id="add" data-barrier="T1" aria-label="Add Canvas Tote Bag to cart">🛒</button>
+<div id="toast" data-barrier="T2" role="status"></div>
+<button id="checkout">Checkout</button>
+
+<div class="modal" id="paymodal" role="dialog" aria-modal="true" aria-label="Payment" data-barrier="T4">
+  <div class="sheet">
+    <label for="card">Card number</label> <input id="card" autocomplete="off" aria-describedby="carderr">
+    <button id="pay">Pay</button>
+    <p id="carderr" data-barrier="T3" aria-live="assertive"></p>
+  </div>
+</div>
+<script>
+  const promos = ['Free shipping over $50', 'New arrivals this week', '20% off hats'];
+  let p = 0; setInterval(() => { document.getElementById('promo').textContent = promos[++p % 3]; }, 700);
+  add.onclick = () => { toast.textContent = 'Added to cart'; };
+  checkout.onclick = () => { paymodal.classList.add('open'); card.focus(); };
+  pay.onclick = () => {
+    const ok = card.value.replace(/\s/g, '').length === 16;
+    carderr.textContent = ok ? '' : 'Card number is invalid';
+    card.setAttribute('aria-invalid', String(!ok));
+    if (ok) { paymodal.classList.remove('open'); toast.textContent = 'Order confirmed'; checkout.focus(); }
+  };
+  paymodal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { paymodal.classList.remove('open'); checkout.focus(); return; }
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    (document.activeElement === card ? pay : card).focus();
+  });
+</script>
+</body></html>

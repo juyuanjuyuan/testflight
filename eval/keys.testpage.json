@@ -1,0 +1,15 @@
+[
+  {"kind":"press","key":"Tab","reason":"find add-to-cart"},
+  {"kind":"press","key":"Enter","reason":"name unclear, trying it"},
+  {"kind":"press","key":"Tab","reason":"find checkout"},
+  {"kind":"press","key":"Enter","reason":"open checkout"},
+  {"kind":"type","text":"4242 4242","reason":"enter card (short on purpose)"},
+  {"kind":"press","key":"Tab","reason":"go to Pay"},
+  {"kind":"press","key":"Enter","reason":"pay"},
+  {"kind":"press","key":"Tab","reason":"look for feedback"},
+  {"kind":"press","key":"Tab","reason":"look for feedback"},
+  {"kind":"press","key":"Tab","reason":"look for feedback"},
+  {"kind":"press","key":"Tab","reason":"look for feedback"},
+  {"kind":"press","key":"Escape","reason":"try to leave the dialog"},
+  {"kind":"stuck","reason":"heard nothing after Pay and cannot leave the dialog"}
+]

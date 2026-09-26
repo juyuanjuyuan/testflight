@@ -1,0 +1,21 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# node
+node_modules/
+
+# run artifacts, LLM cache, generated patched site (never commit real-site results)
+runs/
+.cache/
+sites/shop/patched/
+
+# os and editors
+.DS_Store
+.Rhistory
+.vscode/
+.idea/

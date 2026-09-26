@@ -1,0 +1,21 @@
+{
+  "name": "a11y-task-audit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Task-level accessibility audit: can a screen-reader or keyboard user actually finish checkout?",
+  "engines": { "node": ">=20" },
+  "bin": { "a11y-audit": "./cli.mjs" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "serve": "node scripts/serve.mjs",
+    "replay:fixture": "node cli.mjs replay --trace fixtures/trace.sample.jsonl --goal \"Buy a canvas tote bag\" --no-judge --out runs/"
+  },
+  "dependencies": {
+    "axe-core": "^4.13.0",
+    "dotenv": "^18.0.4",
+    "openai": "^7.23.0",
+    "playwright": "^1.63.0",
+    "yaml": "^2.9.1"
+  }
+}

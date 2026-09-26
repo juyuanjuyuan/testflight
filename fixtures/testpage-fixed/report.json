@@ -1,0 +1,293 @@
+{
+  "meta": {
+    "url": "http://localhost:8080/testpage/fixed/",
+    "mode": "local",
+    "site": "sites/testpage/fixed",
+    "script": true,
+    "goal": "Buy the canvas tote bag",
+    "judge": false,
+    "generatedAt": "2026-09-26T19:29:11.323Z"
+  },
+  "verdicts": {
+    "outcome": "stuck",
+    "agentCanComplete": false,
+    "screenReaderUserCanComplete": false,
+    "blockingFindings": [],
+    "unexplainedStuck": true
+  },
+  "counts": {
+    "block": 0,
+    "degrade": 0,
+    "filteredOut": 0,
+    "axeViolations": 0,
+    "axeBestPractice": 2
+  },
+  "timeline": [
+    {
+      "i": 0,
+      "action": {
+        "kind": "start",
+        "reason": "open page"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "(focus on page body)",
+      "seen": [],
+      "heard": [
+        "(focus on page body)"
+      ],
+      "screenshot": "shots/0000.png",
+      "findingIds": []
+    },
+    {
+      "i": 1,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "find add-to-cart"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Add Canvas Tote Bag to cart\"",
+      "seen": [],
+      "heard": [
+        "button \"Add Canvas Tote Bag to cart\""
+      ],
+      "screenshot": "shots/0001.png",
+      "findingIds": []
+    },
+    {
+      "i": 2,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "name unclear, trying it"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Add Canvas Tote Bag to cart\"",
+      "seen": [
+        "Added to cart",
+        "New arrivals this week"
+      ],
+      "heard": [
+        "Added to cart"
+      ],
+      "screenshot": "shots/0002.png",
+      "findingIds": []
+    },
+    {
+      "i": 3,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "find checkout"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Checkout\"",
+      "seen": [
+        "20% off hats"
+      ],
+      "heard": [
+        "button \"Checkout\""
+      ],
+      "screenshot": "shots/0003.png",
+      "findingIds": []
+    },
+    {
+      "i": 4,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "open checkout"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "textbox \"Card number\"",
+      "seen": [
+        "Card number Pay",
+        "Free shipping over $50"
+      ],
+      "heard": [
+        "textbox \"Card number\"",
+        "Card number Pay"
+      ],
+      "screenshot": "shots/0004.png",
+      "findingIds": []
+    },
+    {
+      "i": 5,
+      "action": {
+        "kind": "type",
+        "text": "4242 4242",
+        "reason": "enter card (short on purpose)"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "textbox \"Card number\"",
+      "seen": [
+        "New arrivals this week"
+      ],
+      "heard": [],
+      "screenshot": "shots/0005.png",
+      "findingIds": []
+    },
+    {
+      "i": 6,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "go to Pay"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Pay\"",
+      "seen": [
+        "20% off hats"
+      ],
+      "heard": [
+        "button \"Pay\""
+      ],
+      "screenshot": "shots/0006.png",
+      "findingIds": []
+    },
+    {
+      "i": 7,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "pay"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Pay\"",
+      "seen": [
+        "Card number is invalid",
+        "Free shipping over $50"
+      ],
+      "heard": [
+        "Card number is invalid"
+      ],
+      "screenshot": "shots/0007.png",
+      "findingIds": []
+    },
+    {
+      "i": 8,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "look for feedback"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "textbox \"Card number\", Card number is invalid",
+      "seen": [
+        "New arrivals this week"
+      ],
+      "heard": [
+        "textbox \"Card number\", Card number is invalid"
+      ],
+      "screenshot": "shots/0008.png",
+      "findingIds": []
+    },
+    {
+      "i": 9,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "look for feedback"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Pay\"",
+      "seen": [
+        "20% off hats"
+      ],
+      "heard": [
+        "button \"Pay\""
+      ],
+      "screenshot": "shots/0009.png",
+      "findingIds": []
+    },
+    {
+      "i": 10,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "look for feedback"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "textbox \"Card number\", Card number is invalid",
+      "seen": [
+        "Free shipping over $50"
+      ],
+      "heard": [
+        "textbox \"Card number\", Card number is invalid"
+      ],
+      "screenshot": "shots/0010.png",
+      "findingIds": []
+    },
+    {
+      "i": 11,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "look for feedback"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Pay\"",
+      "seen": [
+        "New arrivals this week"
+      ],
+      "heard": [
+        "button \"Pay\""
+      ],
+      "screenshot": "shots/0011.png",
+      "findingIds": []
+    },
+    {
+      "i": 12,
+      "action": {
+        "kind": "press",
+        "key": "Escape",
+        "reason": "try to leave the dialog"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Checkout\"",
+      "seen": [
+        "20% off hats"
+      ],
+      "heard": [
+        "button \"Checkout\""
+      ],
+      "screenshot": "shots/0012.png",
+      "findingIds": []
+    },
+    {
+      "i": 13,
+      "action": {
+        "kind": "stuck",
+        "reason": "heard nothing after Pay and cannot leave the dialog"
+      },
+      "url": "http://localhost:8080/testpage/fixed/",
+      "focus": "button \"Checkout\"",
+      "seen": [
+        "Free shipping over $50"
+      ],
+      "heard": [],
+      "screenshot": "shots/0013.png",
+      "findingIds": []
+    }
+  ],
+  "findings": [],
+  "axe": {
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "wcag": false,
+        "nodes": 1
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "wcag": false,
+        "nodes": 4
+      }
+    ]
+  },
+  "fixes": null,
+  "rerun": null,
+  "stats": {}
+}
