@@ -3,9 +3,9 @@ import Brand from "./components/Brand";
 import Icon from "./components/Icon";
 import LandingScreen from "./screens/LandingScreen";
 import { FindingView, LiveRun, RecordView, ReportView, VerificationView } from "./screens/AuditWorkspace";
-import { liveApi, rerunName, runPath } from "./api/live";
+import { liveApi, rerunName, runPath, suggestTasks } from "./api/live";
 import type { RunList, Suggestion } from "./api/contracts";
-import { canFix, isActive, stateLabel } from "./lib/audit";
+import { canFix, isActive, stateLabel, suggestionLabel } from "./lib/audit";
 import useAuditRun from "./hooks/useAuditRun";
 
 type View = "landing" | "setup" | "history" | "run" | "report" | "finding" | "verify" | "record";
@@ -29,6 +29,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
   const suggestionRequest = useRef<AbortController | null>(null);
   const mutationLock = useRef(false);
   const [history, setHistory] = useState<RunList | null>(null);
@@ -86,19 +87,17 @@ export default function App() {
   async function suggest() {
     suggestionRequest.current?.abort();
     const controller = new AbortController(); suggestionRequest.current = controller;
-    setSuggesting(true); setError(null); setSuggestions([]);
+    setSuggesting(true); setError(null); setSuggestions([]); setSuggestNote(null);
     try {
-      const result = await liveApi.suggest(url, controller.signal);
+      const result = await suggestTasks(url, controller.signal);
       if (controller.signal.aborted) return;
-      // Presets from eval/groundtruth are fixed text, not suggestions; only show model-generated tasks.
-      const generated = result.suggestions.filter((s) => s.source === "generated");
-      if (generated.length) setSuggestions(generated);
-      else setError("The audit service returned only preset tasks. Update the backend to support AI-generated suggestions, or describe a task yourself.");
+      setSuggestions(result.suggestions);
+      if (result.generateError) setSuggestNote(`AI suggestions are unavailable, so preset tasks are shown instead. (${result.generateError})`);
     } catch (e) { if (!controller.signal.aborted) setError(message(e)); }
     finally { if (!controller.signal.aborted) setSuggesting(false); }
   }
   function editUrl(value: string) {
-    suggestionRequest.current?.abort(); setSuggesting(false); setSuggestions([]); setUrl(value);
+    suggestionRequest.current?.abort(); setSuggesting(false); setSuggestions([]); setSuggestNote(null); setUrl(value);
   }
   const effectiveView = view === "run" && !active && run.report && !run.loading
     ? run.progress?.state === "failed" ? "report" : run.report.rerun ? "verify" : "report" : view;
@@ -118,7 +117,7 @@ export default function App() {
         <label htmlFor="site-url">Website URL</label><div className="url-field"><Icon name="globe" /><input id="site-url" type="url" value={url} disabled={busy} onChange={(e) => editUrl(e.target.value)} required /></div>
         <label htmlFor="goal">Task goal <small>(optional)</small></label><div className="goal-field"><Icon name="spark" /><input id="goal" value={goal} maxLength={500} disabled={busy} onChange={(e) => setGoal(e.target.value)} placeholder="Leave blank to let the system choose a task" /></div>
         <button type="button" className="suggest-button" disabled={suggesting || busy || !validUrl} onClick={() => void suggest()}>{suggesting ? "Finding suggestions…" : "Suggest tasks"}</button>
-        <div className="task-suggestions" aria-live="polite">{suggestions.map((s, i) => <button type="button" key={i} disabled={busy} onClick={() => { setGoal(s.goal); setSuggestions([]); }}><b>AI-suggested task</b><p>{s.goal}</p><small>{s.reason}</small></button>)}</div>
+        <div className="task-suggestions" aria-live="polite">{suggestNote && <p className="muted">{suggestNote}</p>}{suggestions.map((s, i) => <button type="button" key={i} disabled={busy} onClick={() => { setGoal(s.goal); setSuggestions([]); setSuggestNote(null); }}><b>{suggestionLabel(s.source)}</b><p>{s.goal}</p><small>{s.reason}</small></button>)}</div>
         <button className="hero-button" type="submit" disabled={busy || !validUrl}><span>{busy ? "Starting…" : "Start audit"}</span><Icon name="arrow" /></button>
       </form></section>}
       {view === "history" && <section className="dashboard-screen"><div className="dashboard-heading"><div><span className="result-label">AUDIT WORKSPACE</span><h1>Run history</h1></div><button className="text-button" onClick={() => setHistoryRevision((n) => n + 1)}>Refresh</button></div>

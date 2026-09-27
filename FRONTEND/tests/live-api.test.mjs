@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { liveApi, ApiError, artifactUrl, rerunName } from "../src/api/live.ts";
-import { frameGeometry, stateLabel, isActive, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
+import { liveApi, ApiError, artifactUrl, rerunName, suggestTasks } from "../src/api/live.ts";
+import { frameGeometry, stateLabel, isActive, suggestionLabel, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
 
 function mockFetch(t, data, status = 200) {
   const calls = [];
@@ -93,4 +93,60 @@ test("new audits do not request reports until complete; repairs and legacy runs 
   assert.equal(shouldLoadReport(null, false), true);
   assert.equal(shouldLoadReport({ state: "fixing" }, true), false);
   assert.equal(shouldLoadReport({ state: "done" }, true), true);
+});
+
+const preset = { goal: "Buy a canvas tote bag.", source: "curated", reason: "Preset task.", needs: [] };
+const generated = { goal: "Subscribe to the newsletter.", source: "generated", reason: "Main call to action.", needs: ["email"] };
+function sequenceFetch(t, handlers) {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, ...options, body: JSON.parse(options.body) });
+    return handlers[calls.length - 1](options);
+  });
+  return calls;
+}
+const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
+test("generated suggestions are used without a second request", async (t) => {
+  const calls = sequenceFetch(t, [() => json({ suggestions: [generated] })]);
+  assert.deepEqual(await suggestTasks("http://localhost:8080/shop/original/"), { suggestions: [generated], generateError: null });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.generate, true);
+});
+for (const [name, first, reason] of [
+  ["fails", () => json({ error: { code: "suggest_failed", message: "No valid task." } }, 502), /No valid task/],
+  ["returns an empty list", () => json({ suggestions: [] }), /no suggestions/],
+]) {
+  test(`suggestions fall back to presets when generation ${name}`, async (t) => {
+    const calls = sequenceFetch(t, [first, () => json({ suggestions: [preset] })]);
+    const result = await suggestTasks("http://localhost:8080/shop/original/");
+    assert.deepEqual(result.suggestions, [preset]);
+    assert.match(result.generateError, reason);
+    assert.deepEqual(calls.map((c) => c.body), [{ url: "http://localhost:8080/shop/original/", generate: true }, { url: "http://localhost:8080/shop/original/" }]);
+  });
+}
+test("suggestions fall back to presets when generation times out", async (t) => {
+  const calls = sequenceFetch(t, [
+    (options) => new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))),
+    () => json({ suggestions: [preset] }),
+  ]);
+  const result = await suggestTasks("http://localhost:8080/shop/original/", undefined, 10);
+  assert.deepEqual(result, { suggestions: [preset], generateError: "AI suggestions timed out." });
+  assert.equal(calls.length, 2);
+});
+test("cancelled suggestions do not fall back, and a failed fallback is reported", async (t) => {
+  const controller = new AbortController();
+  const calls = sequenceFetch(t, [
+    (options) => new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))),
+    () => json({ suggestions: [] }),
+    () => json({ suggestions: [] }),
+  ]);
+  const pending = suggestTasks("http://localhost:8080/shop/original/", controller.signal);
+  controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(calls.length, 1);
+  await assert.rejects(suggestTasks("http://localhost:8080/shop/original/"), (e) => e.code === "no_suggestions");
+});
+test("preset suggestions are labelled as presets", () => {
+  assert.equal(suggestionLabel("curated"), "Preset task");
+  assert.equal(suggestionLabel("generated"), "AI-suggested task");
 });

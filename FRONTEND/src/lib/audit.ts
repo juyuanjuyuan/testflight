@@ -24,6 +24,9 @@ export function auditDuration(report: AuditReport): number | null {
 export function sourceLabel(source?: string): string {
   return ({ user: "User-confirmed task", curated: "Preset task", generated: "AI-selected task" } as Record<string, string>)[source ?? ""] ?? "Task";
 }
+export function suggestionLabel(source: string): string {
+  return source === "curated" ? "Preset task" : source === "generated" ? "AI-suggested task" : "Suggested task";
+}
 export function canFix(report: AuditReport): boolean {
   return report.meta.mode === "local" && !!report.meta.site && !/\/patched\/?$/.test(report.meta.site);
 }
