@@ -2,10 +2,13 @@
 site: sites/testpage/original
 variant: original
 goal: "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242."
+# expectedImpact = what this barrier does to THIS file's task (goal + scripted route); the judge should reproduce it:
+# block = a keyboard/screen-reader user cannot finish the task; degrade = can finish, with confusion or extra work;
+# none = not on the task path (the detectors should still find it). Rationale: docs/plans/10-eval-pipeline.md, 结果.
 barriers:
-  - { id: T1, kind: weak-name,   wcag: ["4.1.2"] }
-  - { id: T2, kind: unannounced, wcag: ["4.1.3"] }
-  - { id: T3, kind: unannounced, wcag: ["4.1.3", "3.3.1"] }
-  - { id: T4, kind: trap,        wcag: ["2.1.2"] }
-  - { id: T5, kind: pointer-only, wcag: ["2.1.1"] }
-  - { id: T6, kind: focus-visible, wcag: ["2.4.7"] }
+  - { id: T1, kind: weak-name,   wcag: ["4.1.2"],            expectedImpact: block }
+  - { id: T2, kind: unannounced, wcag: ["4.1.3"],            expectedImpact: degrade }
+  - { id: T3, kind: unannounced, wcag: ["4.1.3", "3.3.1"],   expectedImpact: block }
+  - { id: T4, kind: trap,        wcag: ["2.1.2"],            expectedImpact: block }
+  - { id: T5, kind: pointer-only, wcag: ["2.1.1"],            expectedImpact: none }
+  - { id: T6, kind: focus-visible, wcag: ["2.4.7"],            expectedImpact: degrade }

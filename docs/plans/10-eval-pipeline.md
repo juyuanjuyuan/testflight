@@ -127,3 +127,44 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 - `node eval/run.mjs`：一条命令跑完，退出码 0，打印两张表（重新录制约 2 分钟）；`node eval/run.mjs --replay eval/traces` 不到 1 秒（judge 命中缓存），输出与 README 一致。
 - 没有 key 时跳过 judge 列并提示：`SCIFORIUM_API_KEY= node eval/run.mjs --replay eval/traces` 退出码 0，打印提示，只输出 judge 关闭和 axe 两列，消融表显示 skipped。
 - `npm test`：145 个全部通过；`npm run smoke`：9 个用例全部 ok。
+
+## 后续（2026-09-27，处理上面"发现的问题"第 2、3、4 条）
+
+### 1. D4 跳转链接误报（第 4 条）
+
+`src/detect/focus.mjs`：在链接上按 Enter，如果这一步的 URL 只有 fragment 变了（origin、路径、查询都没变，新 hash 非空且不同于上一步），就不算焦点丢失。trace 里的 `FocusInfo` 没有 `href`，所以用"URL 只改了 hash"来判断链接指向本页锚点：`href="#x"` 和"本页地址 + #x"两种写法按下后都只会改 hash，效果等同于检查 href，而且不用改 runner 和契约。`href="#"`（URL 结尾变成空 hash）和按下后 URL 不变的链接照常报。
+
+回归测试（`test/pipeline.test.mjs`）用 `eval/traces/w3c-bad-fixed`：第 2、5、11、13 步的跳转不再报。对所有已录 trace 前后对比检测结果：只有 w3c-bad 变了（focus-lost 3 → 0），假电商站 B6（第 11 步）和 testpage 的检测结果逐条不变。
+
+**没有重新录制 `eval/traces/`**：目录里存的是 runner 的原始录制（trace.jsonl、axe.json、meta.json），不含检测结果，`--replay` 每次都会用当前检测器重新检测；这次修复不改 runner，录制内容不会变。重新录制反而会因为轮播横幅让 judge 的提示词变掉、缓存失效（第 1 条）。
+
+### 2. 标准答案的 `expectedImpact`
+
+每个障碍新增 `expectedImpact: block | degrade | none`：这个障碍对**该文件的任务**（goal + 录制路线）的实际影响，也就是希望 judge 给出的等级。原来的 `impact` 是设计时的严重程度，保留不动。判断标准：`block` = 键盘/读屏用户没法完成任务；`degrade` = 能完成，但会困惑或多花工夫；`none` = 不在任务路径上（检测器仍然应该找到它）。
+
+| 障碍 | 任务 | expectedImpact | 依据 |
+|---|---|---|---|
+| B1 🛒 加购按钮 | 买帆布包 | block ⚠️ | 加购是必经步骤，名字只有表情符号，而且页头还有一个 "Cart" 按钮，分不清哪个是加购。沿用设计时的 `impact: block`。 |
+| B2 加购提示没播报 | 买帆布包 | degrade | 听不到确认，录制路线里多按了一次，数量变成 2，后面要去购物车改，但任务能完成。 |
+| B3 图片上的促销文字 | 买帆布包 | none | 图片内容是 "All hats 20% off"，和帆布包无关。 |
+| B4 购物车数量/小计不播报 | 买帆布包 | degrade | 改了数量听不到结果，要自己再确认；不妨碍结账。 |
+| B5 −/+ 按钮 | 买帆布包 | degrade | 路线里要用它把数量减回 1，名字里没有商品，需要猜。 |
+| B6 Remove 后焦点掉到 body | 买帆布包 | degrade | 删掉毛线帽后要从头找位置，能继续。 |
+| B7 "Card declined" 不播报 | 买帆布包 | block | 第一张卡必被拒，听不到就不知道要换卡，买不成。 |
+| B8 付款表单 outline:none | 买帆布包 | degrade | 视力正常的键盘用户看不到焦点在卡号框还是 Pay 上；读屏用户不受影响，仍能付款。 |
+| B5 −/+ 按钮 | 用优惠码 | none ⚠️ | 路线只是 Tab 经过，不操作它们。 |
+| B8 付款表单 outline:none | 用优惠码 | none ⚠️ | 同上，只是 Tab 经过卡号框和 Pay；对视力正常的键盘用户来说，经过时焦点"消失"两下，也可以算 degrade。 |
+| B9 "Members only" 弹窗陷阱 | 用优惠码 | block | 焦点到优惠码框就弹出，出不去。 |
+| B10 Apply 是 `<span>` | 用优惠码 | block | 就算没有 B9，键盘也按不到 Apply。 |
+| B11 订阅弹窗陷阱 | 打开帆布包商品页 | block | 进页面就被困住。 |
+| T1 🛒 加购按钮 | 买帆布包 | block ⚠️ | 和 B1 同一种障碍，按 B1 处理。不过 testpage 上不加购也能直接点 Checkout 付款，严格说可以算 degrade。 |
+| T2 加购提示没播报 | 买帆布包 | degrade | 同 B2。 |
+| T3 卡号错误不播报、没关联 | 买帆布包 | block ⚠️ | 录制路线故意输了短卡号，错误出现但听不到，在对话框里卡死。如果照 goal 输 16 位卡号，这个错误根本不会出现。 |
+| T4 付款对话框陷阱 | 买帆布包 | block ⚠️ | 录制路线里和 T3 一起让用户出不去（run 以 stuck 结束）。同样，卡号正确时付款后对话框会关闭，陷阱碰不到。 |
+| T5 只能鼠标点的 Apply coupon | 买帆布包 | none | 优惠券是可选的，买包不需要（按你的决定）。 |
+| T6 Checkout outline:none | 买帆布包 | degrade | 同 B8。 |
+
+**⚠️ 需要你确认的 5 处：**
+- **B1 / T1**：block 还是 degrade？表情符号 🛒 读屏会读成 "shopping cart"，用户可能猜得到；testpage 上 T1 甚至不是必经步骤。
+- **shop-second 的 B5 / B8**：只是 Tab 经过、不操作的控件，算 none 还是 degrade？
+- **T3 / T4**：按"录制路线"（短卡号）是 block；按"goal 里给的正确卡号"两者都碰不到，应该是 none。现在按录制路线填。
