@@ -18,6 +18,13 @@ export function redactFocusValue(focus, { mode, typedSelectors }) {
   if (!blockType(focus) && typedSelectors.has(focus.selector)) return focus;
   return { ...focus, value: null, valueRedacted: true };
 }
+/**
+ * Real mode: every type overwrites the field, so a value the user entered or the browser autofilled is never kept
+ * alongside the agent's text (that would defeat redactFocusValue). Marked forcedReplace so the trace stays honest.
+ */
+export function forceReplace(action) {
+  return action.kind === 'type' && !action.replace ? { ...action, replace: true, forcedReplace: true } : action;
+}
 export function reachedBoundary(url, title) {
   return STOP.test(url) || STOP.test(title || '');
 }

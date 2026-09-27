@@ -102,3 +102,10 @@ LLM 验收（`LLM_CACHE=off`，`--no-judge`，改 prompt 后三组都重跑）�
 - **测试（先写的失败测试）**：`npm test` 新增 2 条（`redactFocusValue` 各分支、`pageText` 过滤字段内的文字）。smoke 新增 `form (local)` 和 `form (real)`：real 模式用带 CDP 端口的 Chromium 模拟"人已经打开的浏览器"，页面脚本预先给 Email 填上值（模拟自动填充），脚本在 Search 里输入 `tote`。验证 Email 的值是 null 并带 `valueRedacted`，Search 的值是 `tote`，而且整个 `trace.jsonl` 和 `report.json` 里都找不到那个邮箱。
 - **仍然存在（已写进 README）**：每步截图保存在本地运行目录里，截图上看得到自动填充的内容。截图目前不发给任何模型，真实网站的运行结果也不提交。如果以后做计划 13（视觉层检查），需要重新考虑这一点。
 - **已知的边界情况**：如果一个字段原本有自动填充的内容，planner 又没用 replace、直接在后面追加输入，这个字段会被当成"planner 输入过的字段"，value 里会带上原有的内容。real 模式下，planner 看不到这类字段的原有内容（value 是 null），所以更正时应该用 replace。
+
+### 补充（第四轮）：real 模式下所有 type 强制按 replace 执行
+
+- **规则**：`audit.mjs` 的 real 模式分支里，guard 放行的 `type` 动作都会经过 `guard.forceReplace`。planner 没有用 replace 时，runner 补上 `replace: true`，并标 `forcedReplace: true`；planner 自己用了 replace 的，原样保留，不标 forced。这些标记直接记进 trace 的 `action`，终端日志显示为 `type (replace)`。prompt 没改，local 模式不变。`contracts.mjs` 加了 `forcedReplace` 的注释。
+- **测试（先写的失败测试）**：新增 1 条单元测试（`forceReplace` 的三个分支）。smoke 的 form 用例在回到预填好的 Email 后先按 End，再输入 `agent@test.dev`。在去掉修复的代码上跑，real 用例失败：value 是 `me@example.comagent@test.dev`，trace 里出现了自动填充的邮箱，动作上也没有 replace 标记。加上修复后，value 只剩 `agent@test.dev`，动作带 `replace: true, forcedReplace: true`。local 用例确认本地仍然是追加。
+- **过程中的发现**：用 Tab 移进输入框时，Chrome 会全选框里的内容，接着输入本来就会覆盖。所以只有光标被移到内容后面（End、方向键、或页面脚本调用 `focus()`）时才真的会追加，测试必须先按 End 才能复现问题。
+- 顺带修了一处：smoke 的 real 用例结束后会删掉临时的 Chromium profile 目录，之前会留在系统临时目录里。

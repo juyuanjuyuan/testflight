@@ -33,7 +33,10 @@ function startServer() {
 // value set by script (like autofill) and split so the full string never appears in the data: URL itself
 const FORM = `data:text/html,<title>Form</title><label>Email <input id=email></label> <label>Search <input id=q></label><script>email.value='me@'+'example.com'</script>`;
 const FORM_SCRIPT = [{ kind: 'press', key: 'Tab', reason: 'to Email' }, { kind: 'press', key: 'Tab', reason: 'to Search' },
-  { kind: 'type', text: 'tote', reason: 'search' }, { kind: 'press', key: 'Shift+Tab', reason: 'back to Email' }, { kind: 'stuck', reason: 'end' }];
+  { kind: 'type', text: 'tote', reason: 'search' }, { kind: 'press', key: 'Shift+Tab', reason: 'back to Email' },
+  // Tab selects a field's content (typing would overwrite it anyway); End puts the caret after it so typing appends
+  { kind: 'press', key: 'End', reason: 'caret after the prefilled Email' },
+  { kind: 'type', text: 'agent@test.dev', reason: 'append to the prefilled Email' }, { kind: 'stuck', reason: 'end' }];
 const valueAt = (trace, i) => trace[i].focusAfter.value;
 
 const CASES = [
@@ -56,12 +59,16 @@ const CASES = [
   // local mode records every field value (our own test sites) ...
   { name: 'form', label: 'local', url: FORM, goal: 'search', script: FORM_SCRIPT,
     check: (s, r, trace) => [valueAt(trace, 1) === 'me@example.com' || `local Email value is ${JSON.stringify(valueAt(trace, 1))}, expected it recorded`,
-      valueAt(trace, 3) === 'tote' || `local Search value is ${JSON.stringify(valueAt(trace, 3))}, expected "tote"`] },
+      valueAt(trace, 3) === 'tote' || `local Search value is ${JSON.stringify(valueAt(trace, 3))}, expected "tote"`,
+      valueAt(trace, 6) === 'me@example.comagent@test.dev' || `local Email after appending is ${JSON.stringify(valueAt(trace, 6))}, expected type to append`,
+      !trace[6].action.replace && !trace[6].action.forcedReplace || 'local mode must not force replace'] },
   // ... real mode records only what the planner typed itself
   { name: 'form', label: 'real', url: FORM, goal: 'search', script: FORM_SCRIPT, mode: 'real',
     check: (s, r, trace, runDir) => [valueAt(trace, 1) === null && trace[1].focusAfter.valueRedacted === true || `real Email value is ${JSON.stringify(valueAt(trace, 1))}, expected null + valueRedacted`,
       valueAt(trace, 3) === 'tote' || `real Search value is ${JSON.stringify(valueAt(trace, 3))}, expected "tote"`,
       valueAt(trace, 4) === null || `real Email value after returning is ${JSON.stringify(valueAt(trace, 4))}, expected null`,
+      valueAt(trace, 6) === 'agent@test.dev' || `real Email after the agent typed is ${JSON.stringify(valueAt(trace, 6))}, expected only "agent@test.dev"`,
+      trace[6].action.replace === true && trace[6].action.forcedReplace === true || `real type action recorded as ${JSON.stringify(trace[6].action)}, expected replace + forcedReplace`,
       !fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8').includes('me@example.com') || 'autofilled value leaked into trace.jsonl',
       !fs.readFileSync(path.join(runDir, 'report.json'), 'utf8').includes('me@example.com') || 'autofilled value leaked into report.json'] },
 ];
@@ -69,13 +76,15 @@ const CASES = [
 // Real mode attaches to a browser the human already opened; stand one up with a CDP port and the page loaded.
 async function withRealBrowser(url, fn) {
   const cdpPort = port + 1;
-  const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-real-')),
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-real-'));
+  const ctx = await chromium.launchPersistentContext(profile,
     { headless: true, args: [`--remote-debugging-port=${cdpPort}`], executablePath: process.env.CHROME_BIN || undefined });
   try {
     await (ctx.pages()[0] || await ctx.newPage()).goto(url);
     return await fn(`http://127.0.0.1:${cdpPort}`);
   } finally {
     await ctx.close();
+    fs.rmSync(profile, { recursive: true, force: true });
   }
 }
 

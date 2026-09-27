@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/paths.mjs';
 import { readTrace, validateAction } from '../src/contracts.mjs';
-import { blockAction, redactFocusValue } from '../src/runner/guard.mjs';
+import { blockAction, redactFocusValue, forceReplace } from '../src/runner/guard.mjs';
 import { focusInfo, pageText } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
 import { buildObservation } from '../src/agent/observation.mjs';
@@ -88,6 +88,14 @@ test('real mode: pageText leaves out text inside editable fields (autofilled val
   const real = await pageText(cdp, 4000, { redactFieldText: true });
   assert.ok(!real.includes('me@example.com'), 'field content leaked into pageText');
   assert.ok(real.includes('[textbox] Email'), 'the field itself is still listed');
+});
+
+test('real mode: every type is forced to replace, and the trace says so', () => {
+  assert.deepEqual(forceReplace({ kind: 'type', text: 'a@b.c', reason: 'x' }), { kind: 'type', text: 'a@b.c', reason: 'x', replace: true, forcedReplace: true });
+  const already = { kind: 'type', text: 'a', replace: true, reason: 'x' };
+  assert.deepEqual(forceReplace(already), already, 'planner already chose replace: nothing was forced');
+  const press = { kind: 'press', key: 'Tab', reason: 'x' };
+  assert.deepEqual(forceReplace(press), press);
 });
 
 test('focusInfo records the AX value of the focused node', async () => {

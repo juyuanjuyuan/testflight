@@ -68,6 +68,7 @@ export const INTERACTIVE_ROLES = [
  * @property {string=}  key     for press, one of ALLOWED_KEYS
  * @property {string=}  text    for type
  * @property {boolean=} replace for type: select the field's current content first so `text` replaces it (default: append)
+ * @property {boolean=} forcedReplace real mode: the runner set replace (the planner did not), so autofilled text is never kept
  * @property {string}   reason  planner's rationale (shown in the viewer's left column)
  * @property {boolean=} probe   inserted by the runner (e.g. Escape after a Tab cycle), not by the planner
  * @property {boolean=} plannerError  stuck because the planner failed or kept producing invalid actions

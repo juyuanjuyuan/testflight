@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openSession } from './runner/session.mjs';
-import { blockAction, reachedBoundary } from './runner/guard.mjs';
+import { blockAction, forceReplace, reachedBoundary } from './runner/guard.mjs';
 import { nextAction } from './agent/planner.mjs';
 import { runDetectors } from './detect/index.mjs';
 import { judge } from './agent/judge.mjs';
@@ -57,7 +57,7 @@ export async function audit(o) {
       const cur = trace[trace.length - 1];
       if (o.mode === 'real') {
         if (reachedBoundary(cur.url, cur.title)) action = { kind: 'done', reason: 'reached checkout boundary (real-site safety stop)' };
-        else { const why = blockAction(action, cur.focusAfter); if (why) action = { kind: 'stuck', reason: why }; }
+        else { const why = blockAction(action, cur.focusAfter); action = why ? { kind: 'stuck', reason: why } : forceReplace(action); }
       }
       push(await s.step(action)); // done/stuck steps are recorded too (no key pressed) so the trace ends with the outcome
       if (action.kind === 'done' || action.kind === 'stuck') break;
