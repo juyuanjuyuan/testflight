@@ -6,11 +6,13 @@ import { focusInfo, pageText } from './observe.mjs';
 import { act } from './act.mjs';
 import { redactFocusValue } from './guard.mjs';
 import { runAxe, mergeAxe } from './axe.mjs';
-import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS, MAX_UNREACHABLE } from '../contracts.mjs';
+import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS } from '../contracts.mjs';
 
 const RECORDER = fs.readFileSync(new URL('./recorder.js', import.meta.url), 'utf8');
 /** Thresholds the in-page recorder needs; injected as window.__A11Y_CONFIG before recorder.js runs. */
-export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS, MAX_UNREACHABLE };
+export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS };
+// cap on D6 candidates per stuck step: real sites have many cursor:pointer cards, the judge filters the rest
+const MAX_UNREACHABLE = 20;
 const CONFIG_SCRIPT = `window.__A11Y_CONFIG = ${JSON.stringify(RECORDER_CONFIG)};`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -108,7 +110,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       else if (action.kind === 'type' && focusBefore && !focusBefore.isBody) typedSelectors.add(focusBefore.selector);
       const focusAfter = await observeFocus();
       // D6 scan only when stuck: it explains why, and scanning every step would flood real sites with pointer cards
-      const unreachable = action.kind === 'stuck' ? { unreachableClickables: await page.evaluate(() => window.__a11yRec.unreachableClickables()) } : {};
+      const unreachable = action.kind === 'stuck' ? { unreachableClickables: await page.evaluate((max) => window.__a11yRec.unreachableClickables(max), MAX_UNREACHABLE) } : {};
       const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, spoken: [], pageLoad, ...unreachable,
         pageText: pageLoad ? await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
       if (axe && (pageLoad || changes.length)) axeRuns.push(await runAxe(page));

@@ -150,7 +150,7 @@
       };
     },
     /** Visible elements that look clickable but Tab can never reach (D6). Called only on a 'stuck' step. */
-    unreachableClickables(max = CFG.MAX_UNREACHABLE) {
+    unreachableClickables(max) {
       const out = [];
       for (const el of document.body?.querySelectorAll('*') ?? []) {
         if (out.length >= max) break;

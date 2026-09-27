@@ -31,6 +31,6 @@
 ## 结果
 
 - 完成。testpage original 检出 5/5、0 误报；fixed 0 误报；`npm run smoke` 6/6 通过。D6 在 original 上只报 `#coupon`（T5），原生按钮及其内部文字不会误报。
-- 上限 `MAX_UNREACHABLE = 20` 放进了 `contracts.mjs`（`test/standards.test.mjs` 要求 recorder 的阈值都来自 contracts）。
+- 上限 `MAX_UNREACHABLE = 20` 定义在 `session.mjs`，作为参数传给 recorder（按计划，`contracts.mjs` 只改注释）。
 - 重新录制后 fixture 步骤数不变（original 14 步、fixed 18 步），只有最后的 stuck 步多了 `unreachableClickables`；fixed 第 5 步现在带有 AX value `'4242 4242'`，相应调整了 focusValue 测试。
 - 待办（不在本计划可改范围）：`docs/ARCHITECTURE.md` 第 7 行仍写"原版检出 4/4"，应改成 5/5。
