@@ -5,6 +5,7 @@ import path from 'node:path';
 import { audit, analyze, newRunDir } from './src/audit.mjs';
 import { readTrace } from './src/contracts.mjs';
 import { runFix, runRerun } from './src/fix/commands.mjs';
+import { createProgressWriter } from './src/report/progress.mjs';
 import { scoreRun, scoreTable } from './eval/score.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -21,6 +22,7 @@ const summary = (r) => console.log(`\nSR user can complete: ${r.verdicts.screenR
 const USAGE = `usage:
   node cli.mjs audit  --url <url> --goal "<task>" [--out runs/] [--script keys.json] [--no-judge] [--headed] [--site sites/shop/original]
                       [--mode real --cdp http://localhost:9222] [--fail-on block]
+                      [--run-dir <existing dir>] [--progress]                               # --progress: keep <runDir>/progress.json live
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
   node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched]
   node cli.mjs rerun  --run <runDir> [--url <patched url>]                                  # same goal on the patched site
@@ -30,8 +32,11 @@ async function main() {
   const out = args.out || undefined; // default: <repo>/runs
   if (cmd === 'audit') {
     const script = args.script ? readJSON(args.script) : null;
-    const { runDir, report } = await audit({ url: need('url'), goal: need('goal'), out, script, mode: args.mode, cdp: args.cdp,
-      judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label, log: console.log });
+    // --progress needs the dir before audit() starts; --run-dir is one the API already created
+    const dir = args['run-dir'] ? path.resolve(args['run-dir']) : args.progress ? newRunDir(out, args.label || 'audit') : undefined;
+    const { runDir, report } = await audit({ url: need('url'), goal: need('goal'), out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
+      judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label, log: console.log,
+      onProgress: args.progress ? createProgressWriter(dir) : undefined });
     summary(report); console.log(`→ ${runDir}/report.json`);
     if (args['fail-on'] === 'block' && report.counts.block > 0) process.exit(1);
   } else if (cmd === 'replay') {

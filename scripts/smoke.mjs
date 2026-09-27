@@ -10,11 +10,15 @@ import { ROOT } from '../src/paths.mjs';
 import { readTrace } from '../src/contracts.mjs';
 import { heardInStep } from '../src/agent/observation.mjs';
 import { scoreRun } from '../eval/score.mjs';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 
 const port = Number(process.env.PORT || 8090);
 const SERVER_READY_MS = 10_000;
 const GOAL = 'Buy the canvas tote bag';
 const readJSON = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+const API_RUN_TIMEOUT_MS = 120_000;
+const POLL_MS = 250;
 
 // Resolve only on the server's own "serving" line: polling the URL could hit some other process already on the port.
 function startServer() {
@@ -111,6 +115,7 @@ async function runCase(c) {
     script: Array.isArray(c.script) ? c.script : readJSON(c.script), judgeEnabled: false, site: c.url ? null : `sites/${c.name}`,
     label: `smoke-${[c.name, c.label].filter(Boolean).join('-').replace('/', '-')}` });
   const { runDir, report } = c.mode === 'real' ? await withRealBrowser(url, run) : await run();
+  if (!c.label && c.name === 'testpage/original') cliReport = report; // the API case must reproduce this
   const trace = readTrace(fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8'));
   const score = c.groundtruth ? scoreRun({ runDir, groundtruth: path.join(ROOT, c.groundtruth) }) : null;
   const failures = c.check(score, report, trace, runDir).filter((x) => x !== true);
@@ -120,12 +125,62 @@ async function runCase(c) {
   return failures.length === 0;
 }
 
+// The frontend's flow (docs/API.md): POST /api/runs with a key script, poll progress.json to done, then read report.json.
+let cliReport = null;
+const ajv = new Ajv2020({ strict: true, allowUnionTypes: true });
+addFormats(ajv);
+ajv.addSchema(readJSON('docs/report.schema.json'));
+const validProgress = ajv.compile(readJSON('docs/progress.schema.json'));
+const validReport = ajv.getSchema(readJSON('docs/report.schema.json').$id);
+const STATE_ORDER = ['running', 'analyzing', 'done'];
+// carousel noise and "appeared Nms after" vary run to run; everything the verdict rests on must match
+const stable = (r) => ({ meta: { ...r.meta, generatedAt: null }, verdicts: r.verdicts, counts: r.counts, axe: r.axe,
+  findings: r.findings.map((f) => [f.id, f.impact, f.detector, f.layer, f.wcag, f.steps, f.evidence.text]),
+  timeline: r.timeline.map((t) => [t.i, t.action, t.url, t.focus, t.heard, t.seen.map((x) => x.text), t.findingIds]) });
+
+async function runApiCase() {
+  const base = `http://localhost:${port}`;
+  const post = (body) => fetch(`${base}/api/runs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await post({ url: `${base}/testpage/original/`, goal: GOAL, script: 'keys.testpage.json' });
+  const { runDir } = await res.json();
+  const failures = [res.status === 202 || `POST /api/runs → ${res.status}, expected 202`];
+  const busy = await post({ url: `${base}/testpage/original/`, goal: GOAL });
+  failures.push(busy.status === 409 || `second POST while running → ${busy.status}, expected 409`);
+  const states = [];
+  const t0 = Date.now();
+  let p;
+  for (;;) {
+    const r = await fetch(`${base}/runs/${runDir}/progress.json`);
+    if (r.status !== 200) { failures.push(`progress.json → ${r.status} after ${Date.now() - t0}ms`); break; }
+    p = await r.json();
+    if (!validProgress(p)) failures.push(`progress.json (${p.state}) does not match the schema: ${ajv.errorsText(validProgress.errors)}`);
+    if (states.at(-1) !== p.state) states.push(p.state);
+    if (p.state === 'done' || p.state === 'failed' || Date.now() - t0 > API_RUN_TIMEOUT_MS) break;
+    await new Promise((r2) => setTimeout(r2, POLL_MS));
+  }
+  failures.push(p?.state === 'done' || `run ended in ${p?.state}${p?.error ? ': ' + p.error : ''}, expected done`);
+  failures.push(states.every((st, k) => k === 0 || STATE_ORDER.indexOf(st) > STATE_ORDER.indexOf(states[k - 1])) || `states out of order: ${states.join(' → ')}`);
+  if (p?.state === 'done') {
+    const report = await (await fetch(`${base}/runs/${runDir}/report.json`)).json();
+    failures.push(validReport(report) || `report.json does not match the schema: ${ajv.errorsText(validReport.errors)}`);
+    const shots = await Promise.all(report.timeline.filter((t) => t.screenshot).map((t) => fetch(`${base}/runs/${runDir}/${t.screenshot}`).then((r) => r.status)));
+    failures.push(shots.length > 0 && shots.every((st) => st === 200) || `screenshots not all served: ${shots.join(',')}`);
+    failures.push(p.timeline.length === report.timeline.length || `progress has ${p.timeline.length} steps, report ${report.timeline.length}`);
+    failures.push(!cliReport || JSON.stringify(stable(report)) === JSON.stringify(stable(cliReport)) || 'report.json differs from the same audit run directly');
+  }
+  const failed = failures.filter((x) => x !== true);
+  console.log(`${failed.length ? 'FAIL' : 'ok  '} api: POST /api/runs → ${states.join(' → ')} · runs/${runDir}`);
+  for (const f of failed) console.log(`       ✗ ${f}`);
+  return failed.length === 0;
+}
+
 const server = startServer();
 let passed = false;
 try {
   await server.ready;
   const results = [];
   for (const c of CASES) results.push(await runCase(c));
+  results.push(await runApiCase());
   passed = results.every(Boolean);
 } catch (e) {
   console.error(process.env.DEBUG ? e : `smoke error: ${e.message.split('\n')[0]} (DEBUG=1 for details)`);

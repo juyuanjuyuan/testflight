@@ -1,8 +1,19 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { computeVerdicts } from '../verdicts.mjs';
 import { heardInStep, describeFocus } from '../agent/observation.mjs';
 import { NOISE_REPEAT } from '../contracts.mjs';
+import { writeJsonAtomic, writeFileAtomic } from './atomic.mjs';
+
+/** One report.json timeline[] entry for a trace step; progress.json uses the same function (findings = [] while running). */
+export function timelineEntry(s, findings) {
+  return {
+    i: s.i, action: s.action, url: s.url, focus: describeFocus(s.focusAfter), focusRect: s.focusAfter.rect ?? null,
+    seen: s.changes.filter((c) => c.visible && c.repeatCount < NOISE_REPEAT).map((c) => ({ text: c.text, rect: c.rect ?? null })), // middle column
+    seenNoise: s.changes.filter((c) => c.repeatCount >= NOISE_REPEAT).map((c) => c.text),                              // carousels etc.
+    heard: heardInStep(s),                                             // right column: what AT conveyed
+    screenshot: s.screenshot, findingIds: findings.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
+  };
+}
 
 /** report.json is the ONLY file the viewer reads. */
 export function buildReport({ meta, trace, findings, axe = null, rerun = null, fixes = null, stats = null }) {
@@ -22,13 +33,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
       axeViolations: axeOk ? axe.violations.filter(isWcag).length : null,        // WCAG rules only; null = axe unavailable
       axeBestPractice: axeOk ? axe.violations.filter((v) => !isWcag(v)).length : null,
     },
-    timeline: trace.map((s) => ({
-      i: s.i, action: s.action, url: s.url, focus: describeFocus(s.focusAfter), focusRect: s.focusAfter.rect ?? null,
-      seen: s.changes.filter((c) => c.visible && c.repeatCount < NOISE_REPEAT).map((c) => ({ text: c.text, rect: c.rect ?? null })), // middle column
-      seenNoise: s.changes.filter((c) => c.repeatCount >= NOISE_REPEAT).map((c) => c.text),                              // carousels etc.
-      heard: heardInStep(s),                                             // right column: what AT conveyed
-      screenshot: s.screenshot, findingIds: shown.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
-    })),
+    timeline: trace.map((s) => timelineEntry(s, shown)),
     findings: shown.sort((a, b) => order[a.impact] - order[b.impact]),
     axe: !axe ? null : axe.error ? { error: axe.error } : { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) },
     fixes, rerun, stats,
@@ -48,7 +53,8 @@ export function reportMarkdown(r) {
   return lines.join('\n') + '\n';
 }
 
+/** Write report.json (atomically: the viewer may be polling it) and report.md into runDir. */
 export function writeReport(runDir, report) {
-  fs.writeFileSync(path.join(runDir, 'report.json'), JSON.stringify(report, null, 2));
-  fs.writeFileSync(path.join(runDir, 'report.md'), reportMarkdown(report));
+  writeJsonAtomic(path.join(runDir, 'report.json'), report);
+  writeFileAtomic(path.join(runDir, 'report.md'), reportMarkdown(report));
 }

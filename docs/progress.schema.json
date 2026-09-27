@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/juyuanjuyuan/testflight/docs/progress.schema.json",
+  "title": "Live progress of a run (runs/<runDir>/progress.json)",
+  "description": "Rewritten atomically while a run is in progress; poll it until state is done or failed. report.json stays the only final result. Timeline entries have exactly the report.json timeline[] shape. See docs/API.md.",
+  "type": "object",
+  "required": ["state", "step", "maxSteps", "timeline", "rerunDir", "error", "updatedAt"],
+  "properties": {
+    "state": {
+      "enum": ["running", "analyzing", "fixing", "rerunning", "done", "failed"],
+      "description": "running = acting step by step; analyzing = detectors/axe/judge; fixing, rerunning = plan 17 P1; done = report.json is already written; failed = see error"
+    },
+    "step": { "type": ["integer", "null"], "minimum": 0, "description": "i of the last recorded step (= timeline[-1].i); null before the first step" },
+    "maxSteps": { "type": ["integer", "null"], "minimum": 1, "description": "Step limit of the planner (the start step 0 is not counted)" },
+    "timeline": {
+      "type": "array",
+      "description": "Steps so far. findingIds is [] until the run is done; the final ids are in report.json.",
+      "items": { "$ref": "report.schema.json#/$defs/timelineStep" }
+    },
+    "rerunDir": { "type": ["string", "null"], "description": "While state is rerunning: the rerun's own runDir (it has its own progress.json). null otherwise (P1)" },
+    "error": { "type": ["string", "null"], "description": "state failed: one sentence to show the user. null otherwise" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

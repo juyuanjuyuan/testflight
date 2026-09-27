@@ -93,4 +93,28 @@
 
 ## 结果
 
-（完成后填写）
+### P0（2026-09-27 完成；P1、P2 未做，所以 README 里还没勾选）
+
+**做了什么**
+- `POST /api/runs`（`src/api/runs.mjs`）：校验 → `newRunDir` → 先原子写第一版 progress.json → 子进程 `node cli.mjs audit … --run-dir <dir> --site <site> --progress`（`src/api/spawn.mjs`，输出记到运行目录的 `cli.log`）→ `202 { runDir }`。一次只允许一个运行（`409 run_in_progress`）；子进程退出时如果 progress 不是 done/failed，服务器补写 `failed`（保留 timeline）。
+- `audit()` 新增 `runDir`、`onProgress`（以及仅供测试的 `openSession` 注入）；状态顺序 running（每步之后）→ analyzing → done（report.json 写完之后）/ failed（一句话 error 后重新抛出）。
+- `src/report/build.mjs` 抽出 `timelineEntry(step, findings)`，report.json 和 progress.json 共用；`writeReport` 改为原子写入（`src/report/atomic.mjs`）。`src/report/progress.mjs`：`createProgressWriter`、`readProgress`、`markFailedIfUnfinished`。
+- 服务器只监听 127.0.0.1（`src/server.mjs` 的 `HOST` + `listen()`，`scripts/serve.mjs` 使用它）。
+- `newRunDir` 同一秒内再建目录时加 `-2` 后缀，不再静默复用已有目录。
+- 文档：新建 `docs/API.md`、`docs/progress.schema.json`（timeline 每一步 `$ref` 到 `report.schema.json#/$defs/timelineStep`）；`REPORT_FORMAT.md` §1 加了指向 API.md 的一句。report.json 的内容没有变化，所以 schema 和 example 不用改。
+
+**验收**
+- `npm test`：新增 `test/api.test.mjs`（注入假的"启动子进程"函数：参数校验、script 白名单、409 与释放、崩溃后 failed、done 不被覆盖、spawn 抛错 → 500、runDir 校验、监听 127.0.0.1）和 `test/progress.test.mjs`（原子写入、各状态符合 schema、用 fixture trace 和假 session 跑真实的 `audit()` 验证状态顺序、report.json 先于 done、两边 timeline 一致、失败写 failed）。
+- `npm run smoke`：新增 `api` 用例，通过 `POST /api/runs`（带 `script`）跑 testpage，轮询到 `done`，每次轮询都校验 progress schema，检查截图可访问、report.json 符合 schema，并与直接运行的结果一致（比较结论、计数、findings、每一步的动作/焦点/听到/看到的文字；轮播噪音和 "appeared Nms after" 里的毫秒数每次不同，不参与比较）。
+- 前端文档第 8 节 P0 的 curl 流程在临时端口上手动跑通：带 `script`（running → done，截图 200）；不带 `script`（planner + judge，running → analyzing → done，12 次模型调用，约 20 秒）；运行中再 POST 返回 409；运行中 `kill -9` 子进程 → `failed`，error 为 "The audit stopped unexpectedly: killed by SIGKILL"，之后可以再次启动。
+
+**和前端文档不一致的地方（已写进 docs/API.md §1，需要转告前端）**
+1. `maxSteps` 是 25，不是 30。
+2. 网页上只能审计本服务器的站点（localhost/127.0.0.1 + 本服务器端口 + `sites/` 下存在的站点），其他网址 `400 real_site_cli_only`，本服务器上不存在的站点 `400 unknown_site`。前端不需要传 `mode`。
+3. 服务器只监听 127.0.0.1：Vite 代理请指向 `localhost:8080` 或 `127.0.0.1:8080`。
+4. 请求体多了可选的 `script`（`eval/keys.*.json` 的文件名，确定性运行，不调用模型），前端正常使用时不传。
+5. 除了前端列的 400/404/409/500，还有 `405 method_not_allowed`；请求体超过 16KB 是 `400 body_too_large`。完整的 code 列表见 API.md §4。
+6. 还没有任何步骤时 `progress.step` 是 `null`，不是数字。
+7. 按脚本运行只要十秒左右，每秒轮询可能看不到 `analyzing`，会从 `running` 直接跳到 `done`。
+8. 运行目录里多了一个 `cli.log`（后端排查用），前端不要读。
+9. `fixPolicy`（替代 `fix.constraints`）、`GET /api/runs`、修复接口都还没有（P1/P2）。`GET /api/runs` 目前返回 405。

@@ -16,7 +16,7 @@
 | 测试用的固定数据 | `http://localhost:8080/fixtures/testpage-original/report.json` |
 | 截图 | 报告所在目录 + `timeline[].screenshot`，例如 `/runs/<运行目录名>/shots/0007.png` |
 
-运行目录名形如 `2026-09-26T21-24-50-audit`，后端命令行在运行结束时会打印出来。目前没有"列出所有运行"的接口，需要的话告诉后端。
+运行目录名形如 `2026-09-26T21-24-50-audit`，后端命令行在运行结束时会打印出来；从网页启动的运行由 `POST /api/runs` 返回，运行中的进度在同一目录的 `progress.json`，见 `docs/API.md`。目前没有"列出所有运行"的接口（计划 17 P2）。
 
 直接用 `file://` 打开页面会读不到报告，必须经过服务器。
 
