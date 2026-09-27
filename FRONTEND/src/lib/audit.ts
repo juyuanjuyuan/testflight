@@ -1,4 +1,4 @@
-import type { AuditReport, Progress, Rect, ShotSize } from "../api/contracts";
+import type { AuditReport, Progress, Rect, RunEntry, ShotSize } from "../api/contracts";
 
 // States the backend may add later are shown as in progress; polling continues until done or failed.
 // "unknown" is the run list's marker for a corrupt progress file, not a working state.
@@ -15,6 +15,13 @@ export function inconclusiveMessage(reason?: string | null): string {
   return reason === "missing_test_data"
     ? "Inconclusive: the task is missing test data (for example, a card number). Add it and run again."
     : "Inconclusive: the backend could not determine whether this task can be completed.";
+}
+// In the run list these states imply a saved report, so a null verdict means inconclusive;
+// in any other state null means no report yet (docs/API.md §4).
+export function historyVerdict(run: Pick<RunEntry, "state" | "screenReaderUserCanComplete">): string {
+  if (run.screenReaderUserCanComplete === true) return "Audit: task completable";
+  if (run.screenReaderUserCanComplete === false) return "Audit: needs attention";
+  return ["done", "unknown", "fixing", "rerunning"].includes(run.state) ? "Audit: inconclusive" : "No verdict yet";
 }
 export function auditDuration(report: AuditReport): number | null {
   const start = Date.parse(report.meta.startedAt ?? "");

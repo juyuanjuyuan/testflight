@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { liveApi, ApiError, artifactUrl, rerunName, suggestTasks } from "../src/api/live.ts";
-import { frameGeometry, stateLabel, isActive, suggestionLabel, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
+import { frameGeometry, stateLabel, isActive, suggestionLabel, historyVerdict, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
 
 function mockFetch(t, data, status = 200) {
   const calls = [];
@@ -170,4 +170,10 @@ test("the preset fallback has its own shorter timeout", async () => {
   const { SUGGEST_GENERATE_TIMEOUT_MS, SUGGEST_PRESET_TIMEOUT_MS } = await import("../src/api/live.ts");
   assert.equal(SUGGEST_PRESET_TIMEOUT_MS, 15_000);
   assert.ok(SUGGEST_PRESET_TIMEOUT_MS < SUGGEST_GENERATE_TIMEOUT_MS);
+});
+test("run history separates inconclusive finished runs from runs without a report yet", () => {
+  for (const state of ["done", "unknown", "fixing", "rerunning"]) assert.equal(historyVerdict({ state, screenReaderUserCanComplete: null }), "Audit: inconclusive");
+  for (const state of ["planning_task", "waiting_for_user", "running", "analyzing", "failed", "future_state"]) assert.equal(historyVerdict({ state, screenReaderUserCanComplete: null }), "No verdict yet");
+  assert.equal(historyVerdict({ state: "done", screenReaderUserCanComplete: true }), "Audit: task completable");
+  assert.equal(historyVerdict({ state: "fixing", screenReaderUserCanComplete: false }), "Audit: needs attention");
 });
