@@ -6,7 +6,7 @@
     "script": true,
     "goal": "Buy the canvas tote bag",
     "judge": false,
-    "generatedAt": "2026-09-26T20:59:58.997Z"
+    "generatedAt": "2026-09-27T01:20:03.302Z"
   },
   "verdicts": {
     "outcome": "done",
@@ -51,9 +51,9 @@
       "focus": "button \"Add Canvas Tote Bag to cart\"",
       "focusRect": {
         "x": 32,
-        "y": 213,
+        "y": 211,
         "w": 33,
-        "h": 21
+        "h": 28
       },
       "seen": [],
       "seenNoise": [],
@@ -74,24 +74,22 @@
       "focus": "button \"Add Canvas Tote Bag to cart\"",
       "focusRect": {
         "x": 32,
-        "y": 213,
+        "y": 211,
         "w": 33,
-        "h": 21
+        "h": 28
       },
       "seen": [
         {
           "text": "Added to cart",
           "rect": {
             "x": 32,
-            "y": 242,
+            "y": 247,
             "w": 640,
             "h": 19
           }
         }
       ],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [
         "Added to cart"
       ],
@@ -109,14 +107,12 @@
       "focus": "button \"Checkout\"",
       "focusRect": {
         "x": 32,
-        "y": 269,
+        "y": 274,
         "w": 72,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Checkout\""
       ],
@@ -133,9 +129,9 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [
@@ -149,9 +145,7 @@
           }
         }
       ],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\"",
         "Card number Pay"
@@ -169,15 +163,13 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0005.png",
       "findingIds": []
@@ -192,14 +184,14 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
       "seenNoise": [
-        "20% off hats"
+        "Free shipping over $50"
       ],
       "heard": [
         "button \"Pay\""
@@ -217,7 +209,7 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
@@ -226,15 +218,15 @@
         {
           "text": "Card number is invalid",
           "rect": {
-            "x": 470,
+            "x": 492,
             "y": 401,
-            "w": 339,
+            "w": 295,
             "h": 19
           }
         }
       ],
       "seenNoise": [
-        "Free shipping over $50"
+        "New arrivals this week"
       ],
       "heard": [
         "Card number is invalid"
@@ -252,14 +244,14 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\", Card number is invalid",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
       "seenNoise": [
-        "New arrivals this week"
+        "20% off hats"
       ],
       "heard": [
         "textbox \"Card number\", Card number is invalid"
@@ -277,15 +269,13 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Pay\""
       ],
@@ -302,15 +292,13 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\", Card number is invalid",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\", Card number is invalid"
       ],
@@ -327,15 +315,13 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Pay\""
       ],
@@ -353,14 +339,12 @@
       "focus": "button \"Checkout\"",
       "focusRect": {
         "x": 32,
-        "y": 269,
+        "y": 274,
         "w": 72,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Checkout\""
       ],
@@ -377,9 +361,9 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\", Card number is invalid",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [
@@ -395,16 +379,14 @@
         {
           "text": "Card number is invalid",
           "rect": {
-            "x": 470,
+            "x": 492,
             "y": 401,
-            "w": 339,
+            "w": 295,
             "h": 19
           }
         }
       ],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\", Card number is invalid",
         "Card number Pay",
@@ -423,15 +405,13 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "textbox \"Card number\", Card number is invalid",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0014.png",
       "findingIds": []
@@ -446,14 +426,14 @@
       "url": "http://localhost:8080/testpage/fixed/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
       "seenNoise": [
-        "20% off hats"
+        "Free shipping over $50"
       ],
       "heard": [
         "button \"Pay\""
@@ -472,7 +452,7 @@
       "focus": "button \"Checkout\"",
       "focusRect": {
         "x": 32,
-        "y": 269,
+        "y": 274,
         "w": 72,
         "h": 21
       },
@@ -481,15 +461,13 @@
           "text": "Order confirmed",
           "rect": {
             "x": 32,
-            "y": 242,
+            "y": 247,
             "w": 640,
             "h": 19
           }
         }
       ],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Checkout\"",
         "Order confirmed"
@@ -507,14 +485,12 @@
       "focus": "button \"Checkout\"",
       "focusRect": {
         "x": 32,
-        "y": 269,
+        "y": 274,
         "w": 72,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0017.png",
       "findingIds": []

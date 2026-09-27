@@ -9,7 +9,7 @@ import { mergeAxe } from '../src/runner/axe.mjs';
 import { enableAX, screenshotOrNull, waitForLoad, RECORDER_CONFIG } from '../src/runner/session.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { applyEdits } from '../src/fix/apply.mjs';
-import { readTrace, CHANGE_WINDOW_MS } from '../src/contracts.mjs';
+import { readTrace, CHANGE_WINDOW_MS, MAX_UNREACHABLE } from '../src/contracts.mjs';
 
 const trace = readTrace(fs.readFileSync(path.join(ROOT, 'fixtures/testpage-original/trace.jsonl'), 'utf8'));
 
@@ -61,7 +61,7 @@ test('recorder thresholds come from contracts.mjs, not literals in the page scri
   const src = fs.readFileSync(path.join(ROOT, 'src/runner/recorder.js'), 'utf8');
   assert.ok(!/\b1500\b/.test(src), 'recorder.js hard-codes 1500');
   assert.match(src, /__A11Y_CONFIG/);
-  assert.deepEqual(RECORDER_CONFIG, { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS });
+  assert.deepEqual(RECORDER_CONFIG, { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS, MAX_UNREACHABLE });
 });
 
 test('package.json scripts only reference files that exist', () => {

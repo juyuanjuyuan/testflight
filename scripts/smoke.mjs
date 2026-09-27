@@ -41,7 +41,7 @@ const valueAt = (trace, i) => trace[i].focusAfter.value;
 
 const CASES = [
   { name: 'testpage/original', script: 'eval/keys.testpage.json', groundtruth: 'eval/groundtruth/testpage.yaml',
-    check: (s) => [s.hits === s.planted && s.planted === 4 || `detected ${s.hits}/${s.planted}, expected 4/4 (missed: ${s.misses.join(' ')})`,
+    check: (s) => [s.hits === s.planted && s.planted === 5 || `detected ${s.hits}/${s.planted}, expected 5/5 (missed: ${s.misses.join(' ')})`,
       s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`] },
   { name: 'testpage/fixed', script: 'eval/keys.testpage.fixed.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
     check: (s, r) => [s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`,

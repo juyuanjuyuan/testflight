@@ -20,9 +20,20 @@ const load = (v) => readTrace(fs.readFileSync(path.join(ROOT, `fixtures/testpage
 const original = load('original');
 const fixed = load('fixed');
 
-test('detectors find all 4 planted barriers on the original page', () => {
+test('detectors find all 5 planted barriers on the original page', () => {
   const ids = new Set(runDetectors(original).map((c) => c.evidence.barrierId).filter(Boolean));
-  assert.deepEqual([...ids].sort(), ['T1', 'T2', 'T3', 'T4']);
+  assert.deepEqual([...ids].sort(), ['T1', 'T2', 'T3', 'T4', 'T5']);
+});
+
+test('D6: mouse-only "Apply coupon" is reported as pointer-only on the stuck step', () => {
+  const last = original[original.length - 1];
+  assert.equal(last.action.kind, 'stuck');
+  const d6 = runDetectors(original).filter((c) => c.detector === 'pointer-only');
+  assert.deepEqual(d6.map((c) => c.evidence.barrierId), ['T5'], 'only the planted div: native buttons and text inside them are reachable');
+  assert.deepEqual(d6[0].steps, [last.i]);
+  assert.deepEqual(d6[0].wcag, ['2.1.1']);
+  assert.match(d6[0].hint, /Apply coupon/);
+  assert.ok(original.slice(0, -1).every((s) => !('unreachableClickables' in s)), 'scanned only when stuck');
 });
 
 test('detectors report nothing on the fixed page (no false positives)', () => {
@@ -46,7 +57,9 @@ test('focusValue is the AX value of the focused field, not what the planner type
   const withValue = (steps, value) => steps.map((s, n) => (n === steps.length - 1 ? { ...s, focusAfter: { ...s.focusAfter, value } } : s));
   assert.equal(buildObservation('buy', withValue(fixed.slice(0, 6), '4242 4242')).focusValue, '4242 4242');
   assert.equal(buildObservation('buy', withValue(fixed.slice(0, 6), '')).focusValue, '');
-  assert.equal(buildObservation('buy', fixed.slice(0, 6)).focusValue, null, 'no AX value recorded → null, never inferred from typed text');
+  const { value, ...noValue } = fixed[5].focusAfter;
+  assert.equal(value, '4242 4242', 'the fixture recorded the AX value after typing');
+  assert.equal(buildObservation('buy', [...fixed.slice(0, 5), { ...fixed[5], focusAfter: noValue }]).focusValue, null, 'no AX value recorded → null, never inferred from typed text');
 });
 
 test('Action: type accepts optional boolean replace, nothing else does', () => {

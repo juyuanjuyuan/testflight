@@ -6,19 +6,20 @@
     "script": true,
     "goal": "Buy the canvas tote bag",
     "judge": false,
-    "generatedAt": "2026-09-26T21:24:50.996Z"
+    "generatedAt": "2026-09-27T01:19:53.458Z"
   },
   "verdicts": {
     "outcome": "stuck",
     "agentCanComplete": false,
     "screenReaderUserCanComplete": false,
     "blockingFindings": [
-      "F4"
+      "F4",
+      "F6"
     ],
     "unexplainedStuck": false
   },
   "counts": {
-    "block": 1,
+    "block": 2,
     "degrade": 4,
     "filteredOut": 0,
     "axeViolations": 0,
@@ -53,9 +54,9 @@
       "focus": "button \"🛒\"",
       "focusRect": {
         "x": 32,
-        "y": 213,
+        "y": 211,
         "w": 33,
-        "h": 21
+        "h": 28
       },
       "seen": [],
       "seenNoise": [],
@@ -78,16 +79,16 @@
       "focus": "button \"🛒\"",
       "focusRect": {
         "x": 32,
-        "y": 213,
+        "y": 211,
         "w": 33,
-        "h": 21
+        "h": 28
       },
       "seen": [
         {
           "text": "Added to cart",
           "rect": {
             "x": 32,
-            "y": 242,
+            "y": 247,
             "w": 640,
             "h": 19
           }
@@ -112,14 +113,12 @@
       "focus": "button \"Checkout\"",
       "focusRect": {
         "x": 32,
-        "y": 269,
+        "y": 292,
         "w": 72,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Checkout\""
       ],
@@ -136,9 +135,9 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [
@@ -152,9 +151,7 @@
           }
         }
       ],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\"",
         "Card number Pay"
@@ -172,15 +169,13 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0005.png",
       "findingIds": []
@@ -195,14 +190,14 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
       "seenNoise": [
-        "20% off hats"
+        "Free shipping over $50"
       ],
       "heard": [
         "button \"Pay\""
@@ -220,7 +215,7 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
@@ -229,15 +224,15 @@
         {
           "text": "Card number is invalid",
           "rect": {
-            "x": 470,
+            "x": 492,
             "y": 401,
-            "w": 339,
+            "w": 295,
             "h": 19
           }
         }
       ],
       "seenNoise": [
-        "Free shipping over $50"
+        "New arrivals this week"
       ],
       "heard": [],
       "screenshot": "shots/0007.png",
@@ -256,14 +251,14 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
       "seenNoise": [
-        "New arrivals this week"
+        "20% off hats"
       ],
       "heard": [
         "textbox \"Card number\""
@@ -281,15 +276,13 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Pay\""
       ],
@@ -306,15 +299,13 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "textbox \"Card number\"",
       "focusRect": {
-        "x": 581,
+        "x": 591,
         "y": 364,
-        "w": 185,
+        "w": 153,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\""
       ],
@@ -333,15 +324,13 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [
         "button \"Pay\""
       ],
@@ -360,15 +349,13 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0012.png",
       "findingIds": [
@@ -384,18 +371,18 @@
       "url": "http://localhost:8080/testpage/original/",
       "focus": "button \"Pay\"",
       "focusRect": {
-        "x": 771,
+        "x": 749,
         "y": 364,
         "w": 39,
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "Free shipping over $50"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0013.png",
-      "findingIds": []
+      "findingIds": [
+        "F6"
+      ]
     }
   ],
   "findings": [
@@ -427,6 +414,31 @@
       "candidateId": "C4"
     },
     {
+      "id": "F6",
+      "detector": "pointer-only",
+      "layer": "operation",
+      "steps": [
+        13
+      ],
+      "wcag": [
+        "2.1.1"
+      ],
+      "hint": "clickable \"Apply coupon\" never received keyboard focus",
+      "evidence": {
+        "selector": "#coupon",
+        "barrierId": "T5",
+        "text": "Apply coupon",
+        "screenshot": "shots/0013.png"
+      },
+      "impact": "block",
+      "summary": "clickable \"Apply coupon\" never received keyboard focus",
+      "userImpact": "",
+      "judged": false,
+      "axeAlsoFound": true,
+      "fix": null,
+      "candidateId": "C6"
+    },
+    {
       "id": "F1",
       "detector": "unannounced",
       "layer": "announcement",
@@ -436,7 +448,7 @@
       "wcag": [
         "4.1.3"
       ],
-      "hint": "\"Added to cart\" appeared 3ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
+      "hint": "\"Added to cart\" appeared 1ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
       "evidence": {
         "selector": "#toast",
         "barrierId": "T2",
@@ -444,7 +456,7 @@
         "screenshot": "shots/0002.png"
       },
       "impact": "degrade",
-      "summary": "\"Added to cart\" appeared 3ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
+      "summary": "\"Added to cart\" appeared 1ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
       "userImpact": "",
       "judged": false,
       "axeAlsoFound": true,
@@ -461,7 +473,7 @@
       "wcag": [
         "4.1.3"
       ],
-      "hint": "\"Card number is invalid\" appeared 3ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
+      "hint": "\"Card number is invalid\" appeared 1ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
       "evidence": {
         "selector": "#carderr",
         "barrierId": "T3",
@@ -469,7 +481,7 @@
         "screenshot": "shots/0007.png"
       },
       "impact": "degrade",
-      "summary": "\"Card number is invalid\" appeared 3ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
+      "summary": "\"Card number is invalid\" appeared 1ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
       "userImpact": "",
       "judged": false,
       "axeAlsoFound": false,
@@ -542,7 +554,7 @@
         "id": "region",
         "impact": "moderate",
         "wcag": false,
-        "nodes": 5
+        "nodes": 6
       }
     ]
   },

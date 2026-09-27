@@ -88,6 +88,18 @@
       cur = child;
     }
   }
+  // keyboard-reachable = Tab can land on it; tabindex=-1 is focusable by script but never by Tab
+  function tabbable(el) {
+    if (el.disabled) return false;
+    if ((el.tagName === 'A' || el.tagName === 'AREA') && !el.hasAttribute('href') && !el.hasAttribute('tabindex')) return false;
+    return el.tabIndex >= 0;
+  }
+  function looksClickable(el) {
+    if (el.hasAttribute('onclick') || typeof el.onclick === 'function') return true;
+    if (['button', 'link'].includes(el.getAttribute('role'))) return true;
+    // cursor is inherited: only count the element where pointer starts, not every descendant
+    return getComputedStyle(el).cursor === 'pointer' && !(el.parentElement && getComputedStyle(el.parentElement).cursor === 'pointer');
+  }
   function isActiveBody() {
     const a = document.activeElement;
     return !a || a === document.body || a === document.documentElement;
@@ -136,6 +148,21 @@
         rect: body ? null : rectOf(a),
         inputHints: body ? null : ['type', 'name', 'id', 'autocomplete'].map((k) => a.getAttribute(k) || '').join(' '),
       };
+    },
+    /** Visible elements that look clickable but Tab can never reach (D6). Called only on a 'stuck' step. */
+    unreachableClickables(max = CFG.MAX_UNREACHABLE) {
+      const out = [];
+      for (const el of document.body?.querySelectorAll('*') ?? []) {
+        if (out.length >= max) break;
+        if (el.closest('script,style,noscript,[inert],[aria-hidden="true"]') || !looksClickable(el) || !isVisible(el)) continue;
+        // inside something Tab can reach (text inside a button/link): the ancestor is the control
+        let reachable = false;
+        for (let e = el; e && e !== document.body; e = e.parentElement) if (tabbable(e)) { reachable = true; break; }
+        if (reachable || out.some((o) => o.el.contains(el))) continue;
+        const text = lines(el.innerText).join(' ') || el.getAttribute('aria-label') || el.getAttribute('title') || '';
+        out.push({ el, selector: selectorOf(el), barrierId: barrierOf(el), text: text.slice(0, 120) });
+      }
+      return out.map(({ el, ...u }) => u);
     },
     modalOpen() {
       return [...document.querySelectorAll('dialog[open],[role="dialog"],[role="alertdialog"],[aria-modal="true"]')].some(isVisible);
