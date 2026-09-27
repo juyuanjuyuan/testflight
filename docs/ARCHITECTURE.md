@@ -73,7 +73,7 @@ flowchart LR
 | D5 | `focus` | `step.focusVisible === false`。runner 在焦点元素旁插入一个不可聚焦的克隆体，比较两者的计算样式（outline、box-shadow、border、背景、颜色、下划线），全部相同即判为不可见（计划 07 方案 A，无新依赖） | runner 目前填 null |
 | D6 | `focus` | 结果为 stuck，且 runner 提供了 `unreachableClickables` | runner 尚未实现 |
 
-噪音处理：recorder 在页面加载后先空闲观察 2 秒（`BASELINE_MS`），然后累计"没有操作在进行时"发生的变化次数，写入 `repeatCount`。轮播在第一步之前就会被识别出来。剩下的噪音交给 judge 过滤。
+噪音处理：recorder 在页面加载后先空闲观察 3.5 秒（`BASELINE_MS`，保证 1 Hz 倒计时在第一步之前就变化满 `NOISE_REPEAT` 次），然后累计"没有操作在进行时"发生的变化次数，写入 `repeatCount`。倒计时和快速轮换的横幅在第一步之前就会被识别出来；几秒一换的轮播、推荐、搜索建议等交给 judge 过滤（计划 09）。
 
 ## 6. 两个结论的定义（`src/verdicts.mjs`）
 

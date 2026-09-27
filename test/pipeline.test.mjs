@@ -9,8 +9,8 @@ import { readTrace, validateAction } from '../src/contracts.mjs';
 import { blockAction, redactFocusValue, forceReplace, reachedBoundary } from '../src/runner/guard.mjs';
 import { focusInfo, pageText } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
-import { buildObservation } from '../src/agent/observation.mjs';
-import { judge } from '../src/agent/judge.mjs';
+import { buildObservation, describeFocus } from '../src/agent/observation.mjs';
+import { judge, judgeInput } from '../src/agent/judge.mjs';
 import { computeVerdicts } from '../src/verdicts.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { checkEdit, applyEdits } from '../src/fix/apply.mjs';
@@ -171,6 +171,18 @@ test('judge disabled → deterministic findings with traceable steps; verdicts',
   assert.equal(v.screenReaderUserCanComplete, false);
   const r = buildReport({ meta: { goal: 'buy' }, trace: original, findings });
   assert.equal(r.timeline.length, original.length);
+});
+
+test('judge input: an SPA route change (URL changed, no load) is a new view; a hash change is not; only the batch\'s steps', () => {
+  const at = (i, url, pageLoad = false) => ({ ...original[1], i, url, pageLoad });
+  const trace = [at(0, 'http://x/', true), at(1, 'http://x/results?q=bag'), at(2, 'http://x/results?q=bag#top'), at(3, 'http://x/results?q=bag')];
+  const cand = (steps) => ({ id: 'C1', detector: 'unannounced', steps });
+  const input = judgeInput({ goal: 'g', trace, batch: [cand([1, 2])] });
+  assert.equal(input.steps[1].newView, true, 'URL changed without a page load');
+  assert.equal(input.steps[2].newView, false, 'same URL except the hash');
+  assert.deepEqual(Object.keys(input.steps), ['1', '2'], 'steps of other batches are not sent');
+  assert.equal(judgeInput({ goal: 'g', trace, batch: [cand([0])] }).steps[0].newView, true, 'a page load is a new view');
+  assert.equal(input.steps[1].focusBefore, describeFocus(original[1].focusBefore), 'the control the key was pressed on');
 });
 
 test('fix guard: cannot delete the error message, can add aria', () => {

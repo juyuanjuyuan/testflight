@@ -9,7 +9,9 @@ export const NO_PROGRESS_STEPS = 10;
 export const CHANGE_WINDOW_MS = 1500;   // changes later than this after an action are not attributed to it
 export const SETTLE_MS = 300;           // minimum quiet time before we observe
 export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown
-export const BASELINE_MS = 2000;        // watch the page idle after load so carousels/countdowns reveal themselves
+// watch the page idle after load so fast rotators reveal themselves: a 1 Hz countdown must tick NOISE_REPEAT times
+// before the first action (2000 left it at 2 → reported as unannounced). Slower carousels are the judge's job.
+export const BASELINE_MS = 3500;
 export const LOAD_TIMEOUT_MS = 10_000;   // max wait for 'load' after a navigation; exceeding it is recorded as loadTimeout
 // per-attempt LLM timeout by role. The planner is short: a stalled call is cheaper to retry than to wait out.
 export const LLM_TIMEOUT_MS = { planner: 8_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
