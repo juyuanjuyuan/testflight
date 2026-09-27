@@ -19,3 +19,4 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+package-lock.json
