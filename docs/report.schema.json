@@ -137,7 +137,7 @@
   },
   "$defs": {
     "rect": {
-      "description": "Box in screenshot pixels (local mode: 1280x800 viewport). Scale by displayedWidth/1280.",
+      "description": "Box in CSS pixels of the viewport. Local mode (1280x800 at DPR 1) equals screenshot pixels. In general: multiply by timeline[].shotSize.dpr to get screenshot pixels, then scale by displayedWidth/shotSize.w.",
       "type": ["object", "null"],
       "required": ["x", "y", "w", "h"],
       "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" } }
@@ -183,6 +183,11 @@
         "seenNoise": { "type": "array", "items": { "type": "string" }, "description": "Changes recognised as noise (carousels, countdowns). Optional to show, greyed out." },
         "heard": { "type": "array", "items": { "type": "string" }, "description": "RIGHT column: what assistive tech conveyed this step. Empty = the user heard NOTHING; show that prominently." },
         "screenshot": { "type": ["string", "null"], "description": "Path relative to the report's folder, e.g. shots/0007.png. null = screenshot failed" },
+        "shotSize": {
+          "type": ["object", "null"], "required": ["w", "h", "dpr"], "additionalProperties": false,
+          "description": "Actual pixel size of this step's screenshot and the page's devicePixelRatio. focusRect / seen[].rect are CSS pixels: × dpr = screenshot pixels. Local mode: {w:1280, h:800, dpr:1}; real mode depends on the human's window and display. null = no screenshot. Absent in reports built before plan 08.",
+          "properties": { "w": { "type": "integer", "minimum": 1 }, "h": { "type": "integer", "minimum": 1 }, "dpr": { "type": "number", "exclusiveMinimum": 0 } }
+        },
         "findingIds": { "type": "array", "items": { "type": "string" }, "description": "Findings whose evidence includes this step" }
       }
     },

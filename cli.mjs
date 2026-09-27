@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { audit, analyze, newRunDir } from './src/audit.mjs';
 import { readTrace } from './src/contracts.mjs';
 import { runFix, runRerun } from './src/fix/commands.mjs';
@@ -17,12 +18,20 @@ for (let k = 0; k < rest.length; k++) {
 }
 const need = (k) => { if (!args[k]) { console.error(`missing --${k}`); process.exit(2); } return args[k]; };
 const readJSON = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
+// Real mode: the human clears captcha/login in Chrome first. Resolves on Enter, or when stdin closes (piped / no TTY).
+const waitForEnter = () => new Promise((resolve) => {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  rl.once('close', resolve);
+  rl.question('Chrome attached. Solve any captcha/login in that window, then press Enter to start.\n'
+    + '(Cookie banners are left as they are: the agent does not close them for you, they are part of the test.) ', () => rl.close());
+});
 const summary = (r) => console.log(`\nSR user can complete: ${r.verdicts.screenReaderUserCanComplete} · agent can complete: ${r.verdicts.agentCanComplete} · block ${r.counts.block} · degrade ${r.counts.degrade} · axe ${r.counts.axeViolations}`);
 
 const USAGE = `usage:
   node cli.mjs audit  --url <url> --goal "<task>" [--out runs/] [--script keys.json] [--no-judge] [--headed] [--site sites/shop/original]
-                      [--mode real --cdp http://localhost:9222] [--fail-on block]
-                      [--run-dir <existing dir>] [--progress]                               # --progress: keep <runDir>/progress.json live
+                      [--fail-on block] [--run-dir <existing dir>] [--progress]            # --progress: keep <runDir>/progress.json live
+  node cli.mjs audit  --mode real --cdp http://localhost:9222 --goal "<task>" [--url <url>] [--out runs/real]
+                      # takes over the visible tab of scripts/real-chrome.sh; waits for Enter; stops at checkout
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
   node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched]
   node cli.mjs rerun  --run <runDir> [--url <patched url>]                                  # same goal on the patched site
@@ -34,9 +43,10 @@ async function main() {
     const script = args.script ? readJSON(args.script) : null;
     // --progress needs the dir before audit() starts; --run-dir is one the API already created
     const dir = args['run-dir'] ? path.resolve(args['run-dir']) : args.progress ? newRunDir(out, args.label || 'audit') : undefined;
-    const { runDir, report } = await audit({ url: need('url'), goal: need('goal'), out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
+    const real = args.mode === 'real';
+    const { runDir, report } = await audit({ url: real ? args.url : need('url'), goal: need('goal'), out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
       judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label, log: console.log,
-      onProgress: args.progress ? createProgressWriter(dir) : undefined });
+      onProgress: args.progress ? createProgressWriter(dir) : undefined, waitForUser: real ? waitForEnter : undefined });
     summary(report); console.log(`→ ${runDir}/report.json`);
     if (args['fail-on'] === 'block' && report.counts.block > 0) process.exit(1);
   } else if (cmd === 'replay') {

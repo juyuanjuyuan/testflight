@@ -34,14 +34,18 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
 }
 
 /**
- * @param {{url:string, goal:string, out?:string, runDir?:string, mode?:'local'|'real', cdp?:string, script?:object[],
+ * url is optional in real mode (the tab the human has open is audited; meta.url records where it actually started).
+ * @param {{url?:string, goal:string, out?:string, runDir?:string, mode?:'local'|'real', cdp?:string, script?:object[],
  *          judgeEnabled?:boolean, headless?:boolean, label?:string, site?:string, log?:(msg:string)=>void,
- *          onProgress?:(p:{state:string, trace?:object[], error?:string})=>void, openSession?:Function}} o
+ *          onProgress?:(p:{state:string, trace?:object[], error?:string})=>void, openSession?:Function,
+ *          waitForUser?:()=>Promise<void>}} o
  * runDir: an existing dir to use (the HTTP API creates it first); default a new one under `out`.
  * onProgress: called with state running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
  * openSession: replaces the browser session (tests only).
+ * waitForUser (real mode): resolved once the human has cleared captcha/login; the agent loop starts after it.
  */
 export async function audit(o) {
+  if (o.mode !== 'real' && !o.url) throw new Error('audit needs a url (only real mode can take over the open tab)');
   const log = o.log || (() => {});
   const onProgress = o.onProgress || (() => {});
   if (o.runDir && !fs.statSync(o.runDir).isDirectory()) throw new Error(`run dir is not a directory: ${o.runDir}`);
@@ -60,7 +64,7 @@ export async function audit(o) {
 async function execute(o, runDir, trace, log, onProgress) {
   const tracePath = path.join(runDir, 'trace.jsonl');
   const stats = {};
-  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false });
+  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false, waitForUser: o.waitForUser });
   let axe = null;
   const push = (step) => {
     const err = validateStep(step);
@@ -73,13 +77,12 @@ async function execute(o, runDir, trace, log, onProgress) {
   try {
     push(await s.start());
     for (let n = 0; n < MAX_STEPS; n++) {
-      let action = o.script ? o.script[n] : await nextAction({ goal: o.goal, trace, stats });
-      if (!action) action = { kind: 'stuck', reason: 'script exhausted' };
       const cur = trace[trace.length - 1];
-      if (o.mode === 'real') {
-        if (reachedBoundary(cur.url, cur.title)) action = { kind: 'done', reason: 'reached checkout boundary (real-site safety stop)' };
-        else { const why = blockAction(action, cur.focusAfter); action = why ? { kind: 'stuck', reason: why } : forceReplace(action); }
-      }
+      // boundary first: once at checkout neither the planner nor the script gets another action
+      let action = o.mode === 'real' && reachedBoundary(cur.url, cur.title) ? { kind: 'done', reason: 'reached checkout boundary (real-site safety stop)' }
+        : o.script ? o.script[n] : await nextAction({ goal: o.goal, trace, stats });
+      if (!action) action = { kind: 'stuck', reason: 'script exhausted' };
+      if (o.mode === 'real') { const why = blockAction(action, cur.focusAfter); action = why ? { kind: 'stuck', reason: why } : forceReplace(action); }
       push(await s.step(action)); // done/stuck steps are recorded too (no key pressed) so the trace ends with the outcome
       if (action.kind === 'done' || action.kind === 'stuck') break;
     }
@@ -88,7 +91,7 @@ async function execute(o, runDir, trace, log, onProgress) {
     await s.close();
   }
   fs.writeFileSync(path.join(runDir, 'axe.json'), JSON.stringify(axe, null, 2));
-  const meta = { url: o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script };
+  const meta = { url: o.mode === 'real' ? trace[0].url : o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script };
   fs.writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify({ ...meta, goal: o.goal }, null, 2));
   onProgress({ state: 'analyzing', trace });
   return analyze({ trace, goal: o.goal, meta, runDir, judgeEnabled: o.judgeEnabled !== false, axe, stats, log });

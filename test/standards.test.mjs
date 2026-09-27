@@ -6,10 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT, insideDir } from '../src/paths.mjs';
 import { mergeAxe } from '../src/runner/axe.mjs';
-import { enableAX, screenshotOrNull, waitForLoad, RECORDER_CONFIG } from '../src/runner/session.mjs';
+import { enableAX, screenshotOrNull, waitForLoad, pngSize, RECORDER_CONFIG } from '../src/runner/session.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { applyEdits } from '../src/fix/apply.mjs';
-import { readTrace, CHANGE_WINDOW_MS } from '../src/contracts.mjs';
+import { readTrace, validateStep, CHANGE_WINDOW_MS } from '../src/contracts.mjs';
 
 const trace = readTrace(fs.readFileSync(path.join(ROOT, 'fixtures/testpage-original/trace.jsonl'), 'utf8'));
 
@@ -55,6 +55,25 @@ test('runner: a load that never finishes is recorded as loadTimeout', async () =
   assert.deepEqual(await waitForLoad(fast), { loadTimeout: false });
   const broken = { waitForLoadState: async () => { throw new Error('page crashed'); } };
   await assert.rejects(waitForLoad(broken), /page crashed/);
+});
+
+test('runner: screenshot size is read from the PNG header; a non-PNG is an error, not a made-up size', () => {
+  assert.deepEqual(pngSize(path.join(ROOT, 'fixtures/testpage-original/shots/0000.png')), { w: 1280, h: 800 });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'png-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'x.png'), 'not an image at all, just text');
+    assert.throws(() => pngSize(path.join(dir, 'x.png')), /not a PNG/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('shotSize: every recorded screenshot has its size; report carries it, null when a step has none', () => {
+  for (const s of trace) assert.deepEqual(s.shotSize, s.screenshot ? { w: 1280, h: 800, dpr: 1 } : undefined, `step ${s.i}`);
+  const noShot = trace.map((s, k) => (k === 1 ? { ...s, screenshot: null, shotSize: undefined } : s));
+  const r = buildReport({ meta: { goal: 'x' }, trace: noShot, findings: [] });
+  assert.deepEqual(r.timeline[0].shotSize, { w: 1280, h: 800, dpr: 1 });
+  assert.equal(r.timeline[1].shotSize, null);
+  assert.match(validateStep({ ...trace[0], shotSize: { w: 1280, h: 0, dpr: 1 } }), /shotSize/);
+  assert.match(validateStep({ ...trace[0], shotSize: null }), /shotSize/);
 });
 
 test('recorder thresholds come from contracts.mjs, not literals in the page script', () => {

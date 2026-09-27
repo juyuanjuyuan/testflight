@@ -11,7 +11,7 @@ export function timelineEntry(s, findings) {
     seen: s.changes.filter((c) => c.visible && c.repeatCount < NOISE_REPEAT).map((c) => ({ text: c.text, rect: c.rect ?? null })), // middle column
     seenNoise: s.changes.filter((c) => c.repeatCount >= NOISE_REPEAT).map((c) => c.text),                              // carousels etc.
     heard: heardInStep(s),                                             // right column: what AT conveyed
-    screenshot: s.screenshot, findingIds: findings.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
+    screenshot: s.screenshot, shotSize: s.shotSize ?? null, findingIds: findings.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
   };
 }
 

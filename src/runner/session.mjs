@@ -26,6 +26,32 @@ export async function screenshotOrNull(page, runDir, rel) {
   try { await page.screenshot({ path: path.join(runDir, rel) }); return rel; } catch { return null; }
 }
 
+/** Pixel size {w, h} of a PNG file, read from its IHDR header (screenshots differ in size in real mode). */
+export function pngSize(file) {
+  const buf = Buffer.alloc(24);
+  const fd = fs.openSync(file, 'r');
+  try { fs.readSync(fd, buf, 0, 24, 0); } finally { fs.closeSync(fd); }
+  if (buf.toString('latin1', 12, 16) !== 'IHDR') throw new Error(`not a PNG: ${file}`);
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+
+/** Real mode: the tab the human is looking at (first visible one), else the first tab. */
+export async function pickTab(browser) {
+  const pages = browser.contexts().flatMap((c) => c.pages());
+  if (!pages.length) throw new Error('real mode: the attached Chrome has no open tab; open the site first (scripts/real-chrome.sh <url>)');
+  // a tab that cannot run script (crashed, chrome:// page) is simply not a candidate; the chosen URL is recorded as meta.url
+  const visible = await Promise.all(pages.map((p) => p.evaluate(() => document.visibilityState === 'visible').catch(() => false)));
+  return pages[visible.indexOf(true)] ?? pages[0];
+}
+
+async function connectReal(cdp) {
+  const endpoint = cdp || process.env.CDP_ENDPOINT;
+  if (!endpoint) throw new Error('real mode needs --cdp http://localhost:9222 (or CDP_ENDPOINT in .env); start Chrome with scripts/real-chrome.sh');
+  try { return await chromium.connectOverCDP(endpoint); } catch (e) {
+    throw new Error(`cannot attach to Chrome at ${endpoint} (is scripts/real-chrome.sh running?): ${e.message.split('\n')[0]}`);
+  }
+}
+
 /** Wait for 'load' after a navigation. A timeout is recorded as loadTimeout; any other error propagates. */
 export async function waitForLoad(page) {
   try { await page.waitForLoadState('load', { timeout: LOAD_TIMEOUT_MS }); return { loadTimeout: false }; } catch (e) {
@@ -35,14 +61,19 @@ export async function waitForLoad(page) {
 }
 
 /**
- * @param {{url:string, runDir:string, mode?:'local'|'real', cdp?:string, headless?:boolean, axe?:boolean}} o
+ * Real mode attaches to the human's Chrome: with `url` it navigates the visible tab there first; then it awaits
+ * waitForUser (human clears captcha/login, nothing is recorded meanwhile) and, without `url`, takes the tab visible then.
+ * @param {{url?:string, runDir:string, mode?:'local'|'real', cdp?:string, headless?:boolean, axe?:boolean,
+ *          waitForUser?:()=>Promise<void>}} o
  */
-export async function openSession({ url, runDir, mode = 'local', cdp, headless = true, axe = true }) {
+export async function openSession({ url, runDir, mode = 'local', cdp, headless = true, axe = true, waitForUser }) {
   let browser, page, owned = true;
   if (mode === 'real') {
-    browser = await chromium.connectOverCDP(cdp || process.env.CDP_ENDPOINT);
-    page = browser.contexts()[0].pages()[0]; // tab the human already opened and cleared captcha/login on
+    browser = await connectReal(cdp);
     owned = false;
+    if (url) { page = await pickTab(browser); await page.goto(url, { waitUntil: 'load' }); }
+    await waitForUser?.();
+    if (!url) page = await pickTab(browser);
     await page.context().addInitScript(CONFIG_SCRIPT);
     await page.context().addInitScript(RECORDER);
     await page.evaluate(CONFIG_SCRIPT);
@@ -68,9 +99,10 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
 
   async function snapshot(extra) {
     const shot = await screenshotOrNull(page, runDir, `shots/${String(i).padStart(4, '0')}.png`);
-    const { modalOpen, focusVisible } = await page.evaluate(() => ({ modalOpen: window.__a11yRec?.modalOpen() ?? false,
-      focusVisible: window.__a11yRec?.focusVisible() ?? null })); // null = recorder missing → not checked
-    return { url: page.url(), title: await page.title(), modalOpen, focusVisible, screenshot: shot, ...extra };
+    const { modalOpen, focusVisible, dpr } = await page.evaluate(() => ({ modalOpen: window.__a11yRec?.modalOpen() ?? false,
+      focusVisible: window.__a11yRec?.focusVisible() ?? null, dpr: window.devicePixelRatio })); // null = recorder missing → not checked
+    const shotSize = shot ? { shotSize: { ...pngSize(path.join(runDir, shot)), dpr } } : {}; // real mode: window size and DPR are the human's
+    return { url: page.url(), title: await page.title(), modalOpen, focusVisible, screenshot: shot, ...shotSize, ...extra };
   }
 
   async function settle(loadsBefore) {
@@ -119,6 +151,9 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       return step;
     },
     axeResults: () => mergeAxe(axeRuns),
-    async close() { if (owned) await browser.close(); else await cdpSession.detach().catch(() => {}); }, // cleanup only: the run is already recorded, and a tab the human closed can't be detached
+    async close() {
+      if (!owned) await cdpSession.detach().catch(() => {}); // cleanup only: the run is already recorded, and a tab the human closed can't be detached
+      await browser.close(); // real mode: only drops our CDP connection, the human's Chrome and tabs stay open
+    },
   };
 }

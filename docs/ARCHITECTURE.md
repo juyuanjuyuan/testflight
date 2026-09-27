@@ -45,6 +45,7 @@ flowchart LR
 3. **Action** 新增 `start`（页面初次加载，由 runner 产生）；`done`/`stuck` 同样写入 trace，trace 的最后一步就是任务结果。
 4. **Candidate**（检测器输出）和 **Finding**（judge 输出）分开定义。Finding 新增 `layer`（presence/association/announcement/operation）、`judged` 和 `candidateId`；`fix` 改为 `{edits:[{file,old,new}], rationale}`。
 5. **Action** 的 `type` 新增可选 `replace: boolean`：为 true 时 runner 先全选（Control/Meta+A）再输入，用来更正输入框内容；real 模式下 guard 对它同样拒绝敏感输入框。**FocusInfo** 新增可选 `value`：焦点节点在 AX 树里的 value（读屏器聚焦输入框时读出的内容，密码框由浏览器遮蔽为 •），planner 的 `focusValue` 只来自它。real 模式下只保留 planner 本次运行自己输入过、且不敏感的字段的 value，其他字段为 `value: null` 加 `valueRedacted: true`，`pageText` 也不含字段内的文字。
+6. **Step** 新增可选 `shotSize: {w, h, dpr}`：截图的实际像素宽高和 devicePixelRatio（截图失败时没有这个字段）。rect 都是 CSS 像素，× dpr 才是截图像素。本地模式固定 1280×800、dpr 1；real 模式接管的是用户的 Chrome，大小不固定。`report.json` 的 `timeline[].shotSize` 原样带出。
 
 ## 4. 信息隔离（最重要的设计改动）
 

@@ -90,6 +90,8 @@ export const INTERACTIVE_ROLES = [
  * @property {boolean}  modalOpen
  * @property {boolean|null} focusVisible  null = not checked
  * @property {string|null} screenshot relative path inside the run dir; null if the screenshot failed
+ * @property {{w:number, h:number, dpr:number}=} shotSize  pixel size of the screenshot + devicePixelRatio; absent when
+ *                                   screenshot is null. Rects are CSS px: × dpr = screenshot px (real mode: human's window)
  * @property {boolean=} loadTimeout  a navigation started but 'load' did not fire in time; observed anyway
  * @property {{selector:string, barrierId:string|null, text:string}[]=} unreachableClickables
  *                                   only on a 'stuck' step: visible clickables keyboard can never reach (D6)
@@ -143,6 +145,7 @@ export function validateStep(s) {
     if (!isStr(c.text) || !isStr(c.selector)) return 'change needs text and selector';
     if (!Array.isArray(c.referencedBy)) return 'change.referencedBy must be an array';
   }
+  if (s.shotSize !== undefined && !(['w', 'h', 'dpr'].every((k) => s.shotSize?.[k] > 0))) return 'shotSize needs positive w, h, dpr';
   return null;
 }
 

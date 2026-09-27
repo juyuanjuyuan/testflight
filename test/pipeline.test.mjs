@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/paths.mjs';
 import { readTrace, validateAction } from '../src/contracts.mjs';
-import { blockAction, redactFocusValue, forceReplace } from '../src/runner/guard.mjs';
+import { blockAction, redactFocusValue, forceReplace, reachedBoundary } from '../src/runner/guard.mjs';
 import { focusInfo, pageText } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
 import { buildObservation } from '../src/agent/observation.mjs';
@@ -95,6 +95,24 @@ test('guard: real-site mode refuses typing into sensitive fields, with or withou
   assert.match(blockAction({ kind: 'type', text: '4242', replace: true, reason: 'x' }, card), /sensitive/);
   assert.equal(blockAction({ kind: 'type', text: 'tote', replace: true, reason: 'x' }, search), null);
   assert.equal(blockAction({ kind: 'press', key: 'Enter', reason: 'x' }, card), null);
+});
+
+test('guard: password, CVV and expiry fields are refused too, by name or by input hints', () => {
+  const type = { kind: 'type', text: 'x', reason: 'x' };
+  assert.match(blockAction(type, { role: 'textbox', name: 'Password', inputHints: 'password pw' }), /sensitive/);
+  assert.match(blockAction(type, { role: 'textbox', name: 'Security code', inputHints: 'text cvc' }), /sensitive/);
+  assert.match(blockAction(type, { role: 'textbox', name: 'MM/YY', inputHints: 'text cc-exp' }), /sensitive/);
+  assert.equal(blockAction(type, { role: 'combobox', name: 'Search', inputHints: 'text field-keywords' }), null);
+});
+
+test('guard: real-site runs stop at checkout or payment, by URL or by title', () => {
+  assert.ok(reachedBoundary('https://shop.example/checkout/step1', 'Shop'));
+  assert.ok(reachedBoundary('https://shop.example/gp/buy/spc', 'Secure Checkout'));
+  assert.ok(reachedBoundary('https://shop.example/pay', ''));
+  assert.ok(reachedBoundary('https://shop.example/billing?x=1', 'Shop'));
+  assert.ok(!reachedBoundary('https://shop.example/cart', 'Shopping Cart'));
+  assert.ok(!reachedBoundary('https://shop.example/s?k=tote+bag', 'tote bag : Shop'));
+  assert.ok(!reachedBoundary('https://shop.example/paypal-info', 'Ways to pay less'), 'only a /pay path segment stops, not words starting with pay');
 });
 
 test('real mode: only fields the planner typed into keep their value; sensitive fields never do', () => {
