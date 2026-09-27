@@ -67,7 +67,7 @@
 **范围说明**：除了"可以改"里的文件，还改了 `test/pipeline.test.mjs`（给 `judgeInput()` 加一条测试）和 `docs/ARCHITECTURE.md` §5 的一句话（基线从 2 秒改成 3.5 秒）。report.json 结构没变。
 
 **交给其他计划（检测器/标准答案问题，按本计划的范围没改）**
-- **D2 误报（`src/detect/trap.mjs`）**：`isTab` 把 Tab 和 Shift+Tab 算在同一串里，planner 来回按 Tab/Shift+Tab 就被当成两个元素之间的循环（候选 1 第 31–38 步）。现在靠 judge 判 none，应该在检测器里只认同方向的连续按键，先写回归测试。
+- **D2 误报（`src/detect/trap.mjs`）**：`isTab` 把 Tab 和 Shift+Tab 算在同一串里，planner 来回按 Tab/Shift+Tab 就被当成两个元素之间的循环（候选 1 第 31–38 步）。现在靠 judge 判 none，应该在检测器里只认同方向的连续按键，先写回归测试。✅ 已修：`detectTrap` 换方向就重新开始一串，回归测试在 `test/pipeline.test.mjs`；shop 的 B9、B11 在 `--no-judge` 下仍然检出。
 - **SPA 路由切换**：URL 变了但没有 `pageLoad`，D1 会把整个新页面的内容都当成"未播报的变化"（候选 2 第 35 步 140 条）。现在靠 `newView` 让 judge 过滤，但要多花约 12 次 judge 调用；而且真正的问题（SPA 跳转后什么都没播报、焦点没动）没有单独的检测器，只能从 focus-lost 间接看到。建议：D1 跳过 URL 变化的步骤，再加一条"视图切换没有任何播报"的检测。
 - **`dedupe` 跨步合并**：同一元素在不同步骤的不同文字会合并成一个候选，`evidence.text` 和 `hint` 只保留第一步（候选 2 的 F39 显示"Add to Bag"，真正的问题是第 54 步的"Adding to Bag…"）。judge 现在会看所有步骤，但报告里显示的文字是错的。
 - **`eval/groundtruth/shop-second.yaml`**（计划 05/10）：second 流程也经过结账页的卡号框，应该像 B5 一样把 B8 也登记进去，否则 second 流程永远多算 1 个误报。

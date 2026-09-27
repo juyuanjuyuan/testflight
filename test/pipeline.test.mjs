@@ -162,6 +162,23 @@ test('trap: Escape that leaves the cycle is not a trap', () => {
   assert.equal(runDetectors(fixed).filter((c) => c.detector === 'trap').length, 0);
   const t = runDetectors(original).find((c) => c.detector === 'trap');
   assert.ok(t.hint.startsWith('trap'));
+  assert.equal(t.evidence.barrierId, 'T4', 'repeated Tab in the payment dialog is still a trap');
+});
+
+test('trap: alternating Tab / Shift+Tab between two elements is not a trap', () => {
+  // Real-site pre-run, steps 31–38: Tab→B, Shift+Tab→A, Tab→B, Shift+Tab→A, then Escape stays on A.
+  const A = original[4].focusAfter; // #card, inside the payment dialog
+  const B = original[6].focusAfter; // #pay
+  let prev = A;
+  const step = (i, key, focus) => {
+    const s = { ...original[6], i, action: { kind: 'press', key, reason: 'look around' }, focusBefore: prev, focusAfter: focus, changes: [], spoken: [] };
+    prev = focus;
+    return s;
+  };
+  const trace = [original[0], { ...original[4], i: 1, changes: [], spoken: [] },
+    step(2, 'Tab', B), step(3, 'Shift+Tab', A), step(4, 'Tab', B), step(5, 'Shift+Tab', A), step(6, 'Escape', A)];
+  assert.equal(trace.at(-1).modalOpen, true, 'Escape stays in the dialog, so only the direction rule can clear this');
+  assert.deepEqual(runDetectors(trace).filter((c) => c.detector === 'trap'), []);
 });
 
 test('judge disabled → deterministic findings with traceable steps; verdicts', async () => {
