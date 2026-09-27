@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/juyuanjuyuan/testflight/docs/report.schema.json",
+  "title": "Task-level accessibility audit report (report.json)",
+  "description": "The only file the frontend reads. Backend changes are additive only: fields are never renamed or removed. Ignore unknown fields. null means 'not available', never 0.",
+  "type": "object",
+  "required": ["meta", "verdicts", "counts", "timeline", "findings", "axe", "fixes", "rerun", "stats"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["goal", "generatedAt"],
+      "properties": {
+        "url": { "type": "string", "description": "Start URL of the audited task" },
+        "mode": { "enum": ["local", "real"], "description": "local = our own test sites; real = a third-party site (detection only, no fixes)" },
+        "site": { "type": ["string", "null"], "description": "Source folder of the audited site, e.g. sites/shop/original (local mode only)" },
+        "script": { "type": "boolean", "description": "true = keys came from a pre-recorded script, false = the AI planner decided every key" },
+        "goal": { "type": "string", "description": "Task given to the planner, e.g. 'Buy the canvas tote bag'" },
+        "judge": { "type": "boolean", "description": "false = judge disabled; findings keep deterministic defaults and userImpact is empty" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" }
+      }
+    },
+    "verdicts": { "$ref": "#/$defs/verdicts" },
+    "counts": {
+      "type": "object",
+      "required": ["block", "degrade", "filteredOut", "axeViolations", "axeBestPractice"],
+      "properties": {
+        "block": { "type": "integer", "minimum": 0, "description": "Findings that stop the task" },
+        "degrade": { "type": "integer", "minimum": 0, "description": "Findings that make the task harder but not impossible" },
+        "filteredOut": { "type": "integer", "minimum": 0, "description": "Detector candidates the judge marked irrelevant (not shown)" },
+        "axeViolations": { "type": ["integer", "null"], "minimum": 0, "description": "axe-core WCAG rule violations on the same page states. null = axe could not run (show 'axe unavailable', never 0)" },
+        "axeBestPractice": { "type": ["integer", "null"], "minimum": 0, "description": "axe-core best-practice (non-WCAG) violations, shown separately" }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "description": "One entry per step, in order. Drives the step-by-step playback.",
+      "items": { "$ref": "#/$defs/timelineStep" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Problems to show, block first then degrade. Findings judged irrelevant are already removed.",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "axe": {
+      "description": "axe-core baseline. null = not run; {error} = could not run; {violations} = ran",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
+        {
+          "type": "object", "required": ["violations"],
+          "properties": {
+            "violations": {
+              "type": "array",
+              "items": {
+                "type": "object", "required": ["id", "wcag", "nodes"],
+                "properties": {
+                  "id": { "type": "string", "description": "axe rule id, e.g. button-name" },
+                  "impact": { "type": ["string", "null"] },
+                  "wcag": { "type": "boolean", "description": "true = WCAG rule (counted in counts.axeViolations)" },
+                  "nodes": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fixes": {
+      "description": "Per-finding result of `fix`. null until a fix has been run for this report.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["finding", "applied", "errors"],
+            "properties": {
+              "finding": { "type": "string", "description": "Finding id, e.g. F2" },
+              "applied": { "type": "integer", "minimum": 0, "description": "Number of edits applied; 0 = fix failed" },
+              "errors": { "type": "array", "items": { "type": "string" } },
+              "rationale": { "type": ["string", "null"] }
+            }
+          }
+        }
+      ]
+    },
+    "rerun": {
+      "description": "Before/after comparison after fix + rerun on the patched copy. null until rerun.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "required": ["before", "after", "status", "introduced", "closedLoop"],
+          "properties": {
+            "runDir": { "type": "string", "description": "Run folder of the rerun (its own report.json lives there)" },
+            "before": { "$ref": "#/$defs/verdicts" },
+            "after": { "$ref": "#/$defs/verdicts" },
+            "status": {
+              "type": "array",
+              "items": {
+                "type": "object", "required": ["id", "status"],
+                "properties": {
+                  "id": { "type": "string", "description": "Finding id in THIS report" },
+                  "key": { "type": "string", "description": "Internal matching key; do not parse" },
+                  "status": { "enum": ["resolved", "persists"] }
+                }
+              }
+            },
+            "introduced": {
+              "type": "array", "description": "Problems that appeared only after the fix (ids refer to the rerun's own report)",
+              "items": { "type": "object", "required": ["id", "status"], "properties": { "id": { "type": "string" }, "key": { "type": "string" }, "status": { "const": "new" } } }
+            },
+            "closedLoop": { "type": "boolean", "description": "true = screen-reader user could NOT complete before the fix and CAN after it. The headline 'passes after fix'." }
+          }
+        }
+      ]
+    },
+    "stats": {
+      "description": "Run statistics. {} or null when no model was called (scripted runs).",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "properties": {
+            "calls": { "type": "integer", "description": "Successful LLM calls" },
+            "ms": { "type": "integer", "description": "Total time of successful LLM calls (ms)" },
+            "cacheHits": { "type": "integer", "description": "LLM answers replayed from cache" },
+            "llmAttempts": { "type": "integer", "description": "All LLM attempts, including failed ones" },
+            "llmFailures": { "type": "integer" },
+            "llmTimeouts": { "type": "integer" },
+            "llmFailedMs": { "type": "integer", "description": "Time spent on failed attempts (ms)" },
+            "llmErrorTypes": { "type": "object", "additionalProperties": { "type": "integer" } },
+            "judgeErrors": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "rect": {
+      "description": "Box in screenshot pixels (local mode: 1280x800 viewport). Scale by displayedWidth/1280.",
+      "type": ["object", "null"],
+      "required": ["x", "y", "w", "h"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" } }
+    },
+    "verdicts": {
+      "type": "object",
+      "required": ["outcome", "agentCanComplete", "screenReaderUserCanComplete", "blockingFindings", "unexplainedStuck"],
+      "properties": {
+        "outcome": { "enum": ["done", "stuck", "max-steps"], "description": "How the run ended" },
+        "agentCanComplete": { "type": "boolean", "description": "Headline 2: can an AI agent that only uses structure (keyboard + screen-reader info) complete the task?" },
+        "screenReaderUserCanComplete": { "type": "boolean", "description": "Headline 1: can a screen-reader user complete it? = agent completed AND no blocking finding" },
+        "blockingFindings": { "type": "array", "items": { "type": "string" }, "description": "Ids of block findings" },
+        "unexplainedStuck": { "type": "boolean", "description": "Agent got stuck but no detector explains why (needs a human look)" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["kind", "reason"],
+      "properties": {
+        "kind": { "enum": ["start", "press", "type", "done", "stuck"] },
+        "key": { "type": "string", "description": "For press: Tab, Shift+Tab, Enter, Space, Escape, Arrow*, Home, End" },
+        "text": { "type": "string", "description": "For type: the text typed" },
+        "replace": { "type": "boolean", "description": "type replaced the field content instead of appending" },
+        "forcedReplace": { "type": "boolean", "description": "Real-site safety forced replace (planner did not ask for it)" },
+        "reason": { "type": "string", "description": "The planner's one-line reasoning. Show it: this is 'what the AI is thinking'." },
+        "probe": { "type": "boolean" },
+        "plannerError": { "type": "boolean", "description": "The planner failed; this stuck step was produced by the runner" }
+      }
+    },
+    "timelineStep": {
+      "type": "object",
+      "required": ["i", "action", "focus", "seen", "seenNoise", "heard", "findingIds"],
+      "properties": {
+        "i": { "type": "integer", "minimum": 0 },
+        "action": { "$ref": "#/$defs/action" },
+        "url": { "type": "string" },
+        "focus": { "type": "string", "description": "What a screen reader says for the focused element, e.g. 'button \"Pay\"' or '(focus on page body)'" },
+        "focusRect": { "$ref": "#/$defs/rect" },
+        "seen": {
+          "type": "array", "description": "LEFT/middle column: new text that appeared on screen after this step (noise removed)",
+          "items": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" }, "rect": { "$ref": "#/$defs/rect" } } }
+        },
+        "seenNoise": { "type": "array", "items": { "type": "string" }, "description": "Changes recognised as noise (carousels, countdowns). Optional to show, greyed out." },
+        "heard": { "type": "array", "items": { "type": "string" }, "description": "RIGHT column: what assistive tech conveyed this step. Empty = the user heard NOTHING; show that prominently." },
+        "screenshot": { "type": ["string", "null"], "description": "Path relative to the report's folder, e.g. shots/0007.png. null = screenshot failed" },
+        "findingIds": { "type": "array", "items": { "type": "string" }, "description": "Findings whose evidence includes this step" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "detector", "layer", "steps", "wcag", "impact", "summary", "userImpact", "judged", "axeAlsoFound", "evidence", "fix"],
+      "properties": {
+        "id": { "type": "string", "description": "F1, F2 ... unique within this report" },
+        "candidateId": { "type": "string" },
+        "detector": { "type": "string", "description": "Known values: unannounced, association, trap, unnamed, weak-name, focus-lost, focus-visible, pointer-only. More will be added: render unknown values as-is." },
+        "layer": { "enum": ["presence", "association", "announcement", "operation"], "description": "presence = info not exposed at all; association = not linked to the field; announcement = not announced when it changes; operation = cannot be operated by keyboard" },
+        "steps": { "type": "array", "items": { "type": "integer" }, "minItems": 1, "description": "Timeline steps that are the evidence (jump targets)" },
+        "wcag": { "type": "array", "items": { "type": "string" }, "description": "WCAG success criteria, e.g. ['4.1.3', '3.3.1']" },
+        "hint": { "type": "string", "description": "Deterministic detector explanation (technical)" },
+        "impact": { "enum": ["block", "degrade"], "description": "block = the task cannot continue; degrade = possible but harder" },
+        "summary": { "type": "string", "description": "One sentence for engineers" },
+        "userImpact": { "type": "string", "description": "One sentence on what the user experiences. Empty when the judge was off: hide it then." },
+        "judged": { "type": "boolean", "description": "false = judge off or failed; impact is a deterministic default" },
+        "axeAlsoFound": { "type": "boolean", "description": "true = axe-core flagged the same element. Most of our findings are false here: that is the point." },
+        "evidence": {
+          "type": "object", "required": ["selector"],
+          "properties": {
+            "selector": { "type": "string" },
+            "barrierId": { "type": ["string", "null"], "description": "Planted-barrier id on our test sites; null on real sites" },
+            "text": { "type": ["string", "null"], "description": "The on-screen text involved, e.g. 'Card number is invalid'" },
+            "screenshot": { "type": ["string", "null"] }
+          }
+        },
+        "fix": {
+          "description": "null until `fix` ran. Edits are search/replace on the site's source.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object", "required": ["edits"],
+              "properties": {
+                "rationale": { "type": ["string", "null"] },
+                "edits": {
+                  "type": "array",
+                  "items": { "type": "object", "required": ["file", "old", "new"], "properties": { "file": { "type": "string" }, "old": { "type": "string" }, "new": { "type": "string" } } }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
