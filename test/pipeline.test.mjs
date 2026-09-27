@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/paths.mjs';
 import { readTrace, validateAction } from '../src/contracts.mjs';
-import { blockAction } from '../src/runner/guard.mjs';
-import { focusInfo } from '../src/runner/observe.mjs';
+import { blockAction, redactFocusValue } from '../src/runner/guard.mjs';
+import { focusInfo, pageText } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
 import { buildObservation } from '../src/agent/observation.mjs';
 import { judge } from '../src/agent/judge.mjs';
@@ -63,6 +63,31 @@ test('guard: real-site mode refuses typing into sensitive fields, with or withou
   assert.match(blockAction({ kind: 'type', text: '4242', replace: true, reason: 'x' }, card), /sensitive/);
   assert.equal(blockAction({ kind: 'type', text: 'tote', replace: true, reason: 'x' }, search), null);
   assert.equal(blockAction({ kind: 'press', key: 'Enter', reason: 'x' }, card), null);
+});
+
+test('real mode: only fields the planner typed into keep their value; sensitive fields never do', () => {
+  const email = { role: 'textbox', name: 'Email', selector: '#email', inputHints: 'email email', value: 'me@example.com' };
+  const search = { role: 'searchbox', name: 'Search', selector: '#q', inputHints: 'search q', value: 'tote' };
+  const card = { role: 'textbox', name: 'Card number', selector: '#card', inputHints: 'text card cc-number', value: '4242' };
+  const button = { role: 'button', name: 'Pay', selector: '#pay' };
+  const typed = new Set(['#q', '#card']);
+  const real = (f) => redactFocusValue(f, { mode: 'real', typedSelectors: typed });
+  assert.deepEqual(real(email), { ...email, value: null, valueRedacted: true }, 'autofilled / user-entered value is not recorded');
+  assert.deepEqual(real(search), search, 'value the planner typed itself is kept');
+  assert.deepEqual(real(card), { ...card, value: null, valueRedacted: true }, 'sensitive field: never recorded, even if typed');
+  assert.deepEqual(real(button), button, 'nodes without a value are untouched');
+  assert.deepEqual(redactFocusValue(email, { mode: 'local', typedSelectors: new Set() }), email, 'local mode unchanged');
+});
+
+test('real mode: pageText leaves out text inside editable fields (autofilled values)', async () => {
+  const n = (nodeId, role, name, childIds = []) => ({ nodeId, role: { value: role }, name: { value: name }, childIds });
+  const nodes = [n('1', 'RootWebArea', 'Form', ['2', '3']), n('2', 'StaticText', 'Email'),
+    n('3', 'textbox', 'Email', ['4']), n('4', 'generic', '', ['5']), n('5', 'StaticText', 'me@example.com')];
+  const cdp = { send: async () => ({ nodes }) };
+  assert.ok((await pageText(cdp)).includes('me@example.com'), 'local mode unchanged');
+  const real = await pageText(cdp, 4000, { redactFieldText: true });
+  assert.ok(!real.includes('me@example.com'), 'field content leaked into pageText');
+  assert.ok(real.includes('[textbox] Email'), 'the field itself is still listed');
 });
 
 test('focusInfo records the AX value of the focused node', async () => {

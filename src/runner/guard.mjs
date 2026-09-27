@@ -9,6 +9,15 @@ export function blockType(focus) {
 export function blockAction(action, focus) {
   return action.kind === 'type' ? blockType(focus) : null;
 }
+/**
+ * Real mode: keep a field's AX value only if the planner typed into that field during this run and it is not
+ * sensitive; anything the user entered or the browser autofilled becomes null + valueRedacted. Local mode: unchanged.
+ */
+export function redactFocusValue(focus, { mode, typedSelectors }) {
+  if (mode !== 'real' || focus.value === undefined) return focus;
+  if (!blockType(focus) && typedSelectors.has(focus.selector)) return focus;
+  return { ...focus, value: null, valueRedacted: true };
+}
 export function reachedBoundary(url, title) {
   return STOP.test(url) || STOP.test(title || '');
 }

@@ -39,7 +39,9 @@ export const INTERACTIVE_ROLES = [
  * @property {Rect|null=} rect         viewport box of the focused element (viewer draws it); null on body
  * @property {string|null=} inputHints type/name/id/autocomplete of the element (guard.mjs checks sensitive fields)
  * @property {string=}  value         AX value of the focused node (what a screen reader reads for a field; passwords masked).
- *                                   Absent when the node has none (buttons, links) or on body
+ *                                   Absent when the node has none (buttons, links) or on body.
+ *                                   Real mode: null unless the planner typed into this field this run (and it is not sensitive)
+ * @property {boolean=} valueRedacted real mode only: the field had a value we deliberately did not record (user-entered/autofilled/sensitive)
  * @property {string=}  axError       CDP could not resolve the AX node; role is 'unknown' (degradation, kept for diagnosis)
  */
 

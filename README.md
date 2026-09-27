@@ -64,7 +64,7 @@ TODO: replace with the full fake-shop table (`node cli.mjs score …`) and the j
 - **Real:** browser automation on real Chromium, accessibility-tree reads via CDP, all detectors, axe-core comparison, LLM calls (Sciforium: DeepSeek V4.1 Flash for the planner, GLM 5.3 Flash for judge/fixer).
 - **Synthetic:** the demo shop (`sites/shop`) and test page are ours, with planted barriers and a hand-fixed reference version. W3C Before-and-After Demonstration is used only to measure false positives.
 - **Real-site segment:** detection only — no fixes, stops before checkout, never types payment data; results are shown from a cached run and not committed to this repo.
-- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); cross-origin iframes (e.g. Stripe) are invisible to us; at real scale, noise filtering on busy sites needs more tuning.
+- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); cross-origin iframes (e.g. Stripe) are invisible to us; at real scale, noise filtering on busy sites needs more tuning. In real-site mode the tool does not record or send what the user typed or the browser autofilled: field values are kept only for fields the agent typed into itself (never for sensitive ones), and field text is dropped from page text. Local per-step screenshots can still show it; they are never sent to a model or committed.
 
 
 ## Running it

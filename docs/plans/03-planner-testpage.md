@@ -94,3 +94,11 @@ LLM 验收（`LLM_CACHE=off`，`--no-judge`，改 prompt 后三组都重跑）�
 - 超时改为 `contracts.mjs` 里的 `LLM_TIMEOUT_MS`：planner 8 s，judge/fixer/vision 60 s。
 - 回退的模型列表先去重：planner 和 judge 配同一个模型时，只在这个模型上试 2 次，而不是 4 次。之前最坏情况 4×20 s = 80 s，现在是 2×8 s = 16 s。
 - `test/llm.test.mjs` 用假 client 测试（先写的失败测试）：超时和解析失败会被记录并分类，同一个模型不会重复尝试，各角色的超时值正确。实跑一次 fixed：`{"llmAttempts":8,"calls":8,"ms":8362}`（那次没有失败）。
+
+### 补充（第三轮）：真实网站模式下不记录用户或自动填充的字段内容
+
+- **规则**（`guard.redactFocusValue`，由 `session.mjs` 在读完每个焦点后调用）：real 模式下，只有本次运行中 planner 自己 type 过的字段（按 selector 记录，页面跳转后清空）才保留 `value`；其他字段写成 `value: null` 并标 `valueRedacted: true`；guard 认定为敏感的字段即使 type 过也不保留。local 模式行为不变。`contracts.mjs` 里补了 `valueRedacted` 的注释。
+- **额外发现并修复**：smoke 暴露出第二条泄露通道。AX 树里输入框下面有一个 StaticText 子节点，内容就是字段的值，所以自动填充的值会出现在 `pageText` 里，而 `pageText` 会发给 planner。real 模式下，`pageText` 现在跳过所有可编辑字段（textbox/searchbox/combobox/spinbutton）下面的文字，字段本身（`[textbox] Email`）仍会列出。local 模式不变。
+- **测试（先写的失败测试）**：`npm test` 新增 2 条（`redactFocusValue` 各分支、`pageText` 过滤字段内的文字）。smoke 新增 `form (local)` 和 `form (real)`：real 模式用带 CDP 端口的 Chromium 模拟"人已经打开的浏览器"，页面脚本预先给 Email 填上值（模拟自动填充），脚本在 Search 里输入 `tote`。验证 Email 的值是 null 并带 `valueRedacted`，Search 的值是 `tote`，而且整个 `trace.jsonl` 和 `report.json` 里都找不到那个邮箱。
+- **仍然存在（已写进 README）**：每步截图保存在本地运行目录里，截图上看得到自动填充的内容。截图目前不发给任何模型，真实网站的运行结果也不提交。如果以后做计划 13（视觉层检查），需要重新考虑这一点。
+- **已知的边界情况**：如果一个字段原本有自动填充的内容，planner 又没用 replace、直接在后面追加输入，这个字段会被当成"planner 输入过的字段"，value 里会带上原有的内容。real 模式下，planner 看不到这类字段的原有内容（value 是 null），所以更正时应该用 replace。

@@ -25,13 +25,28 @@ export async function focusInfo(page, cdp) {
 const PAGE_ROLES = new Set(['heading', 'link', 'button', 'textbox', 'searchbox', 'combobox', 'checkbox', 'radio', 'img',
   'StaticText', 'alert', 'status', 'dialog', 'listitem', 'cell', 'tab', 'option', 'banner', 'main', 'navigation', 'contentinfo']);
 
-/** What a screen-reader user could read on the page (browse mode). Text in images is absent by construction. */
-export async function pageText(cdp, maxChars = 4000) {
+const EDITABLE_ROLES = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton']);
+
+// ids of every node below an editable field: its StaticText is the field's content (possibly autofilled)
+function insideFields(nodes) {
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const inside = new Set();
+  const mark = (id) => { for (const c of byId.get(id)?.childIds || []) if (!inside.has(c)) { inside.add(c); mark(c); } };
+  for (const n of nodes) if (EDITABLE_ROLES.has(val(n.role))) mark(n.nodeId);
+  return inside;
+}
+
+/**
+ * What a screen-reader user could read on the page (browse mode). Text in images is absent by construction.
+ * redactFieldText (real mode): leave out text inside editable fields, i.e. what the user typed or the browser autofilled.
+ */
+export async function pageText(cdp, maxChars = 4000, { redactFieldText = false } = {}) {
   const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+  const skip = redactFieldText ? insideFields(nodes) : new Set();
   const out = [];
   let len = 0;
   for (const n of nodes) {
-    if (n.ignored) continue;
+    if (n.ignored || skip.has(n.nodeId)) continue;
     const role = val(n.role), name = val(n.name).replace(/\s+/g, ' ').trim();
     if (!PAGE_ROLES.has(role) || !name) continue;
     const line = role === 'StaticText' ? name : `[${role}] ${name}`;

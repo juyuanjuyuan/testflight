@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { focusInfo, pageText } from './observe.mjs';
 import { act } from './act.mjs';
+import { redactFocusValue } from './guard.mjs';
 import { runAxe, mergeAxe } from './axe.mjs';
 import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS } from '../contracts.mjs';
 
@@ -60,6 +61,8 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
   const axeRuns = [];
   let i = 0;
   let current = null;
+  const typedSelectors = new Set(); // fields the planner typed into since the last page load (real-mode value redaction)
+  const observeFocus = async () => redactFocusValue(await focusInfo(page, cdpSession), { mode, typedSelectors });
 
   async function snapshot(extra) {
     const shot = await screenshotOrNull(page, runDir, `shots/${String(i).padStart(4, '0')}.png`);
@@ -85,9 +88,9 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     async start(goalUrl = url) {
       if (mode !== 'real') await page.goto(goalUrl, { waitUntil: 'load' });
       await sleep(BASELINE_MS); // idle baseline: anything that changes now is noise, not caused by the user
-      const focus = await focusInfo(page, cdpSession);
+      const focus = await observeFocus();
       const step = { i, t: Date.now(), action: { kind: 'start', reason: 'open page' }, focusBefore: null, focusAfter: focus,
-        changes: [], spoken: [], pageLoad: true, pageText: await pageText(cdpSession), ...(await snapshot()) };
+        changes: [], spoken: [], pageLoad: true, pageText: await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }), ...(await snapshot()) };
       if (axe) axeRuns.push(await runAxe(page));
       current = focus; i++;
       return step;
@@ -101,9 +104,11 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       const loadTimeout = await settle(loadsBefore);
       const pageLoad = loads !== loadsBefore;
       const changes = pageLoad ? [] : await page.evaluate((w) => window.__a11yRec.collect(w), CHANGE_WINDOW_MS);
-      const focusAfter = await focusInfo(page, cdpSession);
+      if (pageLoad) typedSelectors.clear(); // same selector on a new page is a different field, possibly autofilled
+      else if (action.kind === 'type' && focusBefore && !focusBefore.isBody) typedSelectors.add(focusBefore.selector);
+      const focusAfter = await observeFocus();
       const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, spoken: [], pageLoad,
-        pageText: pageLoad ? await pageText(cdpSession) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
+        pageText: pageLoad ? await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
       if (axe && (pageLoad || changes.length)) axeRuns.push(await runAxe(page));
       current = focusAfter; i++;
       return step;
