@@ -356,3 +356,57 @@ test('fix endpoint: wrong method → 405', async () => {
     assert.equal((await res.json()).error.code, 'method_not_allowed');
   });
 });
+
+// ---- P2: GET /api/runs ----
+
+const LIST_FIELDS = ['runDir', 'url', 'goal', 'generatedAt', 'screenReaderUserCanComplete', 'state'].sort();
+
+test('GET /api/runs: finished, fixing, running, runs/real/ entries newest first; broken dirs are counted in skipped', async () => {
+  await withApi(async ({ port, runsDir }) => {
+    const old = finishedRun(runsDir, '2026-09-26T20-00-00-audit');                         // report only (before progress.json existed)
+    const fixing = finishedRun(runsDir, '2026-09-26T21-00-00-audit');
+    createProgressWriter(fixing.dir)({ state: 'fixing', trace: [] });
+    const running = path.join(runsDir, '2026-09-26T22-00-00-audit');
+    fs.mkdirSync(running);
+    createProgressWriter(running)({ state: 'running', trace: [], url: 'http://localhost:8080/shop/original/', goal: 'Buy socks' });
+    const corrupt = path.join(runsDir, '2026-09-26T23-00-00-audit');
+    fs.mkdirSync(corrupt);
+    fs.writeFileSync(path.join(corrupt, 'report.json'), '{"meta": ');
+    fs.mkdirSync(path.join(runsDir, '2026-09-26T23-30-00-replay'));                       // no report, no progress
+    fs.writeFileSync(path.join(runsDir, 'notes.txt'), 'not a run');                         // plain files are not runs
+    fs.mkdirSync(path.join(runsDir, 'real'));
+    finishedRun(path.join(runsDir, 'real'), '2026-09-26T21-30-00-audit', (r) => { r.meta.mode = 'real'; r.meta.url = 'https://example.com/'; });
+    fs.mkdirSync(path.join(runsDir, 'real', '2026-09-26T21-40-00-audit'));                 // broken real run
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/runs`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /application\/json/);
+    const body = await res.json();
+    assert.equal(body.skipped, 3);
+    assert.deepEqual(body.runs.map((r) => r.runDir), ['2026-09-26T22-00-00-audit', 'real/2026-09-26T21-30-00-audit', '2026-09-26T21-00-00-audit', '2026-09-26T20-00-00-audit']);
+    for (const r of body.runs) assert.deepEqual(Object.keys(r).sort(), LIST_FIELDS, `${r.runDir}: only the list fields`);
+    const [run, real, fix, done] = body.runs;
+    assert.deepEqual(run, { runDir: '2026-09-26T22-00-00-audit', url: 'http://localhost:8080/shop/original/', goal: 'Buy socks', generatedAt: null, screenReaderUserCanComplete: null, state: 'running' });
+    const report = readJSON('fixtures/testpage-original/report.json');
+    assert.deepEqual(done, { runDir: old.name, url: report.meta.url, goal: report.meta.goal, generatedAt: report.meta.generatedAt,
+      screenReaderUserCanComplete: report.verdicts.screenReaderUserCanComplete, state: 'done' });
+    assert.equal(fix.state, 'fixing', 'a run being fixed keeps its audit verdict but shows the live state');
+    assert.equal(fix.screenReaderUserCanComplete, report.verdicts.screenReaderUserCanComplete);
+    assert.equal(real.url, 'https://example.com/');
+    const shot = await fetch(`http://127.0.0.1:${port}/runs/${real.runDir}/report.json`);
+    assert.equal(shot.status, 200, 'runDir of a real run is a path under /runs');
+  });
+});
+
+test('GET /api/runs: a failed run with no report is listed as failed; a missing runs dir is an empty list', async () => {
+  await withApi(async ({ port, runsDir }) => {
+    const dir = path.join(runsDir, '2026-09-26T22-00-00-audit');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify({ state: 'failed', step: null, maxSteps: 25, timeline: [], rerunDir: null, error: 'boom', updatedAt: new Date().toISOString() }));
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/runs`)).json();
+    assert.deepEqual(body, { runs: [{ runDir: path.basename(dir), url: null, goal: null, generatedAt: null, screenReaderUserCanComplete: null, state: 'failed' }], skipped: 0 });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+    assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/api/runs`)).json(), { runs: [], skipped: 0 });
+    fs.mkdirSync(runsDir); // withApi removes it again
+  });
+});

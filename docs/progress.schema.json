@@ -19,6 +19,8 @@
     },
     "rerunDir": { "type": ["string", "null"], "description": "Set when state becomes rerunning: the rerun's own runDir, which already has its own progress.json. Kept in the done/failed that follow; null before a rerun" },
     "error": { "type": ["string", "null"], "description": "state failed: one sentence to show the user. null otherwise" },
+    "url": { "type": ["string", "null"], "description": "The audit's start URL (= report.json meta.url). null until known (real mode: after step 0) and in a fix's progress (read report.json). Optional: absent in files written before plan 17 P2" },
+    "goal": { "type": ["string", "null"], "description": "The audit's task (= report.json meta.goal). null in a fix's progress. Optional, like url" },
     "updatedAt": { "type": "string", "format": "date-time" }
   }
 }

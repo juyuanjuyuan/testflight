@@ -1,4 +1,4 @@
-// /api/* for the frontend (docs/API.md). POST /api/runs starts an audit, POST /api/runs/<runDir>/fix a fix (+ rerun),
+// /api/* for the frontend (docs/API.md). GET /api/runs lists runs (list.mjs), POST /api/runs starts an audit, POST /api/runs/<runDir>/fix a fix (+ rerun),
 // each in a child process; progress.json shows it live.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import { newRunDir } from '../audit.mjs';
 import { readTrace } from '../contracts.mjs';
 import { siteDirs } from '../fix/commands.mjs';
 import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../report/progress.mjs';
+import { listRuns } from './list.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_GOAL_CHARS = 500;
@@ -149,7 +150,7 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
       const argv = ['audit', '--url', url, '--goal', goal, '--run-dir', runDir, '--site', site, '--progress',
         ...(script ? ['--script', script, '--no-judge'] : [])];
       try {
-        createProgressWriter(runDir)({ state: 'running', trace: [] });
+        createProgressWriter(runDir)({ state: 'running', trace: [], url, goal });
         return exited(spawnRun({ runDir, argv })).then((exit) => markFailedIfUnfinished(runDir, exitMessage('audit', exit)));
       } catch (e) {
         markFailedIfUnfinished(runDir, 'The audit could not be started.');
@@ -195,7 +196,8 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
   async function route(req, res) {
     const segs = new URL(req.url, 'http://x').pathname.split('/').filter(Boolean); // ['api', 'runs', …]
     if (segs[1] === 'runs' && segs.length === 2) {
-      if (req.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to start a run.');
+      if (req.method === 'GET') return send(res, 200, await listRuns(runsDir));
+      if (req.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use GET to list runs or POST to start one.');
       return startRun(req, res);
     }
     if (segs[1] === 'runs') {

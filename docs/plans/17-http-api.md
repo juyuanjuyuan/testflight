@@ -156,3 +156,30 @@
 - 复测的 `stats` 是 `{calls: 26, llmAttempts: 26}`，没有 `cacheHits`，所以是模型当场的回答，不是缓存里别的任务（例如 fixloop 用的 16 位卡号任务）的答案。另外，原运行有 11 次 `cacheHits`（重放了之前验证 P0 时同一任务的回答），它不能当作独立的第二次采样。
 - 后果：有效卡号让付款成功、弹窗关闭，但"Order confirmed"提示没有播报（这次没选修复它），焦点落到 body（第 8 步）；模型之后在 Card number 和 Pay 之间来回 Tab / Shift+Tab，直到 25 步用完，第 25 步 stuck。复测判定 `unexplainedStuck: true`，`closedLoop: false`。所以这次 `closedLoop: false` 不是修复或 API 的问题，而是复测时 planner 没有按任务给的卡号操作，结果测的是另一条路径。
 - 影响：同一个任务修复前后走的路径不同，前后对比就不可靠。之后在计划 03 的范围里处理（例如要求 planner 逐字使用任务里给出的输入值）。这次没有改 planner 的 prompt。
+
+### P2（2026-09-27 完成；`fixPolicy` 已在 P1 做完。P0、P1、P2 都已完成，README 里勾选）
+
+**做了什么**
+- `GET /api/runs`（新建 `src/api/list.mjs`，`src/api/runs.mjs` 只加了路由）：扫描 `runs/` 和 `runs/real/`，返回 `{ runs: [{ runDir, url, goal, generatedAt, screenReaderUserCanComplete, state }], skipped }`，按目录名倒序（目录名以 UTC 开始时间开头）。每项只有这六个字段，不返回整份报告。
+  - 有能解析的 `report.json`：字段取自报告；`state` 取 progress.json（例如正在修复的运行是 `fixing`，结论仍是审计的），没有 progress.json 的旧运行是 `done`。
+  - 没有 `report.json`、有 progress.json（运行中、分析中、没跑完就失败）：`state` 取 progress，`generatedAt`、`screenReaderUserCanComplete` 为 `null`，`url` / `goal` 取 progress 里新增的同名字段。
+  - 两个文件都读不出来，或者 `report.json` 损坏（不会因为有 progress 就当成"运行中"）：不列出，计入 `skipped`，接口不报错。`runs/` 不存在时返回空列表。
+  - `runs/real/` 下的运行 `runDir` 带 `real/` 前缀（`/runs/real/<名字>/report.json` 能直接访问）；`real` 目录本身不算运行。
+- progress.json 新增可选的 `url`、`goal`：`audit()` 的每次 `onProgress` 都带上（真实网站模式第 0 步之后才有网址），API 启动审计时的第一版也写入；写入器和 `markFailedIfUnfinished` 都会保留它们。修复写的进度里是 `null`（那时已经有 report.json）。`progress.schema.json` 同步（可选字段）。
+- report.json：`meta.startedAt`（`audit()` 开始时）、`meta.finishedAt`（分析结束、写报告之前）、`meta.maxSteps`（本地 25 / 真实 80）；`replay` 没有自己的运行，不写这三个字段。修复后重新生成的报告沿用审计的 meta，所以保留审计的时间。`timeline[].t`：`timelineEntry` 多一个参数 `t0`（第 0 步的时间戳），`t = step.t - t0`，缺时间戳时为 `null`；report.json 和 progress.json 仍用同一个函数。
+- 规则 13：`report.schema.json`（四个新字段都可选）、`REPORT_FORMAT.md`（meta 表、timeline 表、§1 里"没有列表接口"那句）、`report.example.json`（meta 三个字段和每一步的 `t`）同步。`docs/API.md` 新增 §4 列表接口（原 §4–§6 顺延为 §5–§7），progress 字段表加 `url` / `goal`，差异表加两行，405 的例子改掉。
+- 没有改 `src/fix/`、judge、噪音常量、`viewer/`、`sites/shop/`、`docs/frontend/`。
+
+**验收**
+- `npm test` 100 项通过。新增测试（先确认失败再实现）：`GET /api/runs` 覆盖已完成（无 progress）、修复中、运行中、`runs/real/` 下的运行、损坏的 report.json、空目录、坏掉的真实网站目录、普通文件、只有 failed progress 的运行、`runs/` 不存在；检查每项只有六个字段、排序、`skipped` 计数、real 运行的报告能通过 `/runs/real/…` 访问。`audit()` 的 `startedAt ≤ finishedAt ≤ generatedAt`、`maxSteps`（本地和真实模式）、`timeline[].t`（第 0 步为 0，缺时间戳为 null）、progress 的 `url` / `goal` 在每个状态都符合 schema 并在 failed 里保留。
+- `npm run smoke` 全部通过。`api` 用例的"与直接运行一致"比较忽略 `startedAt` / `finishedAt`（和 `generatedAt` 一样每次不同），另外检查 meta 的时间和 `maxSteps`、`timeline[].t` 从 0 递增、`GET /api/runs` 里这次运行是 `done` 且结论一致。
+- 在临时端口上对本地真实的 `runs/`（212 个目录）调用 `GET /api/runs`：212 项，`skipped: 0`。
+- 8080 上的 `npm run serve` 需要重启才有 `GET /api/runs`（旧进程返回 405）。
+
+**和前端文档不一致的地方（已写进 docs/API.md §1 和 §4，需要转告前端）**
+1. `GET /api/runs` 返回**对象** `{ runs: [...], skipped }`，不是数组；每项多一个 `state`。
+2. 还没有报告的条目 `generatedAt`、`screenReaderUserCanComplete` 为 `null`（不是 `false`）；`url` / `goal` 也可能是 `null`（真实网站模式第 0 步之前、P2 之前写的 progress）。
+3. 真实网站的运行也会列出，`runDir` 形如 `real/2026-…-audit`，里面有 `/`；它们不能修复，不要对它们调用修复接口（会返回 404）。
+4. `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t` 在旧报告和 `replay` 生成的报告里没有；真实网站模式的 `startedAt` 包含人处理验证码的时间。
+5. 用命令行跑、被 Ctrl-C 中断的运行，列表里可能一直是 `running`（没有服务器补写 `failed`）；网页启动的运行不会。
+6. progress.json 新增 `url`、`goal`（修复写的进度里为 `null`）。

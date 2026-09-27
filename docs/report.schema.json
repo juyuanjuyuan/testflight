@@ -17,7 +17,10 @@
         "goal": { "type": "string", "description": "Task given to the planner, e.g. 'Buy the canvas tote bag'" },
         "judge": { "type": "boolean", "description": "false = judge disabled; findings keep deterministic defaults and userImpact is empty" },
         "generatedAt": { "type": "string", "format": "date-time" },
-        "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" }
+        "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" },
+        "startedAt": { "type": "string", "format": "date-time", "description": "When the run started. Real mode: includes the time the human spent clearing captcha/login before pressing Enter. Absent in replays and in reports built before plan 17 P2" },
+        "finishedAt": { "type": "string", "format": "date-time", "description": "When the run's analysis finished (report written right after). finishedAt - startedAt = how long the audit took. Absent when startedAt is" },
+        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 25 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" }
       }
     },
     "verdicts": { "$ref": "#/$defs/verdicts" },
@@ -187,6 +190,7 @@
       "required": ["i", "action", "focus", "seen", "seenNoise", "heard", "findingIds"],
       "properties": {
         "i": { "type": "integer", "minimum": 0 },
+        "t": { "type": ["integer", "null"], "minimum": 0, "description": "Milliseconds from step 0 to the moment this step was recorded (step 0 = 0), for a playback time axis such as 00:12. null = the trace has no timestamp for it. Absent in reports built before plan 17 P2" },
         "action": { "$ref": "#/$defs/action" },
         "url": { "type": "string" },
         "focus": { "type": "string", "description": "What a screen reader says for the focused element, e.g. 'button \"Pay\"' or '(focus on page body)'" },

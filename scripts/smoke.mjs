@@ -142,8 +142,8 @@ ajv.addSchema(readJSON('docs/report.schema.json'));
 const validProgress = ajv.compile(readJSON('docs/progress.schema.json'));
 const validReport = ajv.getSchema(readJSON('docs/report.schema.json').$id);
 const STATE_ORDER = ['running', 'analyzing', 'done'];
-// carousel noise and "appeared Nms after" vary run to run; everything the verdict rests on must match
-const stable = (r) => ({ meta: { ...r.meta, generatedAt: null }, verdicts: r.verdicts, counts: r.counts, axe: r.axe,
+// carousel noise, "appeared Nms after" and timings vary run to run; everything the verdict rests on must match
+const stable = (r) => ({ meta: { ...r.meta, generatedAt: null, startedAt: null, finishedAt: null }, verdicts: r.verdicts, counts: r.counts, axe: r.axe,
   findings: r.findings.map((f) => [f.id, f.impact, f.detector, f.layer, f.wcag, f.steps, f.evidence.text]),
   timeline: r.timeline.map((t) => [t.i, t.action, t.url, t.focus, t.heard, t.seen.map((x) => x.text), t.findingIds]) });
 
@@ -176,6 +176,11 @@ async function runApiCase() {
     failures.push(shots.length > 0 && shots.every((st) => st === 200) || `screenshots not all served: ${shots.join(',')}`);
     failures.push(p.timeline.length === report.timeline.length || `progress has ${p.timeline.length} steps, report ${report.timeline.length}`);
     failures.push(!cliReport || JSON.stringify(stable(report)) === JSON.stringify(stable(cliReport)) || 'report.json differs from the same audit run directly');
+    const { startedAt, finishedAt, maxSteps } = report.meta;
+    failures.push(startedAt < finishedAt && finishedAt <= report.meta.generatedAt && maxSteps === p.maxSteps || `meta timing/limit wrong: ${startedAt} ${finishedAt} ${maxSteps}`);
+    failures.push(report.timeline.every((t, k) => (k === 0 ? t.t === 0 : t.t >= report.timeline[k - 1].t)) || 'timeline[].t does not start at 0 and grow');
+    const listed = (await (await fetch(`${base}/api/runs`)).json()).runs.find((r) => r.runDir === runDir);
+    failures.push(listed?.state === 'done' && listed.screenReaderUserCanComplete === report.verdicts.screenReaderUserCanComplete || `GET /api/runs entry: ${JSON.stringify(listed)}`);
   }
   const failed = failures.filter((x) => x !== true);
   console.log(`${failed.length ? 'FAIL' : 'ok  '} api: POST /api/runs → ${states.join(' → ')} · runs/${runDir}`);

@@ -16,7 +16,7 @@
 | 测试用的固定数据 | `http://localhost:8080/fixtures/testpage-original/report.json` |
 | 截图 | 报告所在目录 + `timeline[].screenshot`，例如 `/runs/<运行目录名>/shots/0007.png` |
 
-运行目录名形如 `2026-09-26T21-24-50-audit`，后端命令行在运行结束时会打印出来；从网页启动的运行由 `POST /api/runs` 返回，运行中的进度在同一目录的 `progress.json`，见 `docs/API.md`。目前没有"列出所有运行"的接口（计划 17 P2）。
+运行目录名形如 `2026-09-26T21-24-50-audit`，后端命令行在运行结束时会打印出来；从网页启动的运行由 `POST /api/runs` 返回，运行中的进度在同一目录的 `progress.json`，见 `docs/API.md`。所有运行（包括运行中的和命令行跑的真实网站）可以用 `GET /api/runs` 列出，同样见 `docs/API.md`。
 
 直接用 `file://` 打开页面会读不到报告，必须经过服务器。
 
@@ -47,6 +47,8 @@
 | `script` | `true` = 按预录按键运行；`false` = AI 自己决定每一步 |
 | `judge` | `false` 时问题没有经过 AI 审核，`userImpact` 为空 |
 | `generatedAt` | 生成时间（ISO 格式） |
+| `startedAt` / `finishedAt` | 运行开始、分析结束的时间（ISO 格式），相减就是"本次审计用时"；修复后重新生成的报告保留审计的这两个时间（`generatedAt` 会更新）。真实网站模式的 `startedAt` 包含人在 Chrome 里处理验证码、按回车之前的时间。`replay` 生成的报告和旧报告里没有这两个字段 |
+| `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 25，真实网站 80。可以显示"用了 14 / 25 步"。`replay` 生成的报告和旧报告里没有 |
 
 ### verdicts：两个核心结论
 
@@ -76,6 +78,7 @@
 | 字段 | 说明 | 对应画面 |
 |---|---|---|
 | `i` | 步骤编号，从 0 开始 | 步骤列表 |
+| `t` | 距离第 0 步的毫秒数（第 0 步是 0），用来做时间轴，例如 00:12。`null` 表示 trace 里没有这一步的时间；旧报告里没有这个字段 | 回放时间轴 |
 | `action.kind` | `start` / `press` / `type` / `done` / `stuck` | 步骤列表 |
 | `action.key` | 按下的键（`press` 时），如 `Tab`、`Enter`、`Escape` | 步骤列表 |
 | `action.text` | 输入的文字（`type` 时） | 步骤列表 |

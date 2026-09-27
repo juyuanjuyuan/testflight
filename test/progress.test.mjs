@@ -9,6 +9,7 @@ import addFormats from 'ajv-formats';
 import { ROOT } from '../src/paths.mjs';
 import { readTrace, MAX_STEPS, MAX_STEPS_REAL } from '../src/contracts.mjs';
 import { audit } from '../src/audit.mjs';
+import { buildReport } from '../src/report/build.mjs';
 import { writeJsonAtomic } from '../src/report/atomic.mjs';
 import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../src/report/progress.mjs';
 
@@ -147,4 +148,45 @@ test('audit(): real mode writes its own step limit into every progress.json stat
   fs.writeFileSync(path.join(runDir, 'progress.json'), JSON.stringify({ ...readProgress(runDir), state: 'running' }));
   markFailedIfUnfinished(runDir, 'crashed');
   assert.equal(readProgress(runDir).maxSteps, MAX_STEPS_REAL, 'a crashed real run keeps its limit');
+});
+
+// ---- P2: meta.startedAt / finishedAt / maxSteps, timeline[].t, url + goal in progress.json ----
+
+test('audit(): meta has startedAt ≤ finishedAt ≤ generatedAt and maxSteps; timeline[].t is ms since step 0', async () => {
+  const runDir = tmpDir();
+  const before = new Date().toISOString();
+  const { report } = await audit({ url: 'http://localhost:8080/testpage/original/', goal: 'Buy the canvas tote bag', runDir,
+    script: trace.slice(1).map((s) => s.action), judgeEnabled: false, openSession: fakeSession() });
+  const { startedAt, finishedAt, generatedAt, maxSteps } = report.meta;
+  assert.ok(before <= startedAt && startedAt <= finishedAt && finishedAt <= generatedAt, `${before} ${startedAt} ${finishedAt} ${generatedAt}`);
+  assert.equal(maxSteps, MAX_STEPS);
+  assert.deepEqual(report.timeline.map((s) => s.t), trace.map((s) => s.t - trace[0].t));
+  assert.equal(report.timeline[0].t, 0);
+});
+
+test('audit(): real mode meta.maxSteps is the real-mode limit', async () => {
+  const { report } = await audit({ mode: 'real', goal: 'g', runDir: tmpDir(), script: [{ kind: 'press', key: 'Tab', reason: 'x' }],
+    judgeEnabled: false, openSession: fakeSession() });
+  assert.equal(report.meta.maxSteps, MAX_STEPS_REAL);
+});
+
+test('timeline[].t is null for a step without a timestamp', () => {
+  const noTime = trace.map(({ t, ...s }) => (s.i === 2 ? s : { ...s, t }));
+  const r = buildReport({ meta: { goal: 'g' }, trace: noTime, findings: [] });
+  assert.equal(r.timeline[2].t, null);
+  assert.equal(r.timeline[3].t, trace[3].t - trace[0].t);
+});
+
+test('progress.json carries the audit url and goal (null until known); markFailedIfUnfinished keeps them', async () => {
+  const runDir = tmpDir();
+  const write = createProgressWriter(runDir);
+  write({ state: 'fixing', trace: [] });
+  assert.equal(readProgress(runDir).url, null);
+  const url = 'http://localhost:8080/testpage/original/';
+  await audit({ url, goal: 'Buy the canvas tote bag', runDir, script: trace.slice(1).map((s) => s.action), judgeEnabled: false,
+    onProgress: (u) => { write(u); const p = readProgress(runDir); assertValid(p, p.state); assert.equal(p.url, url); assert.equal(p.goal, 'Buy the canvas tote bag'); },
+    openSession: fakeSession() });
+  fs.writeFileSync(path.join(runDir, 'progress.json'), JSON.stringify({ ...readProgress(runDir), state: 'running' }));
+  markFailedIfUnfinished(runDir, 'crashed');
+  assert.equal(readProgress(runDir).goal, 'Buy the canvas tote bag');
 });

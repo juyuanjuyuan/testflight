@@ -5,10 +5,13 @@ import { NOISE_REPEAT } from '../contracts.mjs';
 import { writeJsonAtomic, writeFileAtomic } from './atomic.mjs';
 import { FIX_POLICY } from '../fix/policy.mjs';
 
-/** One report.json timeline[] entry for a trace step; progress.json uses the same function (findings = [] while running). */
-export function timelineEntry(s, findings) {
+/**
+ * One report.json timeline[] entry for a trace step; progress.json uses the same function (findings = [] while running).
+ * t0: epoch ms of step 0, so `t` is ms since the run started (null if either timestamp is missing).
+ */
+export function timelineEntry(s, findings, t0) {
   return {
-    i: s.i, action: s.action, url: s.url, focus: describeFocus(s.focusAfter), focusRect: s.focusAfter.rect ?? null,
+    i: s.i, t: Number.isFinite(s.t) && Number.isFinite(t0) ? s.t - t0 : null, action: s.action, url: s.url, focus: describeFocus(s.focusAfter), focusRect: s.focusAfter.rect ?? null,
     seen: s.changes.filter((c) => c.visible && c.repeatCount < NOISE_REPEAT).map((c) => ({ text: c.text, rect: c.rect ?? null })), // middle column
     seenNoise: s.changes.filter((c) => c.repeatCount >= NOISE_REPEAT).map((c) => c.text),                              // carousels etc.
     heard: heardInStep(s),                                             // right column: what AT conveyed
@@ -34,7 +37,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
       axeViolations: axeOk ? axe.violations.filter(isWcag).length : null,        // WCAG rules only; null = axe unavailable
       axeBestPractice: axeOk ? axe.violations.filter((v) => !isWcag(v)).length : null,
     },
-    timeline: trace.map((s) => timelineEntry(s, shown)),
+    timeline: trace.map((s) => timelineEntry(s, shown, trace[0]?.t)),
     findings: shown.sort((a, b) => order[a.impact] - order[b.impact]),
     axe: !axe ? null : axe.error ? { error: axe.error } : { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) },
     fixes, rerun, stats,
