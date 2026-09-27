@@ -94,8 +94,8 @@
 **需要通知前端：** progress 新增状态 `planning_task`（此时 `goal` 为 `null`，timeline 可能已经有第 0 步），需要能显示；`POST /api/runs` 可以不传 `goal`；新接口 `POST /api/tasks/suggest`（见 API.md §2.1）；报告 `meta.goalSource` 可以用来显示"AI 生成的任务"。
 
 发现的问题（不在本计划的可改范围内，没有改）：
-- `eval/groundtruth/testpage.yaml` 的 `site` 是 `sites/testpage`，实际目录是 `sites/testpage/original`，所以 testpage/original 匹配不到预设，会走生成。
-- `testpage-fixed.yaml` 的预设任务 "Buy the canvas tote bag" 没有卡号：按脚本跑没问题，但由 planner 跑时会在付款处 stuck（planner 正确地拒绝编造卡号）。如果希望自动任务在 testpage 上跑通，需要在这两份 groundtruth 的 goal 里加上卡号（会影响 eval，需要 10 号计划的负责人确认）。
+- ~~`eval/groundtruth/testpage.yaml` 的 `site` 是 `sites/testpage`~~ **已解决（`9c38ebe`）：** 现在是 `sites/testpage/original`。
+- ~~`testpage-fixed.yaml` 的预设任务 "Buy the canvas tote bag" 没有卡号~~ **已解决：** 计划 10 的 commit `9c38ebe` 给 `testpage.yaml` 和 `testpage-fixed.yaml` 的 goal 都加上了 "Pay with card number 4242 4242 4242 4242."，同一个 commit 也把 `testpage.yaml` 的 `site` 改成了 `sites/testpage/original`（上一条）。
 
 
 ### 后续：`generate: true`（demo 现场展示 AI 生成任务，2026-09-27）
@@ -141,4 +141,4 @@
 
 **需要通知前端：** ① `verdicts.screenReaderUserCanComplete` / `agentCanComplete`（以及 `rerun.before` / `after` 里的同名字段、`GET /api/runs` 的 `screenReaderUserCanComplete`）**可能是 `null`**，同时有 `verdicts.inconclusiveReason`。前端要分别处理 `true` / `false` / `null`，`null` 显示"无法判断：任务里缺少测试数据"之类，不能用 `!verdict` 显示成"不能完成"（目前 `FRONTEND/src/screens/AuditWorkspace.tsx` 就是这样写的，`FRONTEND/src/api/contracts.ts` 的类型也是 `boolean`）。② 报告 `meta.goalInput` / `meta.testDataAppended`：可以显示用户原文并注明"已自动补充测试数据"，progress 里的 `goal` 会比用户输入的长。
 
-没有改的：testpage 没有加测试数据配置（加了会改变 eval 里 `testpage-fixed.yaml` 那条无卡号任务的行为，需要 10 号计划负责人确认），所以 testpage 上的无数字任务仍会在付款处"无法判断"。
+**决定：testpage 不加测试数据配置。** 两份 testpage groundtruth 的 goal 本来就带卡号（`9c38ebe`），eval 和预设任务不受影响。用户在 testpage 上填不带数字的任务时不补任何数据，planner 会在付款处 stuck（`missing data:`），结论为"无法判断"（`null` + `inconclusiveReason: missing_test_data`）：这是**有意保留**的行为，用来测试和演示这个结论（上面第二条验证就是这样跑的）。以后不要为了让它"跑通"而给 testpage 加配置。
