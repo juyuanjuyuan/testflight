@@ -147,3 +147,4 @@
 ### 后续：只拼接站点需要的测试数据、卡号句子改写（2026-09-27）
 
 - 生成任务时，模型给的 `needs` 和站点配置的 `needs` 取交集（`loadTestData()` 现在返回 `needs`；站点配置没有 `needs` 时和以前一样全部拼接）。shop 只有 `payment_card`，生成的任务不再带姓名、地址、邮箱，建议里的 `needs` 也只剩实际拼接的类别。
+- `shop.json` 的 `payment_card` 改为 "Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."（卡号不变，两张卡都能通过 planner 的输入值检查，有测试）。依赖旧句子原文的只有两处测试（`missing-data`、`api` 里拼接后的 goal），已更新；按键脚本 `eval/keys.shop.main.json` 只输入卡号，不受影响。**没有改**：`eval/groundtruth/shop-main.yaml` 的预设 goal、CI（`.github/workflows/a11y-audit.yml`）和 `scripts/demo-prep.sh` 里的 goal 是各自写死的固定任务，不是从配置拼出来的；改了会让 demo 预跑的 LLM 缓存（readonly）全部失效，`eval/traces/*/meta.json` 是历史运行记录。所以 shop 的预设任务仍是旧句子，用户任务和生成任务用新句子。

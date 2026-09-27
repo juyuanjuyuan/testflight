@@ -73,7 +73,7 @@ test('appendTestData: shop goal without digits gets the shop test data; the plan
   const r = appendTestData({ goal: 'buy one thing', siteKey: 'sites/shop/original', mode: 'local' });
   assert.equal(r.appended, true);
   assert.equal(r.profile, 'shop');
-  assert.equal(r.goal, 'buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.');
+  assert.equal(r.goal, 'buy one thing. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242.');
   const shop = JSON.parse(fs.readFileSync(path.join(ROOT, 'config/test-data/shop.json'), 'utf8'));
   assert.ok(r.goal.endsWith(shop.sentences.payment_card), 'values come from config/test-data/shop.json');
   assert.ok(typedValueInGoal('4000 0000 0000 0002', r.goal) && typedValueInGoal('4242 4242 4242 4242', r.goal));

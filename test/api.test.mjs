@@ -677,7 +677,7 @@ test('POST /api/runs: a shop goal without digits shows the goal with test data a
     const r = await post('/api/runs', { url: site('shop/original/'), goal: 'buy one thing' });
     assert.equal(r.status, 202, JSON.stringify(r.body));
     const p = readProgress(path.join(runsDir, r.body.runDir));
-    assert.equal(p.goal, 'buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.');
+    assert.equal(p.goal, 'buy one thing. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242.');
     const { argv } = fake.calls.at(-1);
     assert.equal(argv[argv.indexOf('--goal') + 1], 'buy one thing', 'the child gets the raw input (it records meta.goalInput)');
     fake.calls.at(-1).exit({ code: 0, signal: null, stderr: '' });

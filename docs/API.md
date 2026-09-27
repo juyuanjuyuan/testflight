@@ -47,7 +47,7 @@ Content-Type: application/json
 - 返回之前运行目录已经创建好，里面已经有第一版 `progress.json`（`state: "running"`、`timeline: []`；不传 `goal` 时是 `state: "planning_task"`、`goal: null`），拿到 `runDir` 马上读不会 404。
 - **不传 `goal`**：子进程打开起始页（第 0 步照常记录，所以 `planning_task` 时 `timeline` 里可能已经有第 0 步），用和 planner 第 0 步完全相同的信息（网址、标题、读屏能读到的页面文字）确定任务，把它写进 progress 的 `goal`，再进入 `running`。演示站点有预设任务时直接用预设（稳定、不调用模型）；否则由模型生成（会多花约 5–10 秒）。确定不了时写 `failed`，`error` 以 "Could not work out a task for this page. Please describe one." 开头。报告里 `meta.goalSource` / `goalReason` / `testDataProfile` 记录任务从哪里来（见 `REPORT_FORMAT.md`）。
 - 自动生成的任务每次可能不同（LLM 缓存也就用不上），demo 主流程请继续传固定的 `goal`。
-- **传了 `goal`，但里面没有任何数字**，并且站点有自己的测试数据配置（`config/test-data/<站点>.json`，目前只有 `shop.json`）：后端把配置里的测试数据按计划 18 的模板拼在后面，例如 `"buy one thing"` → `"buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."`。第一版 progress.json 起 `goal` 就是拼接后的完整任务；报告里 `meta.goal` 是完整任务，`meta.goalInput` 是用户原文，`meta.testDataAppended` 为 `true`，`meta.testDataProfile` 是配置名。`goal` 里有数字（例如自己写了卡号）时原样使用。前端可以显示原文并注明"已自动补充测试数据"。
+- **传了 `goal`，但里面没有任何数字**，并且站点有自己的测试数据配置（`config/test-data/<站点>.json`，目前只有 `shop.json`）：后端把配置里的测试数据按计划 18 的模板拼在后面，例如 `"buy one thing"` → `"buy one thing. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."`。第一版 progress.json 起 `goal` 就是拼接后的完整任务；报告里 `meta.goal` 是完整任务，`meta.goalInput` 是用户原文，`meta.testDataAppended` 为 `true`，`meta.testDataProfile` 是配置名。`goal` 里有数字（例如自己写了卡号）时原样使用。前端可以显示原文并注明"已自动补充测试数据"。
 - 同一时间只有一个运行。已有运行时返回 `409 run_in_progress`（修复和复测也共用这个限制，见 §3）。
 - 审计在子进程里执行（`node cli.mjs audit … --run-dir <runDir> --progress`），它的输出记在运行目录的 `cli.log`，仅供后端排查，前端不要读。
 - 同一秒内启动两次，第二个目录名会带 `-2` 后缀，不会共用目录。

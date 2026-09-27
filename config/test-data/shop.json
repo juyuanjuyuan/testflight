@@ -3,6 +3,6 @@
   "_needs": "Data kinds the site asks for at checkout: appended (in this order) to a user goal that has no digits (src/audit.mjs).",
   "needs": ["payment_card"],
   "sentences": {
-    "payment_card": "Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
+    "payment_card": "Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."
   }
 }
