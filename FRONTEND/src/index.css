@@ -821,6 +821,7 @@ a.main-action { text-decoration: none; }
 .live-workspace .history-row p { color: #a5afa5; font-size: 13px; margin: 10px 0; }
 .live-workspace .history-row small { color: var(--muted); font: 11px 'DM Mono', monospace; overflow-wrap: anywhere; }
 .live-workspace .history-row strong { color: var(--lime); font-size: 13px; }
+@media (min-width: 1001px) { .live-workspace .scan-heading { gap: 72px; } } /* keep the step count clear of a long goal */
 .live-workspace .step-count { white-space: nowrap; font-family: 'DM Mono', monospace; color: #a5afa5; }
 .live-workspace .step-count strong { color: var(--lime); font-size: 30px; }
 .live-workspace .timeline-event { display: flex; width: 100%; text-align: left; background: transparent; cursor: pointer; border: 0; border-bottom: 1px solid var(--line); color: inherit; }
