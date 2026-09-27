@@ -650,7 +650,7 @@
     {
       "finding": "F2",
       "applied": 2,
-      "errors": ["index.html: edit removes visible text/literals: \"Card number is invalid\""],
+      "errors": ["index.html: edit removes visible text/literals: \"Card number is invalid\" — An edit may add text but may not remove any visible text or string literal."],
       "rationale": "Announce the error and link it to the field."
     }
   ],
@@ -714,5 +714,31 @@
     "llmErrorTypes": {
       "timeout": 1
     }
+  },
+  "fixPolicy": {
+    "enforced": [
+      {
+        "id": "keep-visible-text",
+        "rule": "An edit may add text but may not remove any visible text or string literal."
+      },
+      {
+        "id": "unique-match",
+        "rule": "The text an edit replaces must occur exactly once in the file."
+      },
+      {
+        "id": "site-copy-only",
+        "rule": "Edits only change files inside the patched copy of the site; the original site is never modified."
+      }
+    ],
+    "instructed": [
+      {
+        "id": "attributes-and-small-js",
+        "rule": "Only add or change attributes (aria-*, role, tabindex, id) or add small JavaScript (focus management, key handlers)."
+      },
+      {
+        "id": "no-rewording",
+        "rule": "NEVER delete or reword visible text or error messages. Making the message disappear is not a fix."
+      }
+    ]
   }
 }

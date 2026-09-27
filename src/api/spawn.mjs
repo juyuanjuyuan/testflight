@@ -7,13 +7,14 @@ import { ROOT } from '../paths.mjs';
 const STDERR_TAIL = 4000; // enough for the CLI's one-line error; the full output is in cli.log
 
 /**
- * Spawn `node cli.mjs <argv>` in the repo root (so .env is found); stdout+stderr go to runDir/cli.log.
+ * Spawn `node cli.mjs <argv>` in the repo root (so .env is found); stdout+stderr are appended to runDir/cli.log
+ * (a fix runs in its audit's dir: both logs are kept).
  * Resolves (never rejects) on exit with {code, signal, stderr} — stderr is the tail, used for the failed message.
  */
 export function spawnCliRun({ runDir, argv }) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [path.join(ROOT, 'cli.mjs'), ...argv], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
-    const log = fs.createWriteStream(path.join(runDir, 'cli.log'));
+    const log = fs.createWriteStream(path.join(runDir, 'cli.log'), { flags: 'a' });
     let stderr = '';
     child.stdout.on('data', (d) => log.write(d));
     child.stderr.on('data', (d) => { log.write(d); stderr = (stderr + d).slice(-STDERR_TAIL); });

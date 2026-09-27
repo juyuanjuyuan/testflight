@@ -114,6 +114,14 @@
         }
       ]
     },
+    "fixPolicy": {
+      "description": "What an automatic fix may change, as shown next to fixes. Present in every report built since plan 17 (older reports lack it). enforced = checked in code: an edit breaking one is rejected (the reason is in fixes[].errors); instructed = only asked of the fixer model, not checked.",
+      "type": "object", "required": ["enforced", "instructed"],
+      "properties": {
+        "enforced": { "type": "array", "items": { "$ref": "#/$defs/fixRule" } },
+        "instructed": { "type": "array", "items": { "$ref": "#/$defs/fixRule" } }
+      }
+    },
     "stats": {
       "description": "Run statistics. {} or null when no model was called (scripted runs).",
       "oneOf": [
@@ -136,6 +144,13 @@
     }
   },
   "$defs": {
+    "fixRule": {
+      "type": "object", "required": ["id", "rule"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable id, e.g. keep-visible-text" },
+        "rule": { "type": "string", "description": "One sentence to show the user" }
+      }
+    },
     "rect": {
       "description": "Box in CSS pixels of the viewport. Local mode (1280x800 at DPR 1) equals screenshot pixels. In general: multiply by timeline[].shotSize.dpr to get screenshot pixels, then scale by displayedWidth/shotSize.w.",
       "type": ["object", "null"],

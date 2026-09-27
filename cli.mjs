@@ -5,7 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { audit, analyze, newRunDir } from './src/audit.mjs';
 import { readTrace } from './src/contracts.mjs';
-import { runFix, runRerun } from './src/fix/commands.mjs';
+import { runFixFlow, runRerun } from './src/fix/commands.mjs';
 import { createProgressWriter } from './src/report/progress.mjs';
 import { scoreRun, scoreTable } from './eval/score.mjs';
 
@@ -33,8 +33,9 @@ const USAGE = `usage:
   node cli.mjs audit  --mode real --cdp http://localhost:9222 --goal "<task>" [--url <url>] [--out runs/real]
                       # takes over the visible tab of scripts/real-chrome.sh; waits for Enter; stops at checkout
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
-  node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched]
-  node cli.mjs rerun  --run <runDir> [--url <patched url>]                                  # same goal on the patched site
+  node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched] [--findings F2,F4]
+                      [--rerun [--no-judge] [--script keys.json] [--out runs/]] [--progress]  # --progress: <runDir>/progress.json fixing → rerunning → done
+  node cli.mjs rerun  --run <runDir> [--url <patched url>] [--no-judge] [--script keys.json]  # same goal on the patched site
   node cli.mjs score  --run <runDir> --groundtruth eval/groundtruth/shop-main.yaml [--tool ours|axe]`;
 
 async function main() {
@@ -56,11 +57,13 @@ async function main() {
     const { report } = await analyze({ trace, goal: need('goal'), meta: { replayOf: args.trace }, runDir, judgeEnabled: !args['no-judge'], log: console.error });
     summary(report); console.log(`→ ${runDir}/report.json`);
   } else if (cmd === 'fix') {
-    const { fixes, patchedDir } = await runFix(args);
+    const { fixes, patchedDir, rerun } = await runFixFlow(args, { log: console.log, script: args.script ? readJSON(args.script) : undefined,
+      progressFor: args.progress ? createProgressWriter : undefined });
     for (const f of fixes) console.log(`${f.finding}: applied ${f.applied}${f.errors.length ? ' · errors: ' + f.errors.join('; ') : ''}`);
     console.log(`→ patched site in ${patchedDir}`);
+    if (rerun) console.log(JSON.stringify(rerun, null, 2));
   } else if (cmd === 'rerun') {
-    console.log(JSON.stringify(await runRerun(args, console.log), null, 2));
+    console.log(JSON.stringify(await runRerun(args, { log: console.log, script: args.script ? readJSON(args.script) : undefined }), null, 2));
   } else if (cmd === 'score') {
     const res = scoreRun({ runDir: need('run'), groundtruth: need('groundtruth'), tool: args.tool || 'ours' });
     console.log(scoreTable([res]));

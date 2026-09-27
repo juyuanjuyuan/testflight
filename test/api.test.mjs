@@ -201,3 +201,147 @@ test('/api: unknown routes and run dirs → 404, wrong method → 405, same erro
     assert.equal((await del.json()).error.code, 'method_not_allowed');
   });
 });
+
+// ---- P1: POST /api/runs/<runDir>/fix ----
+
+/** A finished run in runsDir (the recorded testpage audit: F4, F7 block); `edit(report)` adjusts its report.json. */
+function finishedRun(runsDir, name = '2026-09-26T21-24-50-audit', edit = () => {}) {
+  const dir = path.join(runsDir, name);
+  fs.mkdirSync(dir);
+  fs.copyFileSync(path.join(ROOT, 'fixtures/testpage-original/trace.jsonl'), path.join(dir, 'trace.jsonl'));
+  const report = readJSON('fixtures/testpage-original/report.json');
+  edit(report);
+  fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report));
+  return { name, dir, steps: report.timeline.length };
+}
+const argOf = (argv, k) => argv[argv.indexOf(k) + 1];
+
+test('POST fix: 202 + same runDir; progress is fixing (audit timeline kept) before the response; child argv', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post }) => {
+    const run = finishedRun(runsDir);
+    const r = await post(`/api/runs/${run.name}/fix`, { findingIds: ['F4', 'F7'], rerun: true });
+    assert.equal(r.status, 202);
+    assert.deepEqual(r.body, { runDir: run.name });
+    const p = readProgress(run.dir);
+    assert.ok(validateProgress(p), JSON.stringify(validateProgress.errors));
+    assert.equal(p.state, 'fixing');
+    assert.equal(p.timeline.length, run.steps);
+    assert.equal(p.rerunDir, null);
+    const { argv, runDir } = fake.calls[0];
+    assert.equal(runDir, run.dir);
+    assert.equal(argv[0], 'fix');
+    assert.equal(argOf(argv, '--run'), run.dir);
+    assert.equal(argOf(argv, '--out'), runsDir, 'the rerun must land where the API serves runs from');
+    assert.equal(argOf(argv, '--findings'), 'F4,F7');
+    assert.ok(argv.includes('--rerun') && argv.includes('--progress'));
+    assert.ok(argv.includes('--no-judge'), 'the audit ran without the judge, so the rerun does too');
+  }, fake);
+});
+
+test('POST fix: no findingIds → all block findings (no --findings); rerun defaults to false; judge follows the audit', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post }) => {
+    const run = finishedRun(runsDir, undefined, (r) => { r.meta.judge = true; });
+    assert.equal((await post(`/api/runs/${run.name}/fix`, {})).status, 202);
+    const { argv } = fake.calls[0];
+    assert.ok(!argv.includes('--findings') && !argv.includes('--rerun') && !argv.includes('--no-judge'));
+  }, fake);
+});
+
+test('POST fix: findingIds / rerun validation → 400', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post }) => {
+    const run = finishedRun(runsDir);
+    const cases = [
+      [{ findingIds: ['F99'] }, 'invalid_findings'],
+      [{ findingIds: ['F4', 'F99'] }, 'invalid_findings'],
+      [{ findingIds: [] }, 'invalid_findings'],
+      [{ findingIds: 'F4' }, 'invalid_findings'],
+      [{ findingIds: [4] }, 'invalid_findings'],
+      [{ findingIds: ['F4', 'F4'] }, 'invalid_findings'],
+      [{ rerun: 'yes' }, 'invalid_rerun'],
+      [[1], 'invalid_body'],
+    ];
+    for (const [body, code] of cases) {
+      const r = await post(`/api/runs/${run.name}/fix`, body);
+      assert.equal(r.status, 400, JSON.stringify(body));
+      assert.equal(r.body.error.code, code, JSON.stringify(body));
+      assert.ok(r.body.error.message.length > 0);
+    }
+    assert.equal(fake.calls.length, 0);
+    assert.ok(!fs.existsSync(path.join(run.dir, 'progress.json')), 'a rejected request leaves the run untouched');
+  }, fake);
+});
+
+test('POST fix: runs that cannot be fixed → 409 (real site, no site source, patched copy, no report, nothing to fix)', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post }) => {
+    const cases = [
+      ['real', (r) => { r.meta.mode = 'real'; r.meta.site = null; }, 'real_site_no_fix'],
+      ['nosite', (r) => { r.meta.site = null; }, 'not_fixable'],
+      ['patched', (r) => { r.meta.site = 'sites/testpage/patched'; }, 'not_fixable'],
+      ['noblock', (r) => { for (const f of r.findings) f.impact = 'degrade'; }, 'nothing_to_fix'],
+    ];
+    for (const [name, edit, code] of cases) {
+      finishedRun(runsDir, name, edit);
+      const r = await post(`/api/runs/${name}/fix`, {});
+      assert.equal(r.status, 409, name);
+      assert.equal(r.body.error.code, code, name);
+    }
+    assert.match((await post('/api/runs/real/fix', {})).body.error.message, /not fixed/i);
+    assert.equal((await post('/api/runs/noblock/fix', { rerun: 'x' })).body.error.code, 'invalid_rerun', 'a bad body is a 400 before any 409');
+    const noblock = await post('/api/runs/noblock/fix', { findingIds: ['F1'] });
+    assert.equal(noblock.status, 202, 'explicit findingIds may name degrade findings');
+    fake.calls[0].exit({ code: 0, signal: null, stderr: '' });
+    await tick();
+    fs.mkdirSync(path.join(runsDir, 'unfinished'));
+    const unfinished = await post('/api/runs/unfinished/fix', {});
+    assert.equal(unfinished.status, 409);
+    assert.equal(unfinished.body.error.code, 'run_not_finished');
+  }, fake);
+});
+
+test('fix and audit share the one-run-at-a-time lock', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post, site }) => {
+    const run = finishedRun(runsDir);
+    assert.equal((await post('/api/runs', { url: site(), goal: GOAL })).status, 202);
+    assert.equal((await post(`/api/runs/${run.name}/fix`, {})).body.error.code, 'run_in_progress');
+    fake.calls[0].exit({ code: 0, signal: null, stderr: '' });
+    await tick();
+    assert.equal((await post(`/api/runs/${run.name}/fix`, {})).status, 202);
+    assert.equal((await post('/api/runs', { url: site(), goal: GOAL })).body.error.code, 'run_in_progress');
+  }, fake);
+});
+
+test('fix child crashes while rerunning → the run and its rerun are both marked failed', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post }) => {
+    const run = finishedRun(runsDir);
+    await post(`/api/runs/${run.name}/fix`, { rerun: true });
+    const rerunDir = path.join(runsDir, '2026-09-26T21-30-00-rerun');
+    fs.mkdirSync(rerunDir);
+    createProgressWriter(rerunDir)({ state: 'running', trace: [] });
+    createProgressWriter(run.dir)({ state: 'rerunning', rerunDir: path.basename(rerunDir) });
+    fake.calls[0].exit({ code: null, signal: 'SIGKILL', stderr: '' });
+    await tick();
+    const p = readProgress(run.dir);
+    assert.ok(validateProgress(p));
+    assert.equal(p.state, 'failed');
+    assert.equal(p.error, 'The fix stopped unexpectedly: killed by SIGKILL');
+    assert.equal(p.rerunDir, path.basename(rerunDir));
+    const q = readProgress(rerunDir);
+    assert.equal(q.state, 'failed');
+    assert.match(q.error, /^The rerun stopped unexpectedly/);
+  }, fake);
+});
+
+test('fix endpoint: wrong method → 405', async () => {
+  await withApi(async ({ port, runsDir }) => {
+    const run = finishedRun(runsDir);
+    const res = await fetch(`http://127.0.0.1:${port}/api/runs/${run.name}/fix`);
+    assert.equal(res.status, 405);
+    assert.equal((await res.json()).error.code, 'method_not_allowed');
+  });
+});

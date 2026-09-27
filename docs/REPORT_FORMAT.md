@@ -33,6 +33,7 @@
 | `fixes` | array / null | 自动修复的结果，没跑修复时为 null |
 | `rerun` | object / null | 修复后重跑的前后对比，没重跑时为 null |
 | `stats` | object / null | 模型调用次数、耗时等统计 |
+| `fixPolicy` | object（可能没有） | 自动修复允许改什么：代码强制的规则和只写在 prompt 里的要求，适合放在修复页上。旧报告里没有这个字段 |
 
 ## 3. 各部分字段
 
@@ -127,7 +128,7 @@
 
 ### fixes 和 rerun：修复后重跑
 
-`fixes` 是每条修复的执行结果：`{finding, applied, errors, rationale}`，每条阻断问题一项。`applied` 为 0 表示这条修复没成功；`applied` 大于 0 时 `errors` 也可能不为空（例如某条 edit 因为会删掉可见文字被拒绝，其余的应用了）。运行 `fix` 后，后端会重新生成 `report.json`，`fixes` 和 `findings[].fix` 就有值了，`rerun` 此时为 null（修复变了，旧的重跑结果作废）。
+`fixes` 是每条修复的执行结果：`{finding, applied, errors, rationale}`，每条要修复的问题一项（默认是全部阻断问题；通过 API 指定 `findingIds` 时只有这些，见 `API.md`）。每次修复都从原站点重新复制，所以上一次修复留下的 `findings[].fix` 会清空，只保留这一次的。`applied` 为 0 表示这条修复没成功；`applied` 大于 0 时 `errors` 也可能不为空（例如某条 edit 因为会删掉可见文字被拒绝，其余的应用了）。运行 `fix` 后，后端会重新生成 `report.json`，`fixes` 和 `findings[].fix` 就有值了，`rerun` 此时为 null（修复变了，旧的重跑结果作废）。
 
 `rerun` 是修复后用同一个任务重跑的对比：
 
@@ -140,6 +141,24 @@
 | `runDir` | 重跑那次运行的目录，相对仓库根目录，例如 `runs/2026-09-27T00-54-18-rerun`，它的报告在 `/runs/<运行目录名>/report.json`。固定数据（`fixtures/`）里的 `runDir` 指向没有提交的运行，链接会打不开 |
 
 `status[].key` 是后端内部用的匹配键，**请不要解析它**。
+
+### fixPolicy：修复的限制
+
+修复页可以直接展示这些规则，文字和后端的真实行为一致（`src/fix/policy.mjs` 是唯一出处）：
+
+```json
+"fixPolicy": {
+  "enforced":   [{ "id": "keep-visible-text", "rule": "An edit may add text but may not remove any visible text or string literal." }, "..."],
+  "instructed": [{ "id": "attributes-and-small-js", "rule": "Only add or change attributes (aria-*, role, tabindex, id) or add small JavaScript (focus management, key handlers)." }, "..."]
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `enforced` | **代码强制执行**：违反的 edit 一定不会被应用，原因写在 `fixes[].errors` 里（错误信息末尾就是对应规则的 `rule` 原文）。目前三条：不能删除可见文字和字符串（`keep-visible-text`）、被替换的内容在文件里必须只出现一次（`unique-match`）、只改修复副本里的文件（`site-copy-only`） |
+| `instructed` | **只写在给模型的 prompt 里**，代码不检查。例如"只改 ARIA 属性或加少量 JavaScript"属于这一类，展示时不要说成强制规则 |
+
+每条是 `{id, rule}`：`rule` 是一句英文，可以直接显示；`id` 稳定，可以用来做图标或翻译。当前完整内容见 `docs/report.example.json`。
 
 ### stats
 

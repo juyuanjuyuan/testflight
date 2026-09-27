@@ -17,14 +17,16 @@ function progressDoc({ state, trace, error = null, rerunDir = null, maxSteps = M
 }
 
 /**
- * Returns onProgress({state, trace?, error?}) for audit(): assembles progress.json and writes it atomically.
- * An update without `trace` keeps the previous one, so `failed` still shows the steps done so far.
+ * Returns onProgress({state, trace?, rerunDir?, error?}) for audit() and the fix flow: assembles progress.json and writes it atomically.
+ * An update without `trace` keeps the previous one, so `failed` still shows the steps done so far; likewise rerunDir,
+ * so done/failed after a rerun still point at it.
  */
 export function createProgressWriter(runDir) {
-  let trace = [];
+  let trace = [], rerunDir = null;
   return (update) => {
     if (update.trace) trace = update.trace.slice();
-    writeJsonAtomic(path.join(runDir, PROGRESS_FILE), progressDoc({ ...update, trace }));
+    if (update.rerunDir) rerunDir = update.rerunDir;
+    writeJsonAtomic(path.join(runDir, PROGRESS_FILE), progressDoc({ ...update, trace, rerunDir }));
   };
 }
 

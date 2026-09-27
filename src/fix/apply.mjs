@@ -3,6 +3,10 @@
 // so the fixer cannot "fix" an unannounced error by deleting the error message.
 import fs from 'node:fs';
 import { insideDir } from '../paths.mjs';
+import { enforcedRule } from './policy.mjs';
+
+// rejection message = what happened + the rule's wording from policy.mjs (the fixer sees it on its retry)
+const broke = (id, what) => `${what} — ${enforcedRule(id)}`;
 
 export function textTokens(src) {
   const toks = [];
@@ -15,7 +19,7 @@ export function checkEdit(e) {
   const newToks = new Set(textTokens(e.new));
   const newFlat = e.new.replace(/\s+/g, ' ');
   const lost = textTokens(e.old).filter((t) => !newToks.has(t) && !newFlat.includes(t));
-  return lost.length ? `edit removes visible text/literals: ${lost.slice(0, 3).map((t) => JSON.stringify(t)).join(', ')}` : null;
+  return lost.length ? broke('keep-visible-text', `edit removes visible text/literals: ${lost.slice(0, 3).map((t) => JSON.stringify(t)).join(', ')}`) : null;
 }
 
 /** @returns {{applied:number, errors:string[], appliedEdits:object[]}} — mutates files under siteDir */
@@ -28,11 +32,11 @@ export function applyEdits(siteDir, edits) {
       errors.push(`invalid edit shape: ${JSON.stringify(e).slice(0, 120)}`); continue;
     }
     let file;
-    try { file = insideDir(siteDir, e.file); } catch { errors.push(`${e.file}: outside site dir`); continue; }
+    try { file = insideDir(siteDir, e.file); } catch { errors.push(`${e.file}: ${broke('site-copy-only', 'outside the site copy')}`); continue; }
     if (!fs.existsSync(file)) { errors.push(`${e.file}: not found`); continue; }
     const src = fs.readFileSync(file, 'utf8');
     const count = src.split(e.old).length - 1;
-    if (count !== 1) { errors.push(`${e.file}: "old" matched ${count} times (must be exactly 1)`); continue; }
+    if (count !== 1) { errors.push(`${e.file}: ${broke('unique-match', `"old" matched ${count} times`)}`); continue; }
     const bad = checkEdit(e);
     if (bad) { errors.push(`${e.file}: ${bad}`); continue; }
     fs.writeFileSync(file, src.replace(e.old, () => e.new));

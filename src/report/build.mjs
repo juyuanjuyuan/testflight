@@ -3,6 +3,7 @@ import { computeVerdicts } from '../verdicts.mjs';
 import { heardInStep, describeFocus } from '../agent/observation.mjs';
 import { NOISE_REPEAT } from '../contracts.mjs';
 import { writeJsonAtomic, writeFileAtomic } from './atomic.mjs';
+import { FIX_POLICY } from '../fix/policy.mjs';
 
 /** One report.json timeline[] entry for a trace step; progress.json uses the same function (findings = [] while running). */
 export function timelineEntry(s, findings) {
@@ -37,6 +38,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
     findings: shown.sort((a, b) => order[a.impact] - order[b.impact]),
     axe: !axe ? null : axe.error ? { error: axe.error } : { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) },
     fixes, rerun, stats,
+    fixPolicy: FIX_POLICY, // what a fix may change; shown next to fixes (docs/REPORT_FORMAT.md)
   };
 }
 

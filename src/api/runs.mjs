@@ -1,9 +1,12 @@
-// /api/* for the frontend (docs/API.md). P0: POST /api/runs starts an audit in a child process; progress.json shows it live.
+// /api/* for the frontend (docs/API.md). POST /api/runs starts an audit, POST /api/runs/<runDir>/fix a fix (+ rerun),
+// each in a child process; progress.json shows it live.
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, SITES_DIR, insideDir } from '../paths.mjs';
 import { newRunDir } from '../audit.mjs';
-import { createProgressWriter, markFailedIfUnfinished } from '../report/progress.mjs';
+import { readTrace } from '../contracts.mjs';
+import { siteDirs } from '../fix/commands.mjs';
+import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../report/progress.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_GOAL_CHARS = 500;
@@ -74,11 +77,48 @@ function checkScript(script) {
   return file;
 }
 
-// "error: <msg> (DEBUG=1 for details)" from cli.mjs → "<msg>"
-function exitMessage({ code, signal, stderr }) {
+// "error: <msg> (DEBUG=1 for details)" from cli.mjs → "The <what> stopped unexpectedly: <msg>"
+function exitMessage(what, { code, signal, stderr }) {
   const last = String(stderr || '').trim().split('\n').filter(Boolean).pop();
   const why = last ? last.replace(/^error: /, '').replace(/ \(DEBUG=1 for details\)$/, '') : signal ? `killed by ${signal}` : `exit code ${code}`;
-  return `The audit stopped unexpectedly: ${why}`;
+  return `The ${what} stopped unexpectedly: ${why}`;
+}
+// spawnRun's promise, settled as an exit either way (a rejection is a child we never saw exit)
+const exited = (p) => p.then((exit) => exit, (e) => ({ stderr: e.message }));
+
+// The run's report.json: only a finished audit can be fixed
+function readReport(runDir) {
+  try { return JSON.parse(fs.readFileSync(path.join(runDir, 'report.json'), 'utf8')); } catch {
+    throw new ApiError(409, 'run_not_finished', 'This run has no report yet, so there is nothing to fix.');
+  }
+}
+
+// A local run of a site folder under sites/ that is not itself the patched copy
+function checkFixable({ meta }) {
+  if (meta.mode === 'real') throw new ApiError(409, 'real_site_no_fix', 'Real websites are only audited, not fixed.');
+  const dirs = meta.site ? siteDirs({}, meta) : null;
+  const rel = dirs ? path.relative(SITES_DIR, dirs.originalDir) : '';
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || dirs.originalDir === dirs.patchedDir || !fs.existsSync(dirs.originalDir)) {
+    throw new ApiError(409, 'not_fixable', 'This run has no demo-site source that can be fixed (fix the original run, not a patched copy).');
+  }
+}
+
+// undefined → every block finding (there must be one); otherwise distinct ids of this report's findings
+function checkFindingIds(ids, { findings }) {
+  if (ids === undefined) {
+    if (!findings.some((f) => f.impact === 'block')) throw new ApiError(409, 'nothing_to_fix', 'This run has no blocking problems. Choose the problems to fix with findingIds.');
+    return null;
+  }
+  const known = new Set(findings.map((f) => f.id));
+  if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length || !ids.every((id) => typeof id === 'string' && known.has(id))) {
+    throw bad('invalid_findings', `findingIds must list problems of this run, each once (this run has ${[...known].join(', ') || 'none'}).`);
+  }
+  return ids;
+}
+
+function checkRerun(rerun) {
+  if (rerun !== undefined && typeof rerun !== 'boolean') throw bad('invalid_rerun', 'rerun must be true or false.');
+  return rerun === true;
 }
 
 /**
@@ -86,30 +126,69 @@ function exitMessage({ code, signal, stderr }) {
  * ownPort() is this server's port (only its own sites are accepted); log records failures the HTTP client can't see.
  */
 export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
-  let active = false; // one run at a time (P1 fix/rerun share this lock)
+  let active = false;
+
+  // One run at a time (audit, fix, rerun). start() writes the first progress.json and spawns (synchronously, so the
+  // file exists before we answer: the client polls it at once); its promise settles once the child is gone and recorded.
+  function exclusive(start) {
+    if (active) throw new ApiError(409, 'run_in_progress', 'Another run is already in progress. Wait for it to finish.');
+    active = true;
+    let gone;
+    try { gone = start(); } catch (e) { active = false; throw e; }
+    gone.catch((e) => log(`could not record the end of a run: ${e.message}`)).finally(() => { active = false; });
+  }
 
   async function startRun(req, res) {
     const body = await readJsonBody(req);
     const { url, site } = checkUrl(body.url, ownPort());
     const goal = checkGoal(body.goal);
     const script = body.script === undefined ? null : checkScript(body.script);
-    if (active) throw new ApiError(409, 'run_in_progress', 'Another run is already in progress. Wait for it to finish.');
-    active = true;
-    let runDir = null;
-    try {
+    let runDir;
+    exclusive(() => {
       runDir = newRunDir(runsDir, 'audit');
-      createProgressWriter(runDir)({ state: 'running', trace: [] }); // exists before we answer: the client polls it at once
       const argv = ['audit', '--url', url, '--goal', goal, '--run-dir', runDir, '--site', site, '--progress',
         ...(script ? ['--script', script, '--no-judge'] : [])];
-      spawnRun({ runDir, argv })
-        .then((exit) => markFailedIfUnfinished(runDir, exitMessage(exit)), (e) => markFailedIfUnfinished(runDir, exitMessage({ stderr: e.message })))
-        .catch((e) => log(`could not record the end of run ${path.basename(runDir)}: ${e.message}`))
-        .finally(() => { active = false; });
-    } catch (e) {
-      active = false;
-      if (runDir) markFailedIfUnfinished(runDir, 'The audit could not be started.');
-      throw e;
-    }
+      try {
+        createProgressWriter(runDir)({ state: 'running', trace: [] });
+        return exited(spawnRun({ runDir, argv })).then((exit) => markFailedIfUnfinished(runDir, exitMessage('audit', exit)));
+      } catch (e) {
+        markFailedIfUnfinished(runDir, 'The audit could not be started.');
+        throw e;
+      }
+    });
+    send(res, 202, { runDir: path.basename(runDir) });
+  }
+
+  // The rerun dir the fix child published in the run's progress.json, if any (validated like any runDir from outside).
+  function rerunDirOf(runDir) {
+    let name = null;
+    try { name = readProgress(runDir).rerunDir; } catch { /* unreadable progress: markFailedIfUnfinished replaces it; no rerun to find */ }
+    return name ? runDirPath(runsDir, name) : null;
+  }
+
+  async function startFix(req, res, runDir) {
+    const body = await readJsonBody(req);
+    const rerun = checkRerun(body.rerun);
+    const report = readReport(runDir);
+    checkFixable(report);
+    const ids = checkFindingIds(body.findingIds, report);
+    // --out: the rerun lands where this API serves runs from; the rerun judges only if the audit did
+    const argv = ['fix', '--run', runDir, '--out', runsDir, '--progress', ...(ids ? ['--findings', ids.join(',')] : []),
+      ...(rerun ? ['--rerun'] : []), ...(report.meta.judge === false ? ['--no-judge'] : [])];
+    exclusive(() => {
+      try {
+        // fixing, with the audit's steps kept, before we answer: the previous `done` must not send the client back to the report
+        createProgressWriter(runDir)({ state: 'fixing', trace: readTrace(fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8')) });
+        return exited(spawnRun({ runDir, argv })).then((exit) => {
+          const rerunDir = rerunDirOf(runDir);
+          if (rerunDir) markFailedIfUnfinished(rerunDir, exitMessage('rerun', exit));
+          markFailedIfUnfinished(runDir, exitMessage('fix', exit));
+        });
+      } catch (e) {
+        markFailedIfUnfinished(runDir, 'The fix could not be started.');
+        throw e;
+      }
+    });
     send(res, 202, { runDir: path.basename(runDir) });
   }
 
@@ -122,7 +201,12 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
     if (segs[1] === 'runs') {
       let name = null;
       try { name = decodeURIComponent(segs[2]); } catch { /* malformed escape: same answer as any unknown run */ }
-      if (!name || !runDirPath(runsDir, name)) throw new ApiError(404, 'run_not_found', 'This run does not exist.');
+      const runDir = name && runDirPath(runsDir, name);
+      if (!runDir) throw new ApiError(404, 'run_not_found', 'This run does not exist.');
+      if (segs[3] === 'fix' && segs.length === 4) {
+        if (req.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to fix a run.');
+        return startFix(req, res, runDir);
+      }
     }
     throw new ApiError(404, 'not_found', 'There is no such API endpoint.');
   }
