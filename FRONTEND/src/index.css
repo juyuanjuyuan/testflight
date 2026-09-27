@@ -819,6 +819,11 @@ a.main-action { text-decoration: none; }
 .live-workspace .timeline-event code { display: block; font-size: 11px; overflow-wrap: anywhere; margin-top: 8px; }
 .live-workspace .timeline-event small { color: var(--amber); }
 .live-workspace .event-feed { max-height: 560px; overflow-y: auto; }
+/* Side by side: the feed fills the column height set by the browser panel; contain:size keeps its content from growing the row. */
+@media (min-width: 1001px) {
+  .live-workspace .agent-stream { display: flex; flex-direction: column; }
+  .live-workspace .event-feed { flex: 1 1 0; height: auto; max-height: none; min-height: 380px; contain: size; }
+}
 .live-workspace .live-browser { min-width: 0; align-self: start; }
 .live-workspace .browser-chrome span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-workspace .browser-footer { height: auto; min-height: 42px; overflow-wrap: anywhere; }

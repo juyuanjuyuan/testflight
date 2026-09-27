@@ -87,7 +87,11 @@ export default function App() {
     setSuggesting(true); setError(null); setSuggestions([]);
     try {
       const result = await liveApi.suggest(url, controller.signal);
-      if (!controller.signal.aborted) setSuggestions(result.suggestions);
+      if (controller.signal.aborted) return;
+      // Presets from eval/groundtruth are fixed text, not suggestions; only show model-generated tasks.
+      const generated = result.suggestions.filter((s) => s.source === "generated");
+      if (generated.length) setSuggestions(generated);
+      else setError("The audit service returned only preset tasks. Update the backend to support AI-generated suggestions, or describe a task yourself.");
     } catch (e) { if (!controller.signal.aborted) setError(message(e)); }
     finally { if (!controller.signal.aborted) setSuggesting(false); }
   }
@@ -112,7 +116,7 @@ export default function App() {
         <label htmlFor="site-url">Website URL</label><div className="url-field"><Icon name="globe" /><input id="site-url" type="url" value={url} disabled={busy} onChange={(e) => editUrl(e.target.value)} required /></div>
         <label htmlFor="goal">Task goal <small>(optional)</small></label><div className="goal-field"><Icon name="spark" /><input id="goal" value={goal} maxLength={500} disabled={busy} onChange={(e) => setGoal(e.target.value)} placeholder="Leave blank to let the system choose a task" /></div>
         <button type="button" className="suggest-button" disabled={suggesting || busy || !validUrl} onClick={() => void suggest()}>{suggesting ? "Finding suggestions…" : "Suggest tasks"}</button>
-        <div className="task-suggestions" aria-live="polite">{suggestions.map((s, i) => <button type="button" key={i} disabled={busy} onClick={() => { setGoal(s.goal); setSuggestions([]); }}><b>{s.source === "curated" ? "Preset task" : "Suggested task"}</b><p>{s.goal}</p><small>{s.reason}</small></button>)}</div>
+        <div className="task-suggestions" aria-live="polite">{suggestions.map((s, i) => <button type="button" key={i} disabled={busy} onClick={() => { setGoal(s.goal); setSuggestions([]); }}><b>AI-suggested task</b><p>{s.goal}</p><small>{s.reason}</small></button>)}</div>
         <button className="hero-button" type="submit" disabled={busy || !validUrl}><span>{busy ? "Starting…" : "Start audit"}</span><Icon name="arrow" /></button>
         <p className="launch-note">Web audits currently support the backend's local test sites. Real-site audits are started from the backend terminal and can be viewed in Run history.</p>
       </form></section>}

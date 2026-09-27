@@ -57,7 +57,8 @@ export const liveApi = {
   async start(url: string, goal: string) {
     return request<{ runDir: string }>("/api/runs", undefined, { url: url.trim(), ...(goal.trim() ? { goal: goal.trim() } : {}) });
   },
-  suggest: (url: string, signal?: AbortSignal) => request<{ suggestions: Suggestion[] }>("/api/tasks/suggest", signal, { url: url.trim() }),
+  // generate: ask the model for tasks even on demo sites that have eval/groundtruth presets.
+  suggest: (url: string, signal?: AbortSignal) => request<{ suggestions: Suggestion[] }>("/api/tasks/suggest", signal, { url: url.trim(), generate: true }),
   progress: (id: string, signal?: AbortSignal) => request<Progress>(`/runs/${runPath(id)}/progress.json`, signal),
   report: (id: string, signal?: AbortSignal) => request<AuditReport>(`/runs/${runPath(id)}/report.json`, signal),
   fix: (id: string, findingIds?: string[]) => request<{ runDir: string }>(`/api/runs/${runPath(id)}/fix`, undefined, { rerun: true, ...(findingIds ? { findingIds } : {}) }),

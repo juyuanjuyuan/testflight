@@ -26,6 +26,12 @@ test("default repair fixes all blockers and requests a re-test", async (t) => {
   assert.deepEqual(JSON.parse(calls[0].body), { rerun: true });
   assert.deepEqual(JSON.parse(calls[1].body), { rerun: true, findingIds: ["F2"] });
 });
+test("task suggestions ask the model even for demo sites with presets", async (t) => {
+  const calls = mockFetch(t, { suggestions: [] });
+  await liveApi.suggest(" http://localhost:8080/shop/original/ ");
+  assert.equal(calls[0].url, "/api/tasks/suggest");
+  assert.deepEqual(JSON.parse(calls[0].body), { url: "http://localhost:8080/shop/original/", generate: true });
+});
 test("suggestion errors preserve backend code and English message", async (t) => {
   mockFetch(t, { error: { code: "suggest_timeout", message: "Task suggestion timed out." } }, 504);
   await assert.rejects(liveApi.suggest("http://localhost:8080/shop/original/"), e =>
