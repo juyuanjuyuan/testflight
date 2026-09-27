@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/shop/original/",
+  "mode": "local",
+  "site": "sites/shop/original",
+  "script": true,
+  "startedAt": "2026-09-27T04:55:19.635Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Apply the coupon SAVE10 at checkout"
+}

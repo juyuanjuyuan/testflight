@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/shop/fixed/",
+  "mode": "local",
+  "site": "sites/shop/fixed",
+  "script": true,
+  "startedAt": "2026-09-27T04:55:40.355Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Apply the coupon SAVE10 at checkout"
+}

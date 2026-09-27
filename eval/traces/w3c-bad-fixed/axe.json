@@ -1,0 +1,190 @@
+{
+  "violations": [
+    {
+      "id": "landmark-one-main",
+      "impact": "moderate",
+      "tags": [
+        "cat.semantics",
+        "best-practice"
+      ],
+      "help": "Document should have one main landmark",
+      "nodes": [
+        {
+          "target": [
+            "html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "impact": "moderate",
+      "tags": [
+        "cat.keyboard",
+        "best-practice",
+        "RGAAv4",
+        "RGAA-9.2.1"
+      ],
+      "help": "All page content should be contained by landmarks",
+      "nodes": [
+        {
+          "target": [
+            "#logos"
+          ]
+        },
+        {
+          "target": [
+            "#meta-header > h1"
+          ]
+        },
+        {
+          "target": [
+            ".subline"
+          ]
+        },
+        {
+          "target": [
+            "#mnav"
+          ]
+        },
+        {
+          "target": [
+            "#startcontent"
+          ]
+        },
+        {
+          "target": [
+            ".skip:nth-child(2)"
+          ]
+        },
+        {
+          "target": [
+            "#header > a"
+          ]
+        },
+        {
+          "target": [
+            "img[src$=\"weather.png\"]"
+          ]
+        },
+        {
+          "target": [
+            "#qklabel"
+          ]
+        },
+        {
+          "target": [
+            "#qkmenu"
+          ]
+        },
+        {
+          "target": [
+            "#info"
+          ]
+        },
+        {
+          "target": [
+            "#main"
+          ]
+        },
+        {
+          "target": [
+            "#footer"
+          ]
+        },
+        {
+          "target": [
+            "#meta-footer"
+          ]
+        },
+        {
+          "target": [
+            "#header > a[href$=\"home.html\"]"
+          ]
+        },
+        {
+          "target": [
+            "#navtarget"
+          ]
+        },
+        {
+          "target": [
+            "#nav"
+          ]
+        },
+        {
+          "target": [
+            "#contentmain > h1"
+          ]
+        },
+        {
+          "target": [
+            ".header"
+          ]
+        },
+        {
+          "target": [
+            "form[action=\"survey.php\"] > p:nth-child(1)"
+          ]
+        },
+        {
+          "target": [
+            "#park"
+          ]
+        },
+        {
+          "target": [
+            "#city"
+          ]
+        },
+        {
+          "target": [
+            "fieldset:nth-child(4)"
+          ]
+        },
+        {
+          "target": [
+            "#surveyresults"
+          ]
+        },
+        {
+          "target": [
+            "table"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "empty-table-header",
+      "impact": "minor",
+      "tags": [
+        "cat.name-role-value",
+        "best-practice"
+      ],
+      "help": "Table header text should not be empty",
+      "nodes": [
+        {
+          "target": [
+            "thead > tr > th:nth-child(1)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "label-title-only",
+      "impact": "serious",
+      "tags": [
+        "cat.forms",
+        "best-practice"
+      ],
+      "help": "Form elements should have a visible label",
+      "nodes": [
+        {
+          "target": [
+            "#cc"
+          ]
+        }
+      ]
+    }
+  ]
+}

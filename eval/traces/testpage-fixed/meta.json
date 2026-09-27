@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/testpage/fixed/",
+  "mode": "local",
+  "site": "sites/testpage/fixed",
+  "script": true,
+  "startedAt": "2026-09-27T04:56:29.726Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242."
+}

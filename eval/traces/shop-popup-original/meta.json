@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/shop/original/?from=newsletter",
+  "mode": "local",
+  "site": "sites/shop/original",
+  "script": true,
+  "startedAt": "2026-09-27T04:55:52.234Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Open the Canvas Tote Bag product page"
+}

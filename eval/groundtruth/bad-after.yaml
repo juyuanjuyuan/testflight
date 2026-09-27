@@ -1,0 +1,8 @@
+# W3C Before and After Demonstration (BAD), "after" (accessible) version, local copy in sites/bad/ (see sites/bad/README.md).
+# Nothing planted by us: used only to count false positives. Every finding here is a false positive.
+# Scripted route: eval/keys.bad.after.json (home → skip links → Survey → fill the form → stop at submit).
+site: sites/bad/after
+variant: fixed
+flow: survey
+goal: "Fill in the city survey: favourite park Central Park, name Ada Lovelace, email ada@example.com"
+barriers: []

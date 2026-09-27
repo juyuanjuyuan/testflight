@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/shop/fixed/",
+  "mode": "local",
+  "site": "sites/shop/fixed",
+  "script": true,
+  "startedAt": "2026-09-27T04:55:06.385Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
+}

@@ -48,15 +48,70 @@ Architecture details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Results so far
 
-On a small test page with 4 planted barriers (emoji-only button, unannounced "Added to cart", unannounced and unassociated card error, keyboard trap), same key sequence for all tools:
+Fake shop (3 task flows), the small test page, and the W3C Before-and-After Demonstration "after" page; each flow in its
+original (planted barriers) and hand-fixed version. One recorded key script per flow, so every tool sees the same page states.
+Barriers were planted by a teammate who had read the detector code (see `sites/shop/README.md`), so some overfitting is possible.
 
-| dataset | tool | planted | detected | false positives |
-|---|---|---|---|---|
-| testpage (original) | axe-core (WCAG rules) | 4 | 0 | 0 |
-| testpage (original) | ours (detectors only, no LLM) | 4 | 4 | 0 |
-| testpage (fixed) | ours | 0 | – | 0 |
+**Detection: planted barriers vs tools**
 
-TODO: replace with the full fake-shop table (`node cli.mjs score …`) and the judge on/off ablation.
+| dataset | variant | tool | planted | detected | missed | false positives |
+|---|---|---|---|---|---|---|
+| shop-main | original | ours (judge off) | 8 | 7 | B3† | 0 |
+| shop-main | original | ours (judge on) | 8 | 7 | B3† | 0 |
+| shop-main | original | axe (WCAG rules) | 8 | 0 | B1 B2 B3† B4 B5 B6 B7 B8 | 0 |
+| shop-main | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-main | fixed | ours (judge on) | 0 | 0 | – | 0 |
+| shop-main | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-second | original | ours (judge off) | 4 | 4 | – | 0 |
+| shop-second | original | ours (judge on) | 4 | 4 | – | 0 |
+| shop-second | original | axe (WCAG rules) | 4 | 0 | B5 B8 B9 B10 | 0 |
+| shop-second | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-second | fixed | ours (judge on) | 0 | 0 | – | 0 |
+| shop-second | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-popup | original | ours (judge off) | 1 | 1 | – | 0 |
+| shop-popup | original | ours (judge on) | 1 | 1 | – | 0 |
+| shop-popup | original | axe (WCAG rules) | 1 | 0 | B11 | 0 |
+| shop-popup | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-popup | fixed | ours (judge on) | 0 | 0 | – | 0 |
+| shop-popup | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| testpage | original | ours (judge off) | 6 | 6 | – | 0 |
+| testpage | original | ours (judge on) | 6 | 5 | T5 | 0 |
+| testpage | original | axe (WCAG rules) | 6 | 0 | T1 T2 T3 T4 T5 T6 | 0 |
+| testpage | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| testpage | fixed | ours (judge on) | 0 | 0 | – | 0 |
+| testpage | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 3 |
+| w3c-bad | fixed | ours (judge on) | 0 | 0 | – | 3 |
+| w3c-bad | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| **total** | | ours (judge off) | 19 | 18 | 1 | 3 |
+| **total** | | ours (judge on) | 19 | 17 | 2 | 3 |
+| **total** | | axe (WCAG rules) | 19 | 0 | 19 | 0 |
+
+† vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
+axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
+w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.
+keyboard-a11y-tester: not included in this comparison.
+
+**Ablation: same trace, judge off vs on**
+
+| dataset | variant | candidates | FP judge off | FP judge on | detected off → on | dropped by judge | judge errors |
+|---|---|---|---|---|---|---|---|
+| shop-main | original | 9 | 0 | 0 | 7/8 → 7/8 | 0 | 0 |
+| shop-main | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
+| shop-second | original | 6 | 0 | 0 | 4/4 → 4/4 | 1 | 0 |
+| shop-second | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
+| shop-popup | original | 2 | 0 | 0 | 1/1 → 1/1 | 0 | 0 |
+| shop-popup | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
+| testpage | original | 7 | 0 | 0 | 6/6 → 5/6 | 1 | 0 |
+| testpage | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
+| w3c-bad | fixed | 3 | 3 | 3 | 0/0 → 0/0 | 0 | 0 |
+| **total** | | 27 | 3 | 3 | 18 → 17 | 2 | 0 |
+
+Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.
+
+Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge column needs `.env`).
+`node eval/run.mjs` (no flag) records every flow afresh in Chromium: the judge-off and axe rows come out the same; the judge-on rows can differ (see above).
 
 
 ## What's real and what's mocked

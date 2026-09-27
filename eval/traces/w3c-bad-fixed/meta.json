@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:8092/bad/after/home.html",
+  "mode": "local",
+  "site": "sites/bad/after",
+  "script": true,
+  "startedAt": "2026-09-27T04:56:42.173Z",
+  "maxSteps": 40,
+  "goalSource": "user",
+  "goalReason": null,
+  "testDataProfile": null,
+  "goal": "Fill in the city survey: favourite park Central Park, name Ada Lovelace, email ada@example.com"
+}

@@ -1,0 +1,63 @@
+{
+  "violations": [
+    {
+      "id": "landmark-one-main",
+      "impact": "moderate",
+      "tags": [
+        "cat.semantics",
+        "best-practice"
+      ],
+      "help": "Document should have one main landmark",
+      "nodes": [
+        {
+          "target": [
+            "html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "impact": "moderate",
+      "tags": [
+        "cat.keyboard",
+        "best-practice",
+        "RGAAv4",
+        "RGAA-9.2.1"
+      ],
+      "help": "All page content should be contained by landmarks",
+      "nodes": [
+        {
+          "target": [
+            "h1"
+          ]
+        },
+        {
+          "target": [
+            "#promo"
+          ]
+        },
+        {
+          "target": [
+            "h2"
+          ]
+        },
+        {
+          "target": [
+            "body > p"
+          ]
+        },
+        {
+          "target": [
+            "#coupon"
+          ]
+        },
+        {
+          "target": [
+            "#toast"
+          ]
+        }
+      ]
+    }
+  ]
+}

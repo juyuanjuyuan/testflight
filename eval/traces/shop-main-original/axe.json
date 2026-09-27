@@ -1,0 +1,22 @@
+{
+  "violations": [
+    {
+      "id": "region",
+      "impact": "moderate",
+      "tags": [
+        "cat.keyboard",
+        "best-practice",
+        "RGAAv4",
+        "RGAA-9.2.1"
+      ],
+      "help": "All page content should be contained by landmarks",
+      "nodes": [
+        {
+          "target": [
+            "#promo"
+          ]
+        }
+      ]
+    }
+  ]
+}
