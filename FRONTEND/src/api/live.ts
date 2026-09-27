@@ -65,28 +65,50 @@ export const liveApi = {
 };
 
 export const SUGGEST_GENERATE_TIMEOUT_MS = 30_000;
+export const SUGGEST_PRESET_TIMEOUT_MS = 15_000;
 export type SuggestResult = { suggestions: Suggestion[]; generateError: string | null };
+const DESCRIBE_TASK = "Describe a task yourself.";
 
-// Model generation can fail, time out or return nothing. Presets need no model, so fall back to
-// them; generateError records why so the page can say AI suggestions were unavailable.
-export async function suggestTasks(url: string, signal?: AbortSignal, timeoutMs = SUGGEST_GENERATE_TIMEOUT_MS): Promise<SuggestResult> {
+// Runs one suggest request that the caller's signal or its own timeout can abort; reports which one did.
+async function suggestWithin(url: string, generate: boolean, signal: AbortSignal | undefined, timeoutMs: number) {
   const attempt = new AbortController();
   const cancel = () => attempt.abort();
   signal?.addEventListener("abort", cancel);
   const timer = setTimeout(cancel, timeoutMs);
-  let generateError: string;
   try {
-    const result = await liveApi.suggest(url, attempt.signal);
-    if (result.suggestions?.length) return { suggestions: result.suggestions, generateError: null };
-    generateError = "The model returned no suggestions.";
+    return await liveApi.suggest(url, attempt.signal, generate);
   } catch (e) {
     if (signal?.aborted) throw e;
-    generateError = attempt.signal.aborted ? "AI suggestions timed out." : e instanceof Error ? e.message : "AI suggestions failed.";
+    if (attempt.signal.aborted) throw new ApiError("Task suggestions timed out.", "suggest_timeout", 0);
+    throw e;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", cancel);
   }
-  const presets = await liveApi.suggest(url, signal, false);
-  if (!presets.suggestions?.length) throw new ApiError("No task suggestions are available for this page. Describe a task yourself.", "no_suggestions", 200);
+}
+
+// Model generation can fail, time out or return nothing. Presets need no model, so fall back to
+// them; generateError records why so the page can say AI suggestions were unavailable.
+// If the fallback also fails, the error asks the user to describe a task.
+export async function suggestTasks(url: string, signal?: AbortSignal,
+  timeoutMs = SUGGEST_GENERATE_TIMEOUT_MS, presetTimeoutMs = SUGGEST_PRESET_TIMEOUT_MS): Promise<SuggestResult> {
+  let generateError: string;
+  try {
+    const result = await suggestWithin(url, true, signal, timeoutMs);
+    if (result.suggestions?.length) return { suggestions: result.suggestions, generateError: null };
+    generateError = "The model returned no suggestions.";
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    generateError = e instanceof Error ? e.message : "AI suggestions failed.";
+  }
+  let presets: { suggestions: Suggestion[] };
+  try {
+    presets = await suggestWithin(url, false, signal, presetTimeoutMs);
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    const reason = e instanceof Error ? e.message : "The request failed.";
+    throw new ApiError(`Task suggestions are unavailable (${reason}) ${DESCRIBE_TASK}`, e instanceof ApiError ? e.code : "suggest_failed", e instanceof ApiError ? e.status : 0);
+  }
+  if (!presets.suggestions?.length) throw new ApiError(`No task suggestions are available for this page. ${DESCRIBE_TASK}`, "no_suggestions", 200);
   return { suggestions: presets.suggestions, generateError };
 }

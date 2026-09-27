@@ -130,7 +130,7 @@ test("suggestions fall back to presets when generation times out", async (t) => 
     () => json({ suggestions: [preset] }),
   ]);
   const result = await suggestTasks("http://localhost:8080/shop/original/", undefined, 10);
-  assert.deepEqual(result, { suggestions: [preset], generateError: "AI suggestions timed out." });
+  assert.deepEqual(result, { suggestions: [preset], generateError: "Task suggestions timed out." });
   assert.equal(calls.length, 2);
 });
 test("cancelled suggestions do not fall back, and a failed fallback is reported", async (t) => {
@@ -149,4 +149,25 @@ test("cancelled suggestions do not fall back, and a failed fallback is reported"
 test("preset suggestions are labelled as presets", () => {
   assert.equal(suggestionLabel("curated"), "Preset task");
   assert.equal(suggestionLabel("generated"), "AI-suggested task");
+});
+const hang = (options) => new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+test("a preset fallback that times out is an error asking the user to describe a task", async (t) => {
+  const calls = sequenceFetch(t, [() => json({ suggestions: [] }), hang]);
+  await assert.rejects(suggestTasks("http://localhost:8080/shop/original/", undefined, 1000, 10),
+    (e) => e.code === "suggest_timeout" && /timed out/.test(e.message) && /Describe a task yourself/.test(e.message));
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].body.generate, undefined);
+});
+test("a failed preset fallback keeps the backend error and asks the user to describe a task", async (t) => {
+  sequenceFetch(t, [
+    () => json({ error: { code: "suggest_failed", message: "No valid task." } }, 502),
+    () => json({ error: { code: "url_not_allowed", message: "URL not allowed." } }, 400),
+  ]);
+  await assert.rejects(suggestTasks("http://localhost:8080/shop/original/"),
+    (e) => e.code === "url_not_allowed" && e.status === 400 && /URL not allowed\..*Describe a task yourself/.test(e.message));
+});
+test("the preset fallback has its own shorter timeout", async () => {
+  const { SUGGEST_GENERATE_TIMEOUT_MS, SUGGEST_PRESET_TIMEOUT_MS } = await import("../src/api/live.ts");
+  assert.equal(SUGGEST_PRESET_TIMEOUT_MS, 15_000);
+  assert.ok(SUGGEST_PRESET_TIMEOUT_MS < SUGGEST_GENERATE_TIMEOUT_MS);
 });
