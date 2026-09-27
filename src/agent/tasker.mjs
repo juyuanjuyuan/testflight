@@ -51,18 +51,23 @@ export function curatedTasks(siteKey, url) {
 
 /**
  * Sentences per data kind: config/test-data/default.json, overridden by config/test-data/<a>.json for siteKey sites/<a>/….
- * @returns {{profile:string, sentences:Record<string,string>}}
+ * needs: the kinds the site asks for (its file's `needs`), or null when it does not say (any kind may be appended).
+ * @returns {{profile:string, sentences:Record<string,string>, needs:string[]|null}}
  */
 export function loadTestData(siteKey) {
-  const read = (name) => JSON.parse(fs.readFileSync(insideDir(TEST_DATA_DIR, `${name}.json`), 'utf8')).sentences;
-  const sentences = read('default');
+  const read = (name) => JSON.parse(fs.readFileSync(insideDir(TEST_DATA_DIR, `${name}.json`), 'utf8'));
+  const sentences = read('default').sentences;
   const missing = DATA_KINDS.filter((k) => typeof sentences?.[k] !== 'string');
   if (missing.length) throw new Error(`config/test-data/default.json has no sentence for ${missing.join(', ')}`);
   const site = siteKey?.split('/')[1];
   if (site && NAME.test(site) && fs.existsSync(path.join(TEST_DATA_DIR, `${site}.json`))) {
-    return { profile: site, sentences: { ...sentences, ...read(site) } };
+    const own = read(site);
+    const needs = Array.isArray(own.needs) ? own.needs : null;
+    const unknown = (needs ?? []).filter((k) => !DATA_KINDS.includes(k));
+    if (unknown.length) throw new Error(`config/test-data/${site}.json: unknown data kind ${unknown.join(', ')} in needs`);
+    return { profile: site, sentences: { ...sentences, ...own.sentences }, needs };
   }
-  return { profile: 'default', sentences };
+  return { profile: 'default', sentences, needs: null };
 }
 
 /**
@@ -78,10 +83,8 @@ export function appendTestData({ goal, siteKey, mode = 'local' }) {
   const file = path.join(TEST_DATA_DIR, `${site}.json`);
   if (!fs.existsSync(file)) return same;
   const own = JSON.parse(fs.readFileSync(insideDir(TEST_DATA_DIR, `${site}.json`), 'utf8'));
-  const needs = Array.isArray(own.needs) ? own.needs : Object.keys(own.sentences ?? {});
-  const unknown = needs.filter((k) => !DATA_KINDS.includes(k));
-  if (unknown.length) throw new Error(`config/test-data/${site}.json: unknown data kind ${unknown.join(', ')} in needs`);
-  const { profile, sentences } = loadTestData(siteKey);
+  const { profile, sentences, needs: siteNeeds } = loadTestData(siteKey);
+  const needs = siteNeeds ?? Object.keys(own.sentences ?? {});
   return needs.length ? { goal: buildGoal({ goal, needs }, sentences, mode), appended: true, profile } : same;
 }
 
@@ -108,16 +111,18 @@ export function checkSuggestion(s) {
 }
 
 // One model reply → usable suggestions (goal built with test values) and the reasons the others were dropped.
-function usable(data, sentences, mode) {
+// siteNeeds (the site config's needs, or null): only those kinds are appended, whatever else the model asked for.
+function usable(data, { sentences, needs: siteNeeds }, mode) {
   const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
   if (!list.length) return { ok: [], errors: ['reply must be {"suggestions":[…]} with at least one suggestion'] };
   const ok = [], errors = [];
   for (const s of list) {
     let err = checkSuggestion(s);
-    const goal = err ? null : buildGoal(s, sentences, mode);
+    const needs = err ? [] : [...new Set(s.needs)].filter((k) => !siteNeeds || siteNeeds.includes(k));
+    const goal = err ? null : buildGoal({ goal: s.goal, needs }, sentences, mode);
     if (!err && goal.length > MAX_GOAL_CHARS) err = `goal with its test data is too long (at most ${MAX_GOAL_CHARS} characters)`;
     if (err) errors.push(`"${String(s?.goal).slice(0, 80)}": ${err}`);
-    else ok.push({ goal, source: 'generated', reason: s.reason.slice(0, 200), needs: [...new Set(s.needs)] });
+    else ok.push({ goal, source: 'generated', reason: s.reason.slice(0, 200), needs });
   }
   return { ok, errors };
 }
@@ -133,13 +138,13 @@ function usable(data, sentences, mode) {
 export async function suggestTasks({ url, title = '', pageText = null, mode = 'local', siteKey = null, generate = false, stats, client }) {
   const curated = mode === 'real' || generate ? [] : curatedTasks(siteKey, url);
   if (curated.length) return { suggestions: curated, testDataProfile: null };
-  const { profile, sentences } = loadTestData(siteKey);
+  const data = loadTestData(siteKey);
   const obs = { url, title, pageText, mode, dataKinds: DATA_KINDS, maxSuggestions: MAX_SUGGESTIONS };
   let user = JSON.stringify(obs), errors = [];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { data } = await chatJSON({ role: 'judge', system: SYSTEM, user, stats, client });
-    const r = usable(data, sentences, mode);
-    if (r.ok.length) return { suggestions: r.ok.slice(0, MAX_SUGGESTIONS), testDataProfile: mode === 'real' ? null : profile };
+    const { data: reply } = await chatJSON({ role: 'judge', system: SYSTEM, user, stats, client });
+    const r = usable(reply, data, mode);
+    if (r.ok.length) return { suggestions: r.ok.slice(0, MAX_SUGGESTIONS), testDataProfile: mode === 'real' ? null : data.profile };
     errors = r.errors;
     user = JSON.stringify({ ...obs, previousReplyWasInvalid: errors.join('; ').slice(0, 1000) });
   }

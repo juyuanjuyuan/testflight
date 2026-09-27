@@ -142,3 +142,8 @@
 **需要通知前端：** ① `verdicts.screenReaderUserCanComplete` / `agentCanComplete`（以及 `rerun.before` / `after` 里的同名字段、`GET /api/runs` 的 `screenReaderUserCanComplete`）**可能是 `null`**，同时有 `verdicts.inconclusiveReason`。前端要分别处理 `true` / `false` / `null`，`null` 显示"无法判断：任务里缺少测试数据"之类，不能用 `!verdict` 显示成"不能完成"（目前 `FRONTEND/src/screens/AuditWorkspace.tsx` 就是这样写的，`FRONTEND/src/api/contracts.ts` 的类型也是 `boolean`）。② 报告 `meta.goalInput` / `meta.testDataAppended`：可以显示用户原文并注明"已自动补充测试数据"，progress 里的 `goal` 会比用户输入的长。
 
 **决定：testpage 不加测试数据配置。** 两份 testpage groundtruth 的 goal 本来就带卡号（`9c38ebe`），eval 和预设任务不受影响。用户在 testpage 上填不带数字的任务时不补任何数据，planner 会在付款处 stuck（`missing data:`），结论为"无法判断"（`null` + `inconclusiveReason: missing_test_data`）：这是**有意保留**的行为，用来测试和演示这个结论（上面第二条验证就是这样跑的）。以后不要为了让它"跑通"而给 testpage 加配置。
+
+
+### 后续：只拼接站点需要的测试数据、卡号句子改写（2026-09-27）
+
+- 生成任务时，模型给的 `needs` 和站点配置的 `needs` 取交集（`loadTestData()` 现在返回 `needs`；站点配置没有 `needs` 时和以前一样全部拼接）。shop 只有 `payment_card`，生成的任务不再带姓名、地址、邮箱，建议里的 `needs` 也只剩实际拼接的类别。

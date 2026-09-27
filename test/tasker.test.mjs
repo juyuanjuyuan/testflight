@@ -256,3 +256,20 @@ test('audit() with a goal: meta.goalSource is user and the tasker is not involve
   assert.equal(report.meta.goalSource, 'user');
   assert.equal(report.meta.goalReason, null);
 });
+
+test('generated: needs are intersected with the site config needs (shop: payment_card only, no name/address/email)', async () => {
+  const client = fakeClient([{ suggestions: [good('Buy a canvas tote bag', ['payment_card', 'name', 'address', 'email'])] }]);
+  const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/shop/original/', siteKey: 'sites/shop/original', generate: true, client });
+  const [s] = r.suggestions;
+  assert.deepEqual(s.needs, ['payment_card']);
+  const { sentences } = loadTestData('sites/shop/original');
+  assert.equal(s.goal, `Buy a canvas tote bag. ${sentences.payment_card}`);
+  assert.ok(!s.goal.includes('test@example.com') && !s.goal.includes('Test User') && !s.goal.includes('Test Street'));
+});
+
+test('generated: a site without config needs keeps every kind the model asked for', async () => {
+  const client = fakeClient([{ suggestions: [good('Buy a canvas tote bag', ['payment_card', 'email'])] }]);
+  const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/testpage/fixed/', siteKey: 'sites/testpage/fixed', generate: true, client });
+  assert.deepEqual(r.suggestions[0].needs, ['payment_card', 'email']);
+  assert.ok(r.suggestions[0].goal.includes('test@example.com'));
+});
