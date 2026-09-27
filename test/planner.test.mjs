@@ -9,7 +9,7 @@ import path from 'node:path';
 process.env.LLM_CACHE = 'off';
 process.env.MODEL_PLANNER = 'fake-planner';
 const { ROOT } = await import('../src/paths.mjs');
-const { readTrace, NO_PROGRESS_STEPS } = await import('../src/contracts.mjs');
+const { readTrace, NO_PROGRESS_STEPS, MAX_STEPS } = await import('../src/contracts.mjs');
 const { nextAction, typedValueInGoal, noProgressSteps } = await import('../src/agent/planner.mjs');
 const { detectTrap } = await import('../src/detect/trap.mjs');
 
@@ -107,4 +107,12 @@ test('focus-trap detection is not cut short: the fixture trap and a 3-cycle + Es
   const trap = detectTrap(probe);
   assert.ok(trap.length > 0);
   assert.ok(trap[0].steps.includes(probe.at(-1).i), 'the Escape is part of the evidence');
+});
+
+test('MAX_STEPS leaves the planner room to explore: at least 1.5× the longest scripted local route', () => {
+  // With 25 and a 23-step shop route, the planner ran out even on the hand-fixed shop, right after pressing Pay.
+  const routes = fs.readdirSync(path.join(ROOT, 'eval')).filter((f) => /^keys\..*\.json$/.test(f));
+  assert.ok(routes.length > 0);
+  const longest = Math.max(...routes.map((f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'eval', f), 'utf8')).length));
+  assert.ok(MAX_STEPS >= 1.5 * longest, `MAX_STEPS ${MAX_STEPS} < 1.5 × ${longest}`);
 });

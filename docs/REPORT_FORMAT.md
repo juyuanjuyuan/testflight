@@ -48,7 +48,7 @@
 | `judge` | `false` 时问题没有经过 AI 审核，`userImpact` 为空 |
 | `generatedAt` | 生成时间（ISO 格式） |
 | `startedAt` / `finishedAt` | 运行开始、分析结束的时间（ISO 格式），相减就是"本次审计用时"；修复后重新生成的报告保留审计的这两个时间（`generatedAt` 会更新）。真实网站模式的 `startedAt` 包含人在 Chrome 里处理验证码、按回车之前的时间。`replay` 生成的报告和旧报告里没有这两个字段 |
-| `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 25，真实网站 80。可以显示"用了 14 / 25 步"。`replay` 生成的报告和旧报告里没有 |
+| `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 40，真实网站 80。可以显示"用了 14 / 40 步"。`replay` 生成的报告和旧报告里没有 |
 
 ### verdicts：两个核心结论
 

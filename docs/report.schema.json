@@ -20,7 +20,7 @@
         "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" },
         "startedAt": { "type": "string", "format": "date-time", "description": "When the run started. Real mode: includes the time the human spent clearing captcha/login before pressing Enter. Absent in replays and in reports built before plan 17 P2" },
         "finishedAt": { "type": "string", "format": "date-time", "description": "When the run's analysis finished (report written right after). finishedAt - startedAt = how long the audit took. Absent when startedAt is" },
-        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 25 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" }
+        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" }
       }
     },
     "verdicts": { "$ref": "#/$defs/verdicts" },

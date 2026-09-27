@@ -25,7 +25,7 @@
 | [x] | [08 真实网站模式与预跑](08-real-site-mode.md) | 01、03 | 1–1.5 小时 | 周六 22:00 |
 | [x] | [09 judge 与噪音调优](09-judge-and-noise.md) | 03、05、08 | 1.5 小时 | 周日 10:00 |
 | [ ] | [10 评测流水线](10-eval-pipeline.md) | 05、09 | 1.5 小时 | 周日 10:00 |
-| [ ] | [11 假站闭环与 CI](11-shop-loop-and-ci.md) | 04、05 | 1 小时 | 周日 11:00 |
+| [x] | [11 假站闭环与 CI](11-shop-loop-and-ci.md) | 04、05 | 1 小时 | 周日 11:00 |
 | [x] | [14 报告 viewer](14-report-viewer.md)（前端负责） | 01 | 1.5 小时 | 周六 22:00 |
 | [ ] | [15 Playwright Trace（开发调试用）](15-playwright-trace.md) | 01 | 30 分钟 | 周六 21:00 |
 | [ ] | [16 接入 Guidepup Virtual Screen Reader](16-virtual-screen-reader.md) | 03 | 1.5–2 小时 | 周六 23:00 |

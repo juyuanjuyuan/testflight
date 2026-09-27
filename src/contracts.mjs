@@ -1,7 +1,8 @@
 // FROZEN DATA CONTRACTS — every module talks to every other module only through these shapes.
 // Changing a field: tell the whole team, update fixtures/, update docs/ARCHITECTURE.md §3, run `npm test`.
 
-export const MAX_STEPS = 25;
+// local sites: the shop's shortest route is 23 steps; the planner explores (opens the cart, checks feedback) on top of it
+export const MAX_STEPS = 40;
 export const MAX_STEPS_REAL = 80;       // real sites: Tab-only through a big header and results list needs far more keys
 // planner runs end as stuck after this many consecutive steps that heard nothing new and only revisited known elements.
 // Must stay well above a focus-trap probe (prompt rule 6: 3 Tab cycles + Escape ≈ 8 steps on a 2-element trap).
