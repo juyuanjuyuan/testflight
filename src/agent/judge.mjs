@@ -24,11 +24,15 @@ export function toFinding(c, v = null) {
   };
 }
 
-function compactStep(s) {
+const withoutHash = (u) => (u || '').split('#')[0];
+
+// focusBefore = the control the key was pressed on. newView = a page load OR an SPA route change (URL changed, no load):
+// text that appears then is the new page's content, not feedback on the action (real SPAs produce 100+ such candidates)
+function compactStep(s, prev) {
   return {
-    action: s.action, focus: describeFocus(s.focusAfter), heard: heardInStep(s),
+    action: s.action, focusBefore: describeFocus(s.focusBefore), focus: describeFocus(s.focusAfter), heard: heardInStep(s),
     visibleChanges: s.changes.map((c) => ({ text: c.text, selector: c.selector, dtMs: c.dtMs, repeatCount: c.repeatCount })),
-    url: s.url, modalOpen: s.modalOpen,
+    url: s.url, newView: s.pageLoad || (!!prev && withoutHash(prev.url) !== withoutHash(s.url)), modalOpen: s.modalOpen,
   };
 }
 
@@ -37,19 +41,28 @@ function outcomeOf(trace) {
   return k === 'done' || k === 'stuck' ? k : 'max-steps';
 }
 
+/** The judge's input for one batch of candidates: goal, outcome, the batch, and only the steps it points at. */
+export function judgeInput({ goal, trace, batch }) {
+  const steps = {};
+  for (const c of batch) {
+    for (const i of c.steps) {
+      const n = trace.findIndex((s) => s.i === i);
+      steps[i] ??= compactStep(trace[n], trace[n - 1]);
+    }
+  }
+  return { goal, outcome: outcomeOf(trace), candidates: batch, steps };
+}
+
 /** Labels candidates. Can never add a finding that no detector produced. */
 export async function judge({ goal, trace, candidates, enabled = true, stats = {}, log = () => {} }) {
   const withIds = (fs) => fs.map((f, n) => ({ ...f, id: `F${n + 1}`, candidateId: f.id }));
   if (!enabled || candidates.length === 0) return withIds(candidates.map((c) => toFinding(c)));
-  const steps = {};
-  for (const c of candidates) for (const i of c.steps) steps[i] ??= compactStep(trace.find((s) => s.i === i));
   const findings = [];
   for (let k = 0; k < candidates.length; k += 12) { // batch to keep prompts small
     const batch = candidates.slice(k, k + 12);
     let verdicts = [];
     try {
-      const { data } = await chatJSON({ role: 'judge', system: SYSTEM, stats,
-        user: JSON.stringify({ goal, outcome: outcomeOf(trace), candidates: batch, steps }) });
+      const { data } = await chatJSON({ role: 'judge', system: SYSTEM, stats, user: JSON.stringify(judgeInput({ goal, trace, batch })) });
       verdicts = Array.isArray(data?.verdicts) ? data.verdicts : [];
     } catch (e) {
       stats.judgeErrors = [...(stats.judgeErrors || []), e.message]; // findings keep judged:false
