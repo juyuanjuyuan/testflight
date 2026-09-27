@@ -55,6 +55,36 @@ test('D6: mouse-only "Apply coupon" is reported as pointer-only on the stuck ste
   assert.ok(original.slice(0, -1).every((s) => !('unreachableClickables' in s)), 'scanned only when stuck');
 });
 
+const evalTrace = (flow) => readTrace(fs.readFileSync(path.join(ROOT, `eval/traces/${flow}/trace.jsonl`), 'utf8'));
+
+test('D4: Enter on a same-page skip link that moves the URL hash is not focus lost (W3C BAD false positive)', () => {
+  const bad = evalTrace('w3c-bad-fixed');
+  const skips = bad.filter((s) => s.action.key === 'Enter' && s.focusAfter.isBody && !s.pageLoad).map((s) => s.i);
+  assert.deepEqual(skips, [2, 5, 11, 13], 'the recording still contains the skip-link jumps');
+  assert.deepEqual(runDetectors(bad).filter((c) => c.detector === 'focus-lost'), []);
+});
+
+test('D4: real focus loss is still reported (shop B6 Remove; a link whose URL does not change; href="#")', () => {
+  const lost = runDetectors(evalTrace('shop-main-original')).filter((c) => c.detector === 'focus-lost');
+  assert.deepEqual(lost.map((c) => [c.evidence.barrierId, c.steps]), [['B6', [11]]]);
+  const url = 'http://localhost/p.html';
+  const link = { role: 'link', name: 'Remove', description: '', selector: '#rm', barrierId: 'X', isBody: false, inModal: false, rect: null };
+  const body = { ...link, role: 'body', name: '', selector: 'body', barrierId: null, isBody: true };
+  const step = (i, u, action, focusBefore, focusAfter) => ({ i, t: i, url: u, title: '', action, focusBefore, focusAfter, changes: [],
+    spoken: [], pageLoad: i === 0, pageText: null, modalOpen: false, focusVisible: null, screenshot: null });
+  for (const after of [url, `${url}#`]) {
+    const trace = [step(0, url, { kind: 'start', reason: '' }, null, link), step(1, after, { kind: 'press', key: 'Enter', reason: '' }, link, body)];
+    assert.deepEqual(runDetectors(trace).filter((c) => c.detector === 'focus-lost').map((c) => c.steps), [[1]], `url after: ${after}`);
+  }
+});
+
+test('D4: the skip-link rule leaves the testpage recordings alone (all 6 barriers, no focus-lost)', () => {
+  for (const trace of [original, evalTrace('testpage-original')]) {
+    const c = runDetectors(trace);
+    assert.deepEqual([...new Set(c.map((x) => x.evidence.barrierId).filter(Boolean))].sort(), ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']);
+  }
+});
+
 test('detectors report nothing on the fixed page (no false positives)', () => {
   assert.deepEqual(runDetectors(fixed), []);
 });
