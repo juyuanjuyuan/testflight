@@ -15,10 +15,18 @@ jobs:
       - run: npm test
       - name: Serve demo sites
         run: node scripts/serve.mjs & sleep 1
-      - name: Audit checkout flow (fails the check on any blocking barrier)
+      - name: Audit the shop's checkout flow (hand-fixed version)
         run: |
-          node cli.mjs audit --url http://localhost:8080/testpage/fixed/ --goal "Buy the canvas tote bag" \
-            --script eval/keys.testpage.fixed.json --no-judge --label ci --fail-on block
+          mkdir -p runs/ci-shop-fixed
+          node cli.mjs audit --url http://localhost:8080/shop/fixed/ \
+            --goal "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242." \
+            --script eval/keys.shop.main.json --no-judge --run-dir runs/ci-shop-fixed --fail-on block
+      # Without the judge every candidate is "degrade", so --fail-on block alone can never fail here.
+      # The fixed shop has no planted barriers: any finding at all is a regression.
+      - name: Fail on any finding
+        run: |
+          node -e "const c = require('./runs/ci-shop-fixed/report.json').counts;
+            if (c.block + c.degrade) { console.error('findings on the fixed shop: block ' + c.block + ', degrade ' + c.degrade); process.exit(1); }"
       - name: Report in job summary
         if: always()
         run: cat runs/*/report.md >> "$GITHUB_STEP_SUMMARY"
