@@ -1,0 +1,10 @@
+# Ground truth for sites/shop/original, POPUP flow only: arriving from the newsletter campaign link (?from=newsletter).
+# The popup only opens with that query string, so the main and second flows never see it.
+# Scripted route: eval/keys.shop.popup.json (original, ends stuck) / eval/keys.shop.popup.fixed.json (fixed).
+site: sites/shop/original
+variant: original
+flow: popup
+url: "/shop/original/?from=newsletter"
+goal: "Open the Canvas Tote Bag product page"
+barriers:
+  - { id: B11, kind: trap, wcag: ["2.1.2"], impact: block, flow: popup, detectable: ours, note: "list page: newsletter popup on load; Tab bounces Email↔Subscribe, Escape ignored, × is mouse-only" }

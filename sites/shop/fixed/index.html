@@ -5,13 +5,24 @@
 <div id="promo">Free shipping over $50</div>
 <main>
   <img class="sale" src="sale.svg" alt="Summer sale: all hats 20% off this week only" data-barrier="B3">
-  <h1>All products</h1>
+  <h1 tabindex="-1">All products</h1>
   <ul class="grid">
     <li class="card"><div class="swatch" style="background:#d9c7a3"></div><a href="product.html?id=tote">Canvas Tote Bag</a><p>$24.00</p></li>
     <li class="card"><div class="swatch" style="background:#8a4b3c"></div><a href="product.html?id=beanie">Wool Beanie</a><p>$18.00</p></li>
     <li class="card"><div class="swatch" style="background:#9fb3b0"></div><a href="product.html?id=mug">Stoneware Mug</a><p>$14.00</p></li>
   </ul>
 </main>
+<div class="modal" id="news" role="dialog" aria-modal="true" aria-labelledby="news-title" aria-describedby="news-desc" tabindex="-1" data-barrier="B11" hidden>
+  <div class="sheet">
+    <button type="button" class="x" id="newsclose" aria-label="Close">×</button>
+    <h2 id="news-title">Get 15% off your first order</h2>
+    <p id="news-desc">Join our newsletter for early access to sales.</p>
+    <label for="newsemail">Email</label>
+    <input id="newsemail" type="email" autocomplete="off">
+    <button type="button" class="btn" id="subscribe">Subscribe</button>
+    <p id="newsmsg" role="status"></p>
+  </div>
+</div>
 <div class="modal" id="cart" role="dialog" aria-modal="true" aria-labelledby="cart-title" tabindex="-1" hidden>
   <div class="sheet">
     <h2 id="cart-title">Your cart</h2>
@@ -22,5 +33,22 @@
   </div>
 </div>
 <script src="shop.js"></script>
-<script>initCart(); rotatePromo();</script>
+<script>
+  initCart(); rotatePromo();
+  // Newsletter popup: only when arriving from the email campaign link (?from=newsletter), so the other flows never see it.
+  // Subscribe does not close it; Escape or × does.
+  function closeNews() { news.hidden = true; document.querySelector('h1').focus(); }
+  if (new URLSearchParams(location.search).get('from') === 'newsletter') { news.hidden = false; news.focus(); }
+  subscribe.addEventListener('click', () => { newsmsg.textContent = 'Thanks for subscribing!'; });
+  newsclose.addEventListener('click', closeNews);
+  news.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeNews(); return; }
+    if (e.key !== 'Tab') return;
+    // keep focus inside the dialog; × and Escape are the way out
+    const f = [newsclose, newsemail, subscribe], k = f.indexOf(document.activeElement);
+    e.preventDefault();
+    const next = k < 0 ? (e.shiftKey ? f.length - 1 : 0) : (k + (e.shiftKey ? -1 : 1) + f.length) % f.length;
+    f[next].focus();
+  });
+</script>
 </body></html>

@@ -1,0 +1,8 @@
+[
+  {"kind":"press","key":"Tab","reason":"a newsletter popup covers the page, look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Escape","reason":"try to close the popup"},
+  {"kind":"stuck","reason":"newsletter popup has no keyboard exit"}
+]

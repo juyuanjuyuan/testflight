@@ -1,0 +1,10 @@
+[
+  {"kind":"press","key":"Tab","reason":"a newsletter popup covers the page, look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Escape","reason":"close the popup"},
+  {"kind":"press","key":"Tab","reason":"find the tote bag"},
+  {"kind":"press","key":"Enter","reason":"open the tote bag page"},
+  {"kind":"done","reason":"on the Canvas Tote Bag page"}
+]

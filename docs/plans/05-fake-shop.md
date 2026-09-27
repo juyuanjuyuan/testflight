@@ -58,3 +58,4 @@ node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop-fixed.yam
 - 验收（--no-judge）：shop-main 检出 6/8，漏掉 B3（vision-only）和 B8（等 07）；shop-second 检出 2/3，漏掉 B10（等 06）；fixed 两条流程都是 0 误报，axe 0。两个版本的可见文字完全一样，脚本比较过。
 - **给 09 的噪音问题**：轮播横幅只放在列表页。recorder 只在 `start()` 做 2 秒空闲基线，页面跳转后的新页面没有基线。轮播放在详情页或结账页时，前几步会被 D1 报成 unannounced，fixed 上会出现误报。修法是跳转后也做一次基线，这属于 `src/`，所以这次没改。
 - 埋障碍的人也看过检测器代码，这一点已经在 `sites/shop/README.md` 里说明。
+- 追加第三条流程（弹窗）：从邮件活动链接进来（`/shop/original/?from=newsletter`）时，列表页一加载就弹出 newsletter 订阅弹窗 B11。original 里 Tab 只在 Email 和 Subscribe 之间来回，Escape 没反应，× 只能用鼠标点；fixed 里 × 是按钮，Escape 也能关，关掉后焦点落到 h1。只有带这个参数才会弹，所以主流程和第二流程都碰不到。标准答案 `shop-popup.yaml`，脚本 `eval/keys.shop.popup.json` 和 `eval/keys.shop.popup.fixed.json`，goal 是 "Open the Canvas Tote Bag product page"。验收：original 检出 1/1；fixed 三条流程都是 0 误报。**注意 10/11 跑这条流程时 url 要带 `?from=newsletter`**。
