@@ -70,7 +70,9 @@ test('fix writes the applied fix plan back into report.json, from any working di
     assert.equal(byId[ids.trap].fix, null, 'no edit applied → no fix shown; the reason is in fixes[].errors');
     assert.equal(byId[ids.cardErr].fix, null, 'degrade findings are not fixed');
     assert.equal(report.meta.judge, false, 'meta of the original report is kept');
-    assert.deepEqual(report.stats, { calls: 3 }, 'stats of the original report are kept');
+    const { spokenAgreement, ...kept } = report.stats;
+    assert.deepEqual(kept, { calls: 3 }, 'stats of the original report are kept');
+    assert.ok(spokenAgreement.compared > 0, 'spokenAgreement is rebuilt from the trace');
     assert.equal(report.rerun, null);
     assert.deepEqual(readJSON(path.join(runDir, 'findings.json')).find((f) => f.id === ids.toast).fix, byId[ids.toast].fix);
     assert.match(fs.readFileSync(path.join(patched, 'index.html'), 'utf8'), /role="status"/);

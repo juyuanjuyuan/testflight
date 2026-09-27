@@ -45,8 +45,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "(focus on page body)"
+        "document"
       ],
+      "spoken": [
+        "document"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0000.png",
       "shotSize": {
         "w": 1280,
@@ -74,8 +78,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "button \"🛒\""
+        "button, 🛒"
       ],
+      "spoken": [
+        "button, 🛒"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0001.png",
       "shotSize": {
         "w": 1280,
@@ -115,6 +123,8 @@
       ],
       "seenNoise": [],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0002.png",
       "shotSize": {
         "w": 1280,
@@ -147,8 +157,12 @@
         "20% off hats"
       ],
       "heard": [
-        "button \"Checkout\""
+        "button, Checkout"
       ],
+      "spoken": [
+        "button, Checkout"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0003.png",
       "shotSize": {
         "w": 1280,
@@ -188,9 +202,14 @@
         "Free shipping over $50"
       ],
       "heard": [
-        "textbox \"Card number\"",
-        "Card number Pay"
+        "dialog, Payment",
+        "textbox, Card number"
       ],
+      "spoken": [
+        "dialog, Payment",
+        "textbox, Card number"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0004.png",
       "shotSize": {
         "w": 1280,
@@ -220,6 +239,8 @@
         "New arrivals this week"
       ],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0005.png",
       "shotSize": {
         "w": 1280,
@@ -249,8 +270,12 @@
         "20% off hats"
       ],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0006.png",
       "shotSize": {
         "w": 1280,
@@ -290,6 +315,8 @@
         "Free shipping over $50"
       ],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0007.png",
       "shotSize": {
         "w": 1280,
@@ -322,8 +349,12 @@
         "New arrivals this week"
       ],
       "heard": [
-        "textbox \"Card number\""
+        "textbox, Card number, 4242 4242"
       ],
+      "spoken": [
+        "textbox, Card number, 4242 4242"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0008.png",
       "shotSize": {
         "w": 1280,
@@ -353,8 +384,12 @@
         "20% off hats"
       ],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0009.png",
       "shotSize": {
         "w": 1280,
@@ -384,8 +419,12 @@
         "Free shipping over $50"
       ],
       "heard": [
-        "textbox \"Card number\""
+        "textbox, Card number, 4242 4242"
       ],
+      "spoken": [
+        "textbox, Card number, 4242 4242"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0010.png",
       "shotSize": {
         "w": 1280,
@@ -417,8 +456,12 @@
         "New arrivals this week"
       ],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0011.png",
       "shotSize": {
         "w": 1280,
@@ -450,6 +493,8 @@
         "20% off hats"
       ],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0012.png",
       "shotSize": {
         "w": 1280,
@@ -480,6 +525,8 @@
         "Free shipping over $50"
       ],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0013.png",
       "shotSize": {
         "w": 1280,
@@ -733,6 +780,19 @@
     "llmFailedMs": 8003,
     "llmErrorTypes": {
       "timeout": 1
+    },
+    "spokenAgreement": {
+      "compared": 12,
+      "agreed": 11,
+      "fallbackSteps": 0,
+      "disagreements": [
+        {
+          "step": 4,
+          "text": "Card number Pay",
+          "rules": true,
+          "virtualScreenReader": false
+        }
+      ]
     }
   },
   "fixPolicy": {

@@ -14,6 +14,10 @@ export const NOISE_REPEAT = 3;         // same element changing >= this often wi
 // before the first action (2000 left it at 2 → reported as unannounced). Slower carousels are the judge's job.
 export const BASELINE_MS = 3500;
 export const LOAD_TIMEOUT_MS = 10_000;   // max wait for 'load' after a navigation; exceeding it is recorded as loadTimeout
+// max wait for the virtual screen reader to start in a freshly loaded page; slower = recorded as spokenError, rules fall back
+export const VSR_START_TIMEOUT_MS = 5_000;
+// step.spokenSource when step.spoken is the Guidepup virtual screen reader's own output (plan 16)
+export const SPOKEN_SOURCE = 'virtual-screen-reader';
 // per-attempt LLM timeout by role. The planner is short: a stalled call is cheaper to retry than to wait out.
 export const LLM_TIMEOUT_MS = { planner: 8_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
 export const MAX_GOAL_CHARS = 500;       // task text, typed by the user or built by the tasker (API rejects longer)
@@ -95,7 +99,12 @@ export const INTERACTIVE_ROLES = [
  * @property {FocusInfo|null} focusBefore
  * @property {FocusInfo} focusAfter
  * @property {Change[]} changes
- * @property {string[]} spoken       virtual screen reader output (optional, [] if not wired)
+ * @property {string[]} spoken       what the virtual screen reader said during this step, e.g. 'button, Pay', 'assertive: Card
+ *                                   number is invalid' ([] = it said nothing, or it was not running: see spokenSource).
+ *                                   Password values masked; real mode: field values the planner did not type are '(redacted)'
+ * @property {string|null=} spokenSource SPOKEN_SOURCE when `spoken` is the screen reader's output; null/absent = it was not
+ *                                   running (old trace, or it failed to start: spokenError) and what was heard is inferred by rules
+ * @property {string=}  spokenError  why the virtual screen reader was not running on this step (degradation, kept for diagnosis)
  * @property {boolean}  pageLoad     a navigation happened during this step
  * @property {string|null} pageText  AX-tree text snapshot (headings/landmarks/static text), only when pageLoad; truncated
  * @property {boolean}  modalOpen

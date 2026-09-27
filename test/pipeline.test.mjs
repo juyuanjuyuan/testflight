@@ -5,11 +5,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/paths.mjs';
-import { readTrace, validateAction } from '../src/contracts.mjs';
+import { readTrace, validateAction, SPOKEN_SOURCE } from '../src/contracts.mjs';
 import { blockAction, redactFocusValue, forceReplace, reachedBoundary } from '../src/runner/guard.mjs';
 import { focusInfo, pageText } from '../src/runner/observe.mjs';
 import { runDetectors } from '../src/detect/index.mjs';
-import { buildObservation, describeFocus } from '../src/agent/observation.mjs';
+import { buildObservation, describeFocus, spokenAgreement } from '../src/agent/observation.mjs';
 import { judge, judgeInput } from '../src/agent/judge.mjs';
 import { computeVerdicts } from '../src/verdicts.mjs';
 import { buildReport } from '../src/report/build.mjs';
@@ -71,12 +71,29 @@ test('INFORMATION BARRIER: planner never sees an unannounced error', () => {
   assert.ok(JSON.stringify(buildObservation('buy', fixed.slice(0, kf + 1))).includes('Card number is invalid'), 'announced text must reach planner');
 });
 
+test('virtual screen reader: it ran on every fixture step; after Pay the original says nothing, the fixed page the error', () => {
+  for (const t of [original, fixed]) assert.ok(t.every((s) => s.spokenSource === SPOKEN_SOURCE), 'spokenSource on every step');
+  const pay = (t) => t.find((s) => s.changes.some((c) => c.text === 'Card number is invalid'));
+  assert.deepEqual(pay(original).spoken, []);
+  assert.deepEqual(pay(fixed).spoken, ['assertive: Card number is invalid']);
+});
+
+test('spokenAgreement on the fixtures: rules and screen reader differ only where focus moves into the payment dialog', () => {
+  // the rules count the whole dialog's text as heard; the screen reader says the dialog name and the focused field only
+  for (const t of [original, fixed]) {
+    const a = spokenAgreement(t);
+    assert.ok(a.compared > 0 && a.fallbackSteps === 0, JSON.stringify(a));
+    assert.ok(a.disagreements.length > 0);
+    for (const d of a.disagreements) assert.deepEqual([d.text, d.rules, d.virtualScreenReader], ['Card number Pay', true, false]);
+  }
+});
+
 test('planner history keeps what an opened dialog announced, not just its first lines', () => {
   // Shop cart: the tote was the 7th line announced when the cart opened. With 3 lines kept, the planner forgot it
-  // one step later, decided it was never added and looped until MAX_STEPS.
+  // one step later, decided it was never added and looped until MAX_STEPS. (Rules path: the screen reader not running.)
   const lines = ['Wool Beanie $18.00', 'Remove', '−', 'Qty 1', '+', 'Canvas Tote Bag $24.00', 'Subtotal $42.00', 'Checkout'];
   const change = (text) => ({ text, selector: '#cart li', visible: true, inLiveRegion: false, focusMovedInto: true, referencedBy: [] });
-  const opened = { ...fixed[1], i: 1, changes: lines.map(change), spoken: [],
+  const opened = { ...fixed[1], i: 1, changes: lines.map(change), spoken: [], spokenSource: null,
     focusAfter: { ...fixed[1].focusAfter, role: 'dialog', name: 'Your cart', selector: '#cart' } };
   const next = { ...fixed[2], i: 2, focusBefore: opened.focusAfter };
   const { history } = buildObservation('buy', [fixed[0], opened, next]);

@@ -35,7 +35,7 @@ goal ─► planner (LLM, keyboard only) ─► runner (Playwright + CDP, record
 trace ─► deterministic detectors ─► judge (LLM filters/labels, can't invent) ─► report ─► fixer (LLM) ─► rerun
 ```
 
-**Perception parity.** After every keypress we record, deterministically, what appeared **on screen** and what **assistive tech could convey** (focus role/name/description from the accessibility tree, live-region text). Visible changes with no programmatic path to the user are reported with step, screenshot, element and WCAG criterion.
+**Perception parity.** After every keypress we record, deterministically, what appeared **on screen** and what **assistive tech conveyed**: the words an open-source virtual screen reader ([Guidepup](https://github.com/guidepup/virtual-screen-reader), MIT) running in the page actually said, e.g. `button, Pay` or `assertive: Card number is invalid`, plus focus role/name/description from the accessibility tree. Visible changes with no programmatic path to the user are reported with step, screenshot, element and WCAG criterion. Our own rules make the same call independently; the report's `stats.spokenAgreement` shows where the two agree (on the test page they agree everywhere except the step where the payment dialog opens: see Limits).
 
 **Where the AI does work rules can't:**
 1. **Planner** — operates any site toward a goal using only keyboard + screen-reader information. No per-site scripts to maintain. Its outcome doubles as "can a structure-only AI agent complete this purchase?"
@@ -64,7 +64,7 @@ TODO: replace with the full fake-shop table (`node cli.mjs score …`) and the j
 - **Real:** browser automation on real Chromium, accessibility-tree reads via CDP, all detectors, axe-core comparison, LLM calls (Sciforium: DeepSeek V4.1 Flash for the planner, GLM 5.3 Flash for judge/fixer).
 - **Synthetic:** the demo shop (`sites/shop`) and test page are ours, with planted barriers and a hand-fixed reference version. W3C Before-and-After Demonstration is used only to measure false positives.
 - **Real-site segment:** detection only — no fixes, stops before checkout, never types payment data; results are shown from a cached run and not committed to this repo.
-- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); cross-origin iframes (e.g. Stripe) are invisible to us; focus visibility (D5) compares the focused element's own computed style with an unfocused copy of it, so a focus ring drawn only by a parent's `:focus-within` is reported as missing (left to the judge), and visually hidden inputs whose ring is drawn on a sibling label are not judged; at real scale, noise filtering on busy sites needs more tuning. In real-site mode the tool does not record or send what the user typed or the browser autofilled: field values are kept only for fields the agent typed into itself (never for sensitive ones), and field text is dropped from page text. Local per-step screenshots can still show it; they are never sent to a model or committed.
+- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); when focus moves onto a dialog it says the dialog's name only, where NVDA/JAWS usually also read the dialog's text, so the planner may hear less there than a real user would (our rules count that text as heard; `stats.spokenAgreement` lists each such step); cross-origin iframes (e.g. Stripe) are invisible to us; focus visibility (D5) compares the focused element's own computed style with an unfocused copy of it, so a focus ring drawn only by a parent's `:focus-within` is reported as missing (left to the judge), and visually hidden inputs whose ring is drawn on a sibling label are not judged; at real scale, noise filtering on busy sites needs more tuning. In real-site mode the tool does not record or send what the user typed or the browser autofilled: field values are kept only for fields the agent typed into itself (never for sensitive ones), and field text is dropped from page text. Local per-step screenshots can still show it; they are never sent to a model or committed.
 
 
 ## Running it
@@ -89,5 +89,7 @@ node cli.mjs rerun --run runs/<id>
 
 
 ## Brought in from before the weekend
+
+**Third-party component:** the virtual screen reader is [`@guidepup/virtual-screen-reader`](https://github.com/guidepup/virtual-screen-reader) (Guidepup, MIT), used unchanged to simulate what a screen reader announces. What we built on top: the per-step comparison of what appeared on screen with what the screen reader conveyed, the planner that only ever hears that output (information barrier), and the fix-and-verify loop.
 
 TODO — if the ~100-line feasibility script was written before Saturday, commit it unchanged as "prior work" first and describe it here. Focus-visibility detection will reuse keyboard-a11y-tester (MIT) — TODO: add the exact link and what we changed. Open-source libraries (Playwright, axe-core) don't need listing.

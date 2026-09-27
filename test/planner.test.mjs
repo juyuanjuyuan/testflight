@@ -71,10 +71,11 @@ const extend = (trace, templates) => templates.reduce((t, s) => [...t, { ...stru
 const byI = (i) => original.find((s) => s.i === i);
 
 test('no progress for NO_PROGRESS_STEPS steps: the runner ends the run as stuck without asking the model', async () => {
-  // after Pay (step 7) keep Tabbing between Card number and Pay: nothing new heard, no new element
+  // after Pay (step 7) keep Tabbing between Card number and Pay. Step 8 still hears something new (the screen reader
+  // reads the field with its value for the first time); from step 9 on nothing new is heard and no new element reached
   let trace = original.slice(0, 8);
-  while (trace.length < 8 + NO_PROGRESS_STEPS) trace = extend(trace, [byI(8), byI(9)]);
-  trace = trace.slice(0, 7 + NO_PROGRESS_STEPS);
+  while (trace.length < 9 + NO_PROGRESS_STEPS) trace = extend(trace, [byI(8), byI(9)]);
+  trace = trace.slice(0, 9 + NO_PROGRESS_STEPS);
   assert.equal(noProgressSteps(trace), NO_PROGRESS_STEPS);
   const client = fakeClient([{ kind: 'press', key: 'Tab', reason: 'keep looking' }]);
   const a = await nextAction({ goal: CARD_GOAL, trace, stats: {}, client });
@@ -94,8 +95,12 @@ test('typing a new value or hearing something new counts as progress', () => {
   typed.at(-1).focusAfter.value = '4242 42421';
   assert.equal(noProgressSteps(typed), 0, 'field content never seen before');
   const heard = extend(original.slice(0, 8), [byI(8), byI(9)]);
-  heard.at(-1).changes = [{ ...structuredClone(original[4].changes[0] || {}), text: 'Something new', selector: '#x', visible: true, inLiveRegion: true, referencedBy: [] }];
-  assert.equal(noProgressSteps(heard), 0);
+  assert.equal(noProgressSteps(heard), 1, 'the Pay button again, heard before');
+  heard.at(-1).spoken = ['assertive: Something new'];
+  assert.equal(noProgressSteps(heard), 0, 'the screen reader said something new');
+  const ruled = extend(original.slice(0, 8), [byI(8), byI(9)]);
+  Object.assign(ruled.at(-1), { spokenSource: null, changes: [{ ...structuredClone(original[4].changes[0] || {}), text: 'Something new', selector: '#x', visible: true, inLiveRegion: true, referencedBy: [] }] });
+  assert.equal(noProgressSteps(ruled), 0, 'screen reader not running: the rules say new live-region text was heard');
 });
 
 test('focus-trap detection is not cut short: the fixture trap and a 3-cycle + Escape probe both finish', () => {

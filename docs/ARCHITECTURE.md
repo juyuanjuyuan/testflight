@@ -6,7 +6,8 @@
 
 - 骨架已能端到端运行：Playwright 驱动真实 Chromium → recorder 记录 → CDP 读取焦点 → 检测器 → 报告。在 `sites/testpage` 上用预录按键跑通：**原版检出 4/4 个埋入障碍、0 误报；axe 检出 0/4（WCAG 规则）；修复版 0 误报**。结果存放在 `fixtures/testpage-*`。
 - 已实现：`contracts`、`runner/*`、`detect/*`、`agent/observation`、`agent/llm`（路由、缓存、回退）、`planner`/`judge`（代码与 prompt 草稿，**尚未连接 Sciforium 测试**）、`fix/apply`（search/replace + 文案保护）、`report/build`、`eval/score`、`cli`、CI workflow、`test/` 下的回归测试（数量以 `npm test` 输出为准）。
-- 未做：真实假电商站（`sites/shop`）、viewer 界面、fixer 的真实调用、虚拟读屏器 `spoken`、焦点可见性 D5（计划 07 方案 A：计算样式对比）、D6。
+- 未做：真实假电商站（`sites/shop`）、viewer 界面、fixer 的真实调用、焦点可见性 D5（计划 07 方案 A：计算样式对比）、D6。
+- 计划 16 已接入虚拟读屏器（Guidepup，MIT）：每步的 `spoken` 是它的原话，planner 听到的就是它（见 §4）。
 
 ## 1. 流水线
 
@@ -28,7 +29,7 @@ flowchart LR
 
 | 目录 | 内容 |
 |---|---|
-| `src/runner/` | `session`（启动/接管浏览器、单步执行）、`recorder.js`（页面内注入）、`observe`（CDP 焦点、AX 文本）、`act`、`axe`、`guard`（真实网站安全限制） |
+| `src/runner/` | `session`（启动/接管浏览器、单步执行）、`recorder.js`（页面内注入）、`observe`（CDP 焦点、AX 文本）、`act`、`axe`、`guard`（真实网站安全限制）、`vsr`（虚拟读屏器注入与读取） |
 | `src/agent/` | `observation`（**信息隔离**）、`llm`、`planner`、`judge`、`prompts/` |
 | `src/fix/` | `fixer`（LLM）、`apply`（应用 edits + 保护） |
 | `src/detect/` | D1–D6，纯函数 |
@@ -46,6 +47,7 @@ flowchart LR
 4. **Candidate**（检测器输出）和 **Finding**（judge 输出）分开定义。Finding 新增 `layer`（presence/association/announcement/operation）、`judged` 和 `candidateId`；`fix` 改为 `{edits:[{file,old,new}], rationale}`。
 5. **Action** 的 `type` 新增可选 `replace: boolean`：为 true 时 runner 先全选（Control/Meta+A）再输入，用来更正输入框内容；real 模式下 guard 对它同样拒绝敏感输入框。**FocusInfo** 新增可选 `value`：焦点节点在 AX 树里的 value（读屏器聚焦输入框时读出的内容，密码框由浏览器遮蔽为 •），planner 的 `focusValue` 只来自它。real 模式下只保留 planner 本次运行自己输入过、且不敏感的字段的 value，其他字段为 `value: null` 加 `valueRedacted: true`，`pageText` 也不含字段内的文字。
 6. **Step** 新增可选 `shotSize: {w, h, dpr}`：截图的实际像素宽高和 devicePixelRatio（截图失败时没有这个字段）。rect 都是 CSS 像素，× dpr 才是截图像素。本地模式固定 1280×800、dpr 1；real 模式接管的是用户的 Chrome，大小不固定。`report.json` 的 `timeline[].shotSize` 原样带出。
+7. **Step** 的 `spoken` 从一直为空变成虚拟读屏器（`@guidepup/virtual-screen-reader`，由 `src/runner/vsr.mjs` 注入页面）本步的原话，例如 `button, Pay`、`assertive: Card number is invalid`、页面加载后的 `document`。新增可选 `spokenSource`（`'virtual-screen-reader'` 表示 `spoken` 是它的输出；null/缺省表示它没在运行，听到了什么由规则推算）和 `spokenError`（它在这一页启动失败的原因）。它读的是 DOM 里的值，所以密码框的值一律换成 •；real 模式下 planner 没输入过的字段值换成 `(redacted)`（`guard.redactSpoken`）。
 
 ## 4. 信息隔离（最重要的设计改动）
 
@@ -54,7 +56,7 @@ flowchart LR
 现在 planner 只能看到 `buildObservation()` 返回的内容：
 
 - 焦点的 role、name、description；
-- `heardThisStep`：辅助技术真正会传达的内容，包括焦点变化后读出的内容、live region 的文字、焦点移入的元素、新获得焦点元素的 describedby，以及虚拟读屏器的输出；
+- `heardThisStep`：辅助技术真正会传达的内容。虚拟读屏器在这一步运行时，**就是它的原话**（`step.spoken`）；它没运行时（旧 trace、在这一页启动失败）回退到规则推算：焦点变化后读出的内容、live region 的文字、焦点移入的元素、新获得焦点元素的 describedby。两种来源的对比写进 `report.stats.spokenAgreement`，不一致只记录、不自动改检测器；
 - `pageText`：页面跳转后 AX 树中的文字，对应读屏用户用浏览模式能读到的内容。印在图片上的文字自然不在其中。
 
 `test/pipeline.test.mjs` 里有一条测试专门检查这一点：原版里未播报的错误**不能**出现在 Observation 中，修复版里已播报的错误**必须**出现。
@@ -120,7 +122,7 @@ score  --run <runDir> --groundtruth … [--tool ours|axe]
 
 ## 12. 已知限制（写进 README）
 
-- 虚拟读屏器的行为和 NVDA/JAWS 不完全一致，所以措辞用"没有任何程序化方式能被播报"。
+- 虚拟读屏器的行为和 NVDA/JAWS 不完全一致，所以措辞用"没有任何程序化方式能被播报"。已知差别：焦点落到弹窗上时它只读弹窗的名字，不读弹窗里的文字（NVDA/JAWS 一般会读），规则则把这些文字算作已播报，这是 testpage 上唯一的不一致；导致页面跳转的那一步，跳转前它说的话随旧页面一起丢失，`spoken` 只有新页面的 `document`。
 - 新插入的 live region 节点，部分读屏器不会播报；recorder 目前把它算作已播报，结论偏宽松。
 - MutationObserver 看不到跨域 iframe（例如 Stripe）内部的变化。
 - 不同控件重名（D3b）可能在列表页产生较多候选，依赖 judge 过滤。

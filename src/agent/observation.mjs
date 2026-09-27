@@ -3,6 +3,8 @@
 // It must NEVER see raw `step.changes` text unless assistive tech would actually convey it,
 // otherwise an unannounced "Card number is invalid" leaks to the agent and the demo proves nothing.
 
+import { SPOKEN_SOURCE } from '../contracts.mjs';
+
 const clip = (s, n) => (s && s.length > n ? s.slice(0, n) + '…' : s || '');
 
 export function focusChanged(step) {
@@ -18,19 +20,51 @@ export function describeFocus(f) {
   return `${f.role} ${name}${desc}`;
 }
 
-/** What assistive tech conveys in this step. Single source of truth — detectors reuse the same idea. */
-export function heardInStep(step) {
-  const heard = [];
+/** Rules: is this new on-screen text conveyed by assistive tech? Detectors (D1) apply the same idea. */
+function ruleAnnounces(step, c, moved) {
+  if (!c.visible) return false;
+  return c.inLiveRegion || c.focusMovedInto || (moved && !!c.referencedBy?.includes(step.focusAfter?.selector));
+}
+
+/** What assistive tech conveys in this step, inferred by rules from focus and changes (never reads step.spoken). */
+export function ruleHeard(step) {
   const moved = focusChanged(step);
-  if (moved) heard.push(describeFocus(step.focusAfter));
-  for (const c of step.changes || []) {
-    if (!c.visible) continue;
-    if (c.inLiveRegion) heard.push(c.text);
-    else if (c.focusMovedInto) heard.push(c.text);
-    else if (moved && c.referencedBy?.includes(step.focusAfter?.selector)) heard.push(c.text);
-  }
-  for (const s of step.spoken || []) heard.push(s);
+  return [...(moved ? [describeFocus(step.focusAfter)] : []), ...(step.changes || []).filter((c) => ruleAnnounces(step, c, moved)).map((c) => c.text)];
+}
+
+/**
+ * What assistive tech conveys in this step. Single source of truth for the planner and the report.
+ * The virtual screen reader's own output when it ran on this step; otherwise (old trace, it failed to start) the rules.
+ */
+export function heardInStep(step) {
+  const heard = step.spokenSource === SPOKEN_SOURCE ? step.spoken : ruleHeard(step);
   return [...new Set(heard.map((h) => clip(h, 300)))];
+}
+
+const squash = (s) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * Cross-check of the rules against the virtual screen reader: for every step it ran on that has new visible text,
+ * does it say each text exactly when the rules say the text is heard? Disagreements are listed for a human to read,
+ * never fed back into the detectors. null when no step ran the screen reader.
+ */
+export function spokenAgreement(trace) {
+  const ran = trace.filter((s) => s.spokenSource === SPOKEN_SOURCE);
+  if (!ran.length) return null;
+  let compared = 0, agreed = 0;
+  const disagreements = [];
+  for (const s of ran) {
+    const visible = s.changes.filter((c) => c.visible);
+    if (!visible.length) continue;
+    const moved = focusChanged(s);
+    const said = s.spoken.map(squash);
+    const differ = visible.map((c) => ({ step: s.i, text: c.text, rules: ruleAnnounces(s, c, moved), virtualScreenReader: said.some((p) => p.includes(squash(c.text))) }))
+      .filter((d) => d.rules !== d.virtualScreenReader);
+    compared++;
+    if (!differ.length) agreed++;
+    disagreements.push(...differ);
+  }
+  return { compared, agreed, fallbackSteps: trace.length - ran.length, disagreements };
 }
 
 /**

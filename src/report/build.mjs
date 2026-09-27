@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { computeVerdicts } from '../verdicts.mjs';
-import { heardInStep, describeFocus } from '../agent/observation.mjs';
+import { heardInStep, describeFocus, spokenAgreement } from '../agent/observation.mjs';
 import { NOISE_REPEAT } from '../contracts.mjs';
 import { writeJsonAtomic, writeFileAtomic } from './atomic.mjs';
 import { FIX_POLICY } from '../fix/policy.mjs';
@@ -15,12 +15,14 @@ export function timelineEntry(s, findings, t0) {
     seen: s.changes.filter((c) => c.visible && c.repeatCount < NOISE_REPEAT).map((c) => ({ text: c.text, rect: c.rect ?? null })), // middle column
     seenNoise: s.changes.filter((c) => c.repeatCount >= NOISE_REPEAT).map((c) => c.text),                              // carousels etc.
     heard: heardInStep(s),                                             // right column: what AT conveyed
+    spoken: s.spoken ?? [], spokenSource: s.spokenSource ?? null,      // the virtual screen reader's own words; null source = rules
     screenshot: s.screenshot, shotSize: s.shotSize ?? null, findingIds: findings.filter((f) => f.steps.includes(s.i)).map((f) => f.id),
   };
 }
 
 /** report.json is the ONLY file the viewer reads. */
 export function buildReport({ meta, trace, findings, axe = null, rerun = null, fixes = null, stats = null }) {
+  const agreement = spokenAgreement(trace); // deterministic from the trace, so replay and fix rebuild it the same way
   const isWcag = (v) => (v.tags || []).some((t) => /^wcag\d/.test(t));
   const axeOk = axe && !axe.error;
   const axeSelectors = new Set((axe?.violations || []).flatMap((v) => v.nodes.map((n) => n.target.join(' '))));
@@ -40,7 +42,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
     timeline: trace.map((s) => timelineEntry(s, shown, trace[0]?.t)),
     findings: shown.sort((a, b) => order[a.impact] - order[b.impact]),
     axe: !axe ? null : axe.error ? { error: axe.error } : { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, wcag: isWcag(v), nodes: v.nodes.length })) },
-    fixes, rerun, stats,
+    fixes, rerun, stats: agreement ? { ...stats, spokenAgreement: agreement } : stats,
     fixPolicy: FIX_POLICY, // what a fix may change; shown next to fixes (docs/REPORT_FORMAT.md)
   };
 }

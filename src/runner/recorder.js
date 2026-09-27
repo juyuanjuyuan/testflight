@@ -1,6 +1,6 @@
 // Injected with page.addInitScript BEFORE page scripts (otherwise init-time changes are missed).
 // Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen() /
-// unreachableClickables() (D6) / focusVisible() (D5).
+// unreachableClickables() (D6) / focusVisible() (D5) / fieldValues() (spoken redaction).
 // Thresholds come from contracts.mjs via window.__A11Y_CONFIG, which session.mjs injects first.
 (() => {
   if (window.__a11yRec) return;
@@ -106,6 +106,7 @@
     if ((el.tagName === 'A' || el.tagName === 'AREA') && !el.hasAttribute('href') && !el.hasAttribute('tabindex')) return false;
     return el.tabIndex >= 0;
   }
+  const NOT_TEXT = ['hidden', 'button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file', 'range', 'color'];
   function looksClickable(el) {
     if (el.hasAttribute('onclick') || typeof el.onclick === 'function') return true;
     if (['button', 'link'].includes(el.getAttribute('role'))) return true;
@@ -188,6 +189,16 @@
         out.push({ el, selector: selectorOf(el), barrierId: barrierOf(el), text: text.slice(0, 120) });
       }
       return out.map(({ el, ...u }) => u);
+    },
+    /** Non-empty values of text-entry fields: session.mjs masks them in what the virtual screen reader said (guard.redactSpoken). */
+    fieldValues(max) {
+      const out = [];
+      for (const el of document.querySelectorAll('input,textarea')) {
+        if (out.length >= max) break;
+        if (NOT_TEXT.includes(el.type) || !el.value) continue; // a button's value is its name, not user data
+        out.push({ selector: selectorOf(el), value: el.value, password: el.type === 'password' });
+      }
+      return out;
     },
     modalOpen() {
       return [...document.querySelectorAll('dialog[open],[role="dialog"],[role="alertdialog"],[aria-modal="true"]')].some(isVisible);

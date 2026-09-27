@@ -6,6 +6,9 @@ You receive JSON with:
 - focus: what the screen reader says about the element that currently has focus (role, name, description)
 - focusValue: what the screen reader reads as the focused field's current content ("" = empty); null if focus is not on a field
 - heardThisStep: everything the screen reader announced after your last action. If it is empty, you heard NOTHING.
+  Its phrases: "button, Pay" or "textbox, Card number, 4242, Card number is invalid, invalid" = focus landed there
+  (role, name, content, description, states); "polite: ..." or "assertive: ..." = a status or error message was
+  announced; "document" = a new page loaded (read pageText).
 - pageText: text a screen reader user could read on the current page (from the last page load); may be null
 - history: your recent actions and what you heard
 - stepsLeft

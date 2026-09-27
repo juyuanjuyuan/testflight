@@ -4,9 +4,12 @@
     "mode": "local",
     "site": "sites/testpage/fixed",
     "script": true,
+    "startedAt": "2026-09-27T04:11:45.758Z",
+    "maxSteps": 40,
     "goal": "Buy the canvas tote bag",
     "judge": false,
-    "generatedAt": "2026-09-27T02:02:04.835Z"
+    "finishedAt": "2026-09-27T04:11:57.447Z",
+    "generatedAt": "2026-09-27T04:11:57.447Z"
   },
   "verdicts": {
     "outcome": "done",
@@ -25,6 +28,7 @@
   "timeline": [
     {
       "i": 0,
+      "t": 0,
       "action": {
         "kind": "start",
         "reason": "open page"
@@ -35,8 +39,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "(focus on page body)"
+        "document"
       ],
+      "spoken": [
+        "document"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0000.png",
       "shotSize": {
         "w": 1280,
@@ -47,6 +55,7 @@
     },
     {
       "i": 1,
+      "t": 480,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -63,8 +72,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "button \"Add Canvas Tote Bag to cart\""
+        "button, Add Canvas Tote Bag to cart"
       ],
+      "spoken": [
+        "button, Add Canvas Tote Bag to cart"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0001.png",
       "shotSize": {
         "w": 1280,
@@ -75,6 +88,7 @@
     },
     {
       "i": 2,
+      "t": 1035,
       "action": {
         "kind": "press",
         "key": "Enter",
@@ -99,10 +113,16 @@
           }
         }
       ],
-      "seenNoise": [],
-      "heard": [
-        "Added to cart"
+      "seenNoise": [
+        "Free shipping over $50"
       ],
+      "heard": [
+        "polite: Added to cart"
+      ],
+      "spoken": [
+        "polite: Added to cart"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0002.png",
       "shotSize": {
         "w": 1280,
@@ -113,6 +133,7 @@
     },
     {
       "i": 3,
+      "t": 1703,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -127,10 +148,16 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
-      "heard": [
-        "button \"Checkout\""
+      "seenNoise": [
+        "New arrivals this week"
       ],
+      "heard": [
+        "button, Checkout"
+      ],
+      "spoken": [
+        "button, Checkout"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0003.png",
       "shotSize": {
         "w": 1280,
@@ -141,6 +168,7 @@
     },
     {
       "i": 4,
+      "t": 2040,
       "action": {
         "kind": "press",
         "key": "Enter",
@@ -167,9 +195,14 @@
       ],
       "seenNoise": [],
       "heard": [
-        "textbox \"Card number\"",
-        "Card number Pay"
+        "dialog, Payment, modal",
+        "textbox, Card number"
       ],
+      "spoken": [
+        "dialog, Payment, modal",
+        "textbox, Card number"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0004.png",
       "shotSize": {
         "w": 1280,
@@ -180,6 +213,7 @@
     },
     {
       "i": 5,
+      "t": 2448,
       "action": {
         "kind": "type",
         "text": "4242 4242",
@@ -196,6 +230,8 @@
       "seen": [],
       "seenNoise": [],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0005.png",
       "shotSize": {
         "w": 1280,
@@ -206,6 +242,7 @@
     },
     {
       "i": 6,
+      "t": 3092,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -224,8 +261,12 @@
         "Free shipping over $50"
       ],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0006.png",
       "shotSize": {
         "w": 1280,
@@ -236,6 +277,7 @@
     },
     {
       "i": 7,
+      "t": 3454,
       "action": {
         "kind": "press",
         "key": "Enter",
@@ -260,12 +302,14 @@
           }
         }
       ],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [
-        "Card number is invalid"
+        "assertive: Card number is invalid"
       ],
+      "spoken": [
+        "assertive: Card number is invalid"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0007.png",
       "shotSize": {
         "w": 1280,
@@ -276,6 +320,7 @@
     },
     {
       "i": 8,
+      "t": 3826,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -292,8 +337,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "textbox \"Card number\", Card number is invalid"
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
       ],
+      "spoken": [
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0008.png",
       "shotSize": {
         "w": 1280,
@@ -304,6 +353,7 @@
     },
     {
       "i": 9,
+      "t": 4490,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -318,10 +368,16 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
-      "heard": [
-        "button \"Pay\""
+      "seenNoise": [
+        "20% off hats"
       ],
+      "heard": [
+        "button, Pay"
+      ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0009.png",
       "shotSize": {
         "w": 1280,
@@ -332,6 +388,7 @@
     },
     {
       "i": 10,
+      "t": 4843,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -348,8 +405,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "textbox \"Card number\", Card number is invalid"
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
       ],
+      "spoken": [
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0010.png",
       "shotSize": {
         "w": 1280,
@@ -360,6 +421,7 @@
     },
     {
       "i": 11,
+      "t": 5193,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -376,8 +438,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0011.png",
       "shotSize": {
         "w": 1280,
@@ -388,6 +454,7 @@
     },
     {
       "i": 12,
+      "t": 5538,
       "action": {
         "kind": "press",
         "key": "Escape",
@@ -404,8 +471,12 @@
       "seen": [],
       "seenNoise": [],
       "heard": [
-        "button \"Checkout\""
+        "button, Checkout"
       ],
+      "spoken": [
+        "button, Checkout"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0012.png",
       "shotSize": {
         "w": 1280,
@@ -416,6 +487,7 @@
     },
     {
       "i": 13,
+      "t": 5874,
       "action": {
         "kind": "press",
         "key": "Enter",
@@ -451,10 +523,14 @@
       ],
       "seenNoise": [],
       "heard": [
-        "textbox \"Card number\", Card number is invalid",
-        "Card number Pay",
-        "Card number is invalid"
+        "dialog, Payment, modal",
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
       ],
+      "spoken": [
+        "dialog, Payment, modal",
+        "textbox, Card number, 4242 4242, Card number is invalid, invalid"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0013.png",
       "shotSize": {
         "w": 1280,
@@ -465,6 +541,7 @@
     },
     {
       "i": 14,
+      "t": 6630,
       "action": {
         "kind": "type",
         "text": " 4242 4242",
@@ -483,6 +560,8 @@
         "20% off hats"
       ],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0014.png",
       "shotSize": {
         "w": 1280,
@@ -493,6 +572,7 @@
     },
     {
       "i": 15,
+      "t": 7298,
       "action": {
         "kind": "press",
         "key": "Tab",
@@ -511,8 +591,12 @@
         "Free shipping over $50"
       ],
       "heard": [
-        "button \"Pay\""
+        "button, Pay"
       ],
+      "spoken": [
+        "button, Pay"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0015.png",
       "shotSize": {
         "w": 1280,
@@ -523,6 +607,7 @@
     },
     {
       "i": 16,
+      "t": 7652,
       "action": {
         "kind": "press",
         "key": "Enter",
@@ -549,9 +634,14 @@
       ],
       "seenNoise": [],
       "heard": [
-        "button \"Checkout\"",
-        "Order confirmed"
+        "button, Checkout",
+        "polite: Order confirmed"
       ],
+      "spoken": [
+        "button, Checkout",
+        "polite: Order confirmed"
+      ],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0016.png",
       "shotSize": {
         "w": 1280,
@@ -562,6 +652,7 @@
     },
     {
       "i": 17,
+      "t": 7988,
       "action": {
         "kind": "done",
         "reason": "heard 'Order confirmed'"
@@ -577,6 +668,8 @@
       "seen": [],
       "seenNoise": [],
       "heard": [],
+      "spoken": [],
+      "spokenSource": "virtual-screen-reader",
       "screenshot": "shots/0017.png",
       "shotSize": {
         "w": 1280,
@@ -605,5 +698,51 @@
   },
   "fixes": null,
   "rerun": null,
-  "stats": {}
+  "stats": {
+    "spokenAgreement": {
+      "compared": 10,
+      "agreed": 8,
+      "fallbackSteps": 0,
+      "disagreements": [
+        {
+          "step": 4,
+          "text": "Card number Pay",
+          "rules": true,
+          "virtualScreenReader": false
+        },
+        {
+          "step": 13,
+          "text": "Card number Pay",
+          "rules": true,
+          "virtualScreenReader": false
+        }
+      ]
+    }
+  },
+  "fixPolicy": {
+    "enforced": [
+      {
+        "id": "keep-visible-text",
+        "rule": "An edit may add text but may not remove any visible text or string literal."
+      },
+      {
+        "id": "unique-match",
+        "rule": "The text an edit replaces must occur exactly once in the file."
+      },
+      {
+        "id": "site-copy-only",
+        "rule": "Edits only change files inside the patched copy of the site; the original site is never modified."
+      }
+    ],
+    "instructed": [
+      {
+        "id": "attributes-and-small-js",
+        "rule": "Only add or change attributes (aria-*, role, tabindex, id) or add small JavaScript (focus management, key handlers)."
+      },
+      {
+        "id": "no-rewording",
+        "rule": "NEVER delete or reword visible text or error messages. Making the message disappear is not a fix."
+      }
+    ]
+  }
 }

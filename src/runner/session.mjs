@@ -4,15 +4,17 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { focusInfo, pageText } from './observe.mjs';
 import { act } from './act.mjs';
-import { redactFocusValue } from './guard.mjs';
+import { redactFocusValue, redactSpoken } from './guard.mjs';
 import { runAxe, mergeAxe } from './axe.mjs';
-import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS } from '../contracts.mjs';
+import { vsrScript, startVsr, readVsr, stopVsr } from './vsr.mjs';
+import { CHANGE_WINDOW_MS, SETTLE_MS, BASELINE_MS, LOAD_TIMEOUT_MS, SPOKEN_SOURCE } from '../contracts.mjs';
 
 const RECORDER = fs.readFileSync(new URL('./recorder.js', import.meta.url), 'utf8');
 /** Thresholds the in-page recorder needs; injected as window.__A11Y_CONFIG before recorder.js runs. */
 export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_MS };
 // cap on D6 candidates per stuck step: real sites have many cursor:pointer cards, the judge filters the rest
 const MAX_UNREACHABLE = 20;
+const MAX_FIELDS = 200; // field values checked when masking what the virtual screen reader said
 const CONFIG_SCRIPT = `window.__A11Y_CONFIG = ${JSON.stringify(RECORDER_CONFIG)};`;
 const TRACE_FILE = 'trace.zip';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,6 +86,7 @@ async function stopTrace(ctx, runDir) {
  *          waitForUser?:()=>Promise<void>, browserType?:object}} o
  */
 export async function openSession({ url, runDir, mode = 'local', cdp, headless = true, axe = true, trace = false, waitForUser, browserType = chromium }) {
+  vsrScript(); // a missing or reshaped screen-reader bundle is a setup error: fail before touching the browser
   let browser, page, owned = true;
   if (mode === 'real') {
     browser = await connectReal(browserType, cdp);
@@ -115,6 +118,22 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
   const typedSelectors = new Set(); // fields the planner typed into since the last page load (real-mode value redaction)
   const observeFocus = async () => redactFocusValue(await focusInfo(page, cdpSession), { mode, typedSelectors });
 
+  // virtual screen reader: (re)started in every new document; a document it failed to start in is not retried each step
+  let vsrDoc = { loads: -1, error: null };
+  async function ensureVsr() { // true = (re)started now, its log begins at 0
+    if ((vsrDoc.loads === loads && vsrDoc.error) || (await readVsr(page)) !== null) return false;
+    vsrDoc = { loads, error: await startVsr(page) };
+    return true;
+  }
+  /** What it said after its first `before` phrases in this document, masked (redactSpoken); spokenError when not running. */
+  async function spokenSince(before) {
+    if (await ensureVsr()) before = 0;
+    const log = await readVsr(page);
+    if (log === null) return { spoken: [], spokenSource: null, spokenError: vsrDoc.error ?? 'virtual screen reader is not running in this page' };
+    const fields = await page.evaluate((max) => window.__a11yRec?.fieldValues(max) ?? [], MAX_FIELDS);
+    return { spoken: redactSpoken(log.slice(before ?? 0), fields, { mode, typedSelectors }), spokenSource: SPOKEN_SOURCE };
+  }
+
   async function snapshot(extra) {
     const shot = await screenshotOrNull(page, runDir, `shots/${String(i).padStart(4, '0')}.png`);
     const { modalOpen, focusVisible, dpr } = await page.evaluate(() => ({ modalOpen: window.__a11yRec?.modalOpen() ?? false,
@@ -140,10 +159,11 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     page,
     async start(goalUrl = url) {
       if (mode !== 'real') await page.goto(goalUrl, { waitUntil: 'load' });
+      await ensureVsr(); // listening through the baseline: what the page announces on load is part of step 0
       await sleep(BASELINE_MS); // idle baseline: anything that changes now is noise, not caused by the user
       const focus = await observeFocus();
       const step = { i, t: Date.now(), action: { kind: 'start', reason: 'open page' }, focusBefore: null, focusAfter: focus,
-        changes: [], spoken: [], pageLoad: true, pageText: await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }), ...(await snapshot()) };
+        changes: [], ...(await spokenSince(0)), pageLoad: true, pageText: await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }), ...(await snapshot()) };
       if (axe) axeRuns.push(await runAxe(page));
       current = focus; i++;
       return step;
@@ -152,7 +172,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     async step(action) {
       const focusBefore = current;
       const loadsBefore = loads;
-      await page.evaluate(() => window.__a11yRec?.mark());
+      const saidBefore = await page.evaluate(async () => { window.__a11yRec?.mark(); return window.__vsrReady ? (await window.__vsrModule.virtual.spokenPhraseLog()).length : null; });
       if (action.kind === 'press' || action.kind === 'type') await act(page, action);
       const loadTimeout = await settle(loadsBefore);
       const pageLoad = loads !== loadsBefore;
@@ -162,7 +182,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       const focusAfter = await observeFocus();
       // D6 scan only when stuck: it explains why, and scanning every step would flood real sites with pointer cards
       const unreachable = action.kind === 'stuck' ? { unreachableClickables: await page.evaluate((max) => window.__a11yRec.unreachableClickables(max), MAX_UNREACHABLE) } : {};
-      const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, spoken: [], pageLoad, ...unreachable,
+      const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, ...(await spokenSince(saidBefore)), pageLoad, ...unreachable,
         pageText: pageLoad ? await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
       if (axe && (pageLoad || changes.length)) axeRuns.push(await runAxe(page));
       current = focusAfter; i++;
@@ -171,6 +191,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     axeResults: () => mergeAxe(axeRuns),
     async close() {
       if (traced.trace) traced = await stopTrace(page.context(), runDir); // before close: the zip is written by this browser connection
+      if (!owned) await stopVsr(page).catch(() => {}); // cleanup only, as below: the run is recorded; the tab may be closed or navigated away
       if (!owned) await cdpSession.detach().catch(() => {}); // cleanup only: the run is already recorded, and a tab the human closed can't be detached
       await browser.close(); // real mode: only drops our CDP connection, the human's Chrome and tabs stay open
       return traced;

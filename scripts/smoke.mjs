@@ -69,14 +69,18 @@ const CASES = [
       r.verdicts.screenReaderUserCanComplete === true || `screenReaderUserCanComplete is ${r.verdicts.screenReaderUserCanComplete}, expected true`] },
   // type with replace:true overwrites the rejected short card; the AX value the screen reader reads is recorded
   { name: 'testpage/fixed', label: 'replace', script: 'eval/keys.testpage.replace.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
-    check: (s, r, trace) => [heardInStep(trace[11]).includes('Order confirmed') || `after Pay heard ${JSON.stringify(heardInStep(trace[11]))}, expected "Order confirmed"`,
+    check: (s, r, trace) => [heardInStep(trace[11]).includes('polite: Order confirmed') || `after Pay heard ${JSON.stringify(heardInStep(trace[11]))}, expected "polite: Order confirmed"`,
       trace[5].focusAfter.value === '4242 4242' || `AX value after first type is ${JSON.stringify(trace[5].focusAfter.value)}, expected "4242 4242"`,
       trace[9].focusAfter.value === '4242 4242 4242 4242' || `AX value after replace is ${JSON.stringify(trace[9].focusAfter.value)}, expected the 16-digit number only`] },
-  // a password field's AX value is masked, so the planner never hears the secret
+  // a password field's AX value is masked, so the planner never hears the secret; the virtual screen reader reads the
+  // DOM value, so what it says when focus comes back to the field is masked the same way
   { name: 'password', url: `data:text/html,<label>Password <input type=password></label>`, goal: 'log in',
-    script: [{ kind: 'press', key: 'Tab', reason: 'find field' }, { kind: 'type', text: 'hunter2', reason: 'type' }, { kind: 'stuck', reason: 'end' }],
+    script: [{ kind: 'press', key: 'Tab', reason: 'find field' }, { kind: 'type', text: 'hunter2', reason: 'type' },
+      { kind: 'press', key: 'Shift+Tab', reason: 'leave' }, { kind: 'press', key: 'Tab', reason: 'back to the field' }, { kind: 'stuck', reason: 'end' }],
     check: (s, r, trace) => [typeof trace[2].focusAfter.value === 'string' || 'no AX value recorded for the password field',
-      !String(trace[2].focusAfter.value).includes('hunter2') || 'password value leaked into focusAfter.value'] },
+      !String(trace[2].focusAfter.value).includes('hunter2') || 'password value leaked into focusAfter.value',
+      trace[4].spoken.includes('Password, •••••••') || `screen reader on returning to the field said ${JSON.stringify(trace[4].spoken)}, expected "Password, •••••••"`,
+      trace.every((st) => !st.spoken.join('\n').includes('hunter2')) || 'password leaked into step.spoken'] },
   // local mode records every field value (our own test sites) ...
   { name: 'form', label: 'local', url: FORM, goal: 'search', script: FORM_SCRIPT,
     check: (s, r, trace) => [valueAt(trace, 1) === 'me@example.com' || `local Email value is ${JSON.stringify(valueAt(trace, 1))}, expected it recorded`,

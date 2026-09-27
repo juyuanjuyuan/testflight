@@ -93,7 +93,9 @@
 | `seen` | 这一步之后**屏幕上新出现的文字**：`[{text, rect}]` | 中栏：列出文字，并在截图上画框 |
 | `seenNoise` | 被识别为噪音的变化（轮播、倒计时） | 可选，灰色显示 |
 | `focus` | 读屏器对当前焦点的描述，例如 `button "Pay"` | **右栏：辅助技术获知的** |
-| `heard` | 这一步读屏用户**听到的所有内容**。**空数组 = 什么都没听到**，要醒目显示，例如"（无）" | 右栏 |
+| `heard` | 这一步读屏用户**听到的所有内容**。**空数组 = 什么都没听到**，要醒目显示，例如"（无）"。`spokenSource` 为 `"virtual-screen-reader"` 时它就是虚拟读屏器的原话（和 `spoken` 相同，例如 `button, Pay`）；为 null 时是规则推算的（例如 `button "Pay"`） | 右栏 |
+| `spoken` | 开源虚拟读屏器（Guidepup，MIT）这一步**逐字说的话**：焦点落到某处时是"角色, 名字, 内容, 描述, 状态"，例如 `textbox, Card number, 4242 4242, Card number is invalid, invalid`；live region 播报是 `polite: …` / `assertive: …`；页面加载是 `document`。空数组 = 它什么都没说。密码显示为 •；真实网站上用户自己填的字段值显示为 `(redacted)`。旧报告里没有这个字段 | 右栏，可以标注"虚拟读屏器原话" |
+| `spokenSource` | `"virtual-screen-reader"` = 右栏内容来自虚拟读屏器；`null` = 它这一步没在运行（旧 trace，或在这个页面启动失败），`heard` 是规则推算的。旧报告里没有这个字段 | 右栏标题旁的小标签 |
 | `findingIds` | 这一步涉及的问题 id | 步骤有问题时标红或标色 |
 
 **demo 最关键的一帧**（`fixtures/testpage-original` 第 7 步，按下 Pay 之后）：
@@ -105,11 +107,13 @@
   "focus": "button \"Pay\"",
   "seen": [{ "text": "Card number is invalid", "rect": { "x": 470, "y": 401, "w": 339, "h": 19 } }],
   "heard": [],
+  "spoken": [],
+  "spokenSource": "virtual-screen-reader",
   "findingIds": ["F2", "F3"]
 }
 ```
 
-屏幕上出现了"Card number is invalid"，读屏用户什么都没听到。中栏和右栏并排放，差异一目了然。
+屏幕上出现了"Card number is invalid"，虚拟读屏器一个字都没说。中栏和右栏并排放，差异一目了然。修复版同一步 `spoken` 是 `["assertive: Card number is invalid"]`。
 
 ### findings：问题清单
 
@@ -168,7 +172,26 @@
 
 ### stats
 
-`calls`（成功的模型调用次数）、`ms`（总耗时，毫秒）、`cacheHits`（从缓存回放的次数）、`llmFailures`、`llmTimeouts` 等。按预录按键运行时是空对象 `{}`。可以放在页脚，例如"本次审计调用模型 15 次，用时 31 秒"。
+`calls`（成功的模型调用次数）、`ms`（总耗时，毫秒）、`cacheHits`（从缓存回放的次数）、`llmFailures`、`llmTimeouts` 等。按预录按键运行时没有这些模型统计。可以放在页脚，例如"本次审计调用模型 15 次，用时 31 秒"。
+
+`spokenAgreement`（例子来自 `fixtures/testpage-fixed`）：我们的规则和虚拟读屏器对"这条新出现的文字有没有被播报"各自给出判断，这里是两者的一致情况，适合做成"两种独立方法结论一致 N/M"的标注。只在至少有一步运行了虚拟读屏器时出现（旧报告没有）。
+
+```json
+"spokenAgreement": {
+  "compared": 10, "agreed": 8, "fallbackSteps": 0,
+  "disagreements": [{ "step": 4, "text": "Card number Pay", "rules": true, "virtualScreenReader": false },
+                    { "step": 13, "text": "Card number Pay", "rules": true, "virtualScreenReader": false }]
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `compared` | 参与比较的步数：虚拟读屏器在运行、且屏幕上出现了新文字 |
+| `agreed` | 其中两者对每条新文字的判断都相同的步数。一致率 = `agreed / compared` |
+| `fallbackSteps` | 虚拟读屏器没在运行、只能用规则推算的步数 |
+| `disagreements` | 每条判断不同的文字：`step` 是 `timeline[].i`，`rules` / `virtualScreenReader` 分别表示规则、读屏器认为它被播报了。可以做成跳转链接 |
+
+testpage 上唯一的不一致是弹窗打开那一步：焦点移进弹窗时，规则把弹窗里的文字都算作听到了，虚拟读屏器只说弹窗名字和焦点所在的输入框。
 
 ## 4. 坐标和截图
 
@@ -191,8 +214,6 @@
 
 | 字段 | 内容 | 来源 |
 |---|---|---|
-| `timeline[].spoken` | 开源虚拟读屏器（Guidepup）逐字输出的播报，例如 `"assertive: Card number is invalid"` | 计划 16 |
-| `stats.spokenAgreement` | 虚拟读屏器与我们自己的判断的一致率，适合做成一个"两种方法结论一致"的标注 | 计划 16 |
 | 新的 `detector` 值 | 弹窗相关的检测，例如背景没有被隔离、弹窗没有正确标记 | 讨论中 |
 
 ## 7. 目前的已知情况

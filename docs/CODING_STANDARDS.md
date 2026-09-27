@@ -39,7 +39,7 @@
 
 ## 5. 依赖与安全
 
-- 允许的依赖：playwright、axe-core、openai、dotenv、yaml。devDependencies（仅测试使用，`src/` 不得引用）：ajv、ajv-formats。新增依赖先在群里说一声。
+- 允许的依赖：playwright、axe-core、openai、dotenv、yaml、@guidepup/virtual-screen-reader（虚拟读屏器，MIT，计划 16）。devDependencies（仅测试使用，`src/` 不得引用）：ajv、ajv-formats。新增依赖先在群里说一声。
 - key 只放在 `.env`，不打印、不写进日志、不进 trace 或缓存文件名。
 - 真实网站的运行结果和公司名永远不提交；`guard.mjs` 的限制只能加强，不能放宽。
 

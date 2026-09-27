@@ -18,6 +18,19 @@ export function redactFocusValue(focus, { mode, typedSelectors }) {
   if (!blockType(focus) && typedSelectors.has(focus.selector)) return focus;
   return { ...focus, value: null, valueRedacted: true };
 }
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * The virtual screen reader reads field values from the DOM, so unlike the AX tree it would say a password in clear.
+ * Password values are masked in every mode (as the AX tree masks them). Real mode, like redactFocusValue: a value is kept
+ * only if the planner typed into that field this run. Values are replaced where they form a whole ', '-separated segment
+ * of a phrase (how the screen reader joins role, name, value, state), so a short value never blanks out other words.
+ * @param {string[]} spoken  @param {{selector:string, value:string, password:boolean}[]} fields  current non-empty field values
+ */
+export function redactSpoken(spoken, fields, { mode, typedSelectors }) {
+  const hide = fields.filter((f) => f.value && (f.password || (mode === 'real' && !typedSelectors.has(f.selector))));
+  return spoken.map((p) => hide.reduce((out, f) => out.replace(new RegExp(`(^|, )${escapeRe(f.value)}(?=, |$)`, 'g'),
+    (m, sep) => sep + (f.password ? '•'.repeat(f.value.length) : '(redacted)')), p));
+}
 /**
  * Real mode: every type overwrites the field, so a value the user entered or the browser autofilled is never kept
  * alongside the agent's text (that would defeat redactFocusValue). Marked forcedReplace so the trace stays honest.

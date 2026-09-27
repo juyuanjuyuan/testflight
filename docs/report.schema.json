@@ -143,7 +143,28 @@
             "llmTimeouts": { "type": "integer" },
             "llmFailedMs": { "type": "integer", "description": "Time spent on failed attempts (ms)" },
             "llmErrorTypes": { "type": "object", "additionalProperties": { "type": "integer" } },
-            "judgeErrors": { "type": "array", "items": { "type": "string" } }
+            "judgeErrors": { "type": "array", "items": { "type": "string" } },
+            "spokenAgreement": {
+              "type": "object", "required": ["compared", "agreed", "fallbackSteps", "disagreements"], "additionalProperties": false,
+              "description": "Cross-check of two independent answers to 'did assistive tech convey this new on-screen text?': our rules vs. the virtual screen reader. Counted over steps where the screen reader ran and new text appeared. Absent when the screen reader ran on no step (older traces).",
+              "properties": {
+                "compared": { "type": "integer", "minimum": 0, "description": "Steps compared: the screen reader ran and new visible text appeared" },
+                "agreed": { "type": "integer", "minimum": 0, "description": "Of those, steps where both said the same for every new text. Agreement rate = agreed / compared" },
+                "fallbackSteps": { "type": "integer", "minimum": 0, "description": "Steps where the screen reader was not running (heard inferred by rules)" },
+                "disagreements": {
+                  "type": "array", "description": "One entry per new text the two disagree on, for a human to read (the detectors are never changed automatically)",
+                  "items": {
+                    "type": "object", "required": ["step", "text", "rules", "virtualScreenReader"], "additionalProperties": false,
+                    "properties": {
+                      "step": { "type": "integer", "minimum": 0, "description": "timeline[].i" },
+                      "text": { "type": "string", "description": "The new on-screen text" },
+                      "rules": { "type": "boolean", "description": "Our rules say assistive tech conveyed it" },
+                      "virtualScreenReader": { "type": "boolean", "description": "The virtual screen reader said it" }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       ]
@@ -203,7 +224,9 @@
           "items": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" }, "rect": { "$ref": "#/$defs/rect" } } }
         },
         "seenNoise": { "type": "array", "items": { "type": "string" }, "description": "Changes recognised as noise (carousels, countdowns). Optional to show, greyed out." },
-        "heard": { "type": "array", "items": { "type": "string" }, "description": "RIGHT column: what assistive tech conveyed this step. Empty = the user heard NOTHING; show that prominently." },
+        "heard": { "type": "array", "items": { "type": "string" }, "description": "RIGHT column: what assistive tech conveyed this step. Empty = the user heard NOTHING; show that prominently. When spokenSource is 'virtual-screen-reader' this is the screen reader's own output (same as spoken, e.g. 'button, Pay', 'assertive: Card number is invalid'); otherwise it is inferred by rules (e.g. 'button \"Pay\"')." },
+        "spoken": { "type": "array", "items": { "type": "string" }, "description": "Word for word what the Guidepup virtual screen reader said this step: 'role, name, value, description, state' when focus lands on something, 'polite: …' / 'assertive: …' for live-region announcements, 'document' when a page loads. [] = it said nothing (or was not running: see spokenSource). Password values are masked with •; on real sites field values the agent did not type read '(redacted)'. Absent in reports built before plan 16." },
+        "spokenSource": { "enum": ["virtual-screen-reader", null], "description": "'virtual-screen-reader' = heard comes from the screen reader (spoken). null = it was not running on this step (older trace, or it could not start on that page), heard is inferred by rules. Absent in reports built before plan 16." },
         "screenshot": { "type": ["string", "null"], "description": "Path relative to the report's folder, e.g. shots/0007.png. null = screenshot failed" },
         "shotSize": {
           "type": ["object", "null"], "required": ["w", "h", "dpr"], "additionalProperties": false,

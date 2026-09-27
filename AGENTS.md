@@ -25,7 +25,7 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 4. **Real-site mode**: never type into payment/password fields, stop at checkout (enforced in `src/runner/guard.mjs`).
    Never commit real-site runs or name companies in the repo.
 5. **Secrets**: keys only in `.env` (gitignored). Never print keys in logs.
-6. ESM JavaScript, Node ≥ 20. Allowed deps: playwright, axe-core, openai, dotenv, yaml; devDependencies (tests only, never imported from `src/`): ajv, ajv-formats. Ask before adding others.
+6. ESM JavaScript, Node ≥ 20. Allowed deps: playwright, axe-core, openai, dotenv, yaml, @guidepup/virtual-screen-reader; devDependencies (tests only, never imported from `src/`): ajv, ajv-formats. Ask before adding others.
 7. Keep `main` green: run `npm test` before pushing. Judges read `main` at 14:00 Sunday.
 8. No silent failures: every `catch` rethrows or records the degradation in the output (see CODING_STANDARDS §3).
 9. Library code under `src/` never uses `console.*` and never uses `process.cwd()`; use a `log` callback and `src/paths.mjs`.
