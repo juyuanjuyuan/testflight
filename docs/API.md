@@ -2,6 +2,7 @@
 
 对应前端的需求文档 `docs/frontend/BACKEND_CHANGES.md`，后端计划 17。**P0**（启动运行 + 实时进度）、**P1**（修复和复测，以及报告里的 `fixPolicy`）、**P2**（运行列表，报告里的 `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t`）都已完成。
 计划 18 之后：`POST /api/runs` 的 `goal` 变为可选（不传时先自动确定任务，progress 多一个状态 `planning_task`），并新增 `POST /api/tasks/suggest`（§2.1）。**前端需要能显示 `planning_task` 状态。**
+前端反馈之后（计划 17 结果一节）：运行列表每项新增 `progress`（`ok` / `missing` / `corrupt`），响应新增 `skippedReasons`；新增两个 `state`：`unknown`（只出现在列表里，表示 progress.json 损坏）和 `waiting_for_user`（真实网站模式等人按回车）；排序改为按开始时间、同一秒按后缀数字。**前端需要能显示这两个新状态。**
 
 所有接口都由 `npm run serve`（默认 8080 端口）提供，和 `/runs`、`/fixtures`、`/viewer` 是同一个服务器。`report.json` 仍然是唯一的最终结果，格式见 `REPORT_FORMAT.md`。
 
@@ -20,7 +21,7 @@
 | `message` "会直接显示给用户"；真实网站修复的 message 写"真实网站只检测，不修复" | 所有 `message` 都是**英文**一句话，例如 `real_site_no_fix` 是 "Real websites are only audited, not fixed."。需要中文界面时请按 `code` 自己翻译 | 所有接口的错误信息保持同一种语言；`code` 是稳定的，适合做翻译的键 |
 | 修复接口的错误只有 409 两种（已有运行、真实网站） | 另有 `400 invalid_findings` / `invalid_rerun`，`409 not_fixable` / `nothing_to_fix` / `run_not_finished`，见 §6 | 在前端文档的状态码范围内细分原因 |
 | `rerunDir` 只在 `rerunning` 时有值，其他时候为 null | 进入 `rerunning` 后，之后的 `done` / `failed` **保留** `rerunDir` | 复测结束后前端仍能找到复测目录；`report.json` 的 `rerun.runDir` 里也有 |
-| `GET /api/runs` 返回数组 `[{ runDir, url, goal, generatedAt, screenReaderUserCanComplete }]` | 返回**对象** `{ "runs": [...], "skipped": 0 }`，每项多一个 `state`，见 §4 | 计划要求把读不出来的目录数放进响应（`skipped`），数组放不下；`state` 用来区分运行中、修复中、失败 |
+| `GET /api/runs` 返回数组 `[{ runDir, url, goal, generatedAt, screenReaderUserCanComplete }]` | 返回**对象** `{ "runs": [...], "skipped": 0, "skippedReasons": {} }`，每项多一个 `state` 和 `progress`，见 §4 | 计划要求把读不出来的目录数放进响应（`skipped`），数组放不下；`state` 用来区分运行中、修复中、失败 |
 | 运行列表只有 `runs/` 下的运行 | 命令行跑的真实网站在 `runs/real/` 下，也会列出，`runDir` 形如 `real/2026-09-27T01-02-03-audit` | 真实网站的运行照常只用命令行跑，但结果要在网页上能看到 |
 | 不传 `findingIds` 时修复所有 `block` 问题 | 同上；但如果这次运行**没有** `block` 问题，返回 `409 nothing_to_fix`，请用 `findingIds` 指定（可以指定 `degrade` 问题） | 不做"什么都没修就重跑"的空操作 |
 
@@ -118,26 +119,31 @@ GET /api/runs
 {
   "runs": [
     { "runDir": "2026-09-27T03-10-02-audit", "url": "http://localhost:8080/shop/original/", "goal": "Buy the canvas tote bag",
-      "generatedAt": null, "screenReaderUserCanComplete": null, "state": "running" },
+      "generatedAt": null, "screenReaderUserCanComplete": null, "state": "running", "progress": "ok" },
     { "runDir": "real/2026-09-27T01-02-03-audit", "url": "https://…", "goal": "…",
-      "generatedAt": "2026-09-27T01:05:40.000Z", "screenReaderUserCanComplete": false, "state": "done" }
+      "generatedAt": "2026-09-27T01:05:40.000Z", "screenReaderUserCanComplete": false, "state": "done", "progress": "missing" }
   ],
-  "skipped": 1
+  "skipped": 1,
+  "skippedReasons": { "report_invalid": 1 }
 }
 ```
 
 | 字段 | 说明 |
 |---|---|
 | `runDir` | 运行目录名，报告在 `/runs/<runDir>/report.json`。`runs/real/` 下的真实网站运行带 `real/` 前缀（它们不能修复，所以不会用在 `/api/runs/<runDir>/fix` 里） |
-| `url` / `goal` | 有 `report.json` 时取 `meta.url` / `meta.goal`；运行中取 `progress.json` 的 `url` / `goal`，还不知道时为 `null` |
-| `generatedAt` | `report.json` 的 `meta.generatedAt`；还没有报告时为 `null`。修复后报告会重新生成，这个时间会更新 |
-| `screenReaderUserCanComplete` | `report.json` 的结论一；还没有报告时（运行中、分析中、没跑完就失败）为 `null`，不是 `false` |
-| `state` | 有 `progress.json` 就取它的 `state`（`planning_task` / `running` / `analyzing` / `fixing` / `rerunning` / `done` / `failed`）。已经有报告、正在修复的运行是 `fixing` 或 `rerunning`，结论仍是审计的结论。没有 `progress.json` 的旧运行（命令行不带 `--progress` 跑的）是 `done` |
-| `skipped` | `runs/` 和 `runs/real/` 下**读不出来的目录**个数：既没有能解析的 `report.json`，也没有能解析的 `progress.json`（例如中途被杀、没开 `--progress` 的命令行运行，或者文件损坏）。这些目录不出现在 `runs` 里，也不会让接口报错 |
+| `url` / `goal` | 有有效的 `report.json` 时取 `meta.url` / `meta.goal`（`goal` 一定是字符串）；运行中取 `progress.json` 的 `url` / `goal`，还不知道时为 `null` |
+| `generatedAt` | `report.json` 的 `meta.generatedAt`（字符串或 `null`）；还没有报告时为 `null`。修复后报告会重新生成，这个时间会更新 |
+| `screenReaderUserCanComplete` | `report.json` 的结论一，有报告时一定是 `true` / `false`；还没有报告时（运行中、分析中、没跑完就失败）为 `null`，不是 `false` |
+| `state` | 有能读的 `progress.json` 就取它的 `state`（`waiting_for_user` / `planning_task` / `running` / `analyzing` / `fixing` / `rerunning` / `done` / `failed`，见 §5）。已经有报告、正在修复的运行是 `fixing` 或 `rerunning`，结论仍是审计的结论。有报告但没有 `progress.json` 的旧运行（命令行不带 `--progress` 跑的）是 `done`；有报告但 `progress.json` 损坏（不是 JSON、不是对象、`state` 不是上面这些值，或者 `url` / `goal` 不是字符串或 `null`）是 **`unknown`**：结论照常显示，但不知道现在是否还在修复。`unknown` 只出现在列表里，progress.json 里永远不会写它 |
+| `progress` | `progress.json` 的情况：`ok`（能读，`state` 取自它）/ `missing`（没有这个文件，`state` 是 `done`）/ `corrupt`（损坏，`state` 是 `unknown`）。没有报告的条目一定是 `ok` |
+| `skipped` | `runs/` 和 `runs/real/` 下**没有列出的目录**个数（原因见 `skippedReasons`）。这些目录不出现在 `runs` 里，也不会让接口报错 |
+| `skippedReasons` | 按原因统计的 `skipped`，只列出现过的原因，没有跳过时是 `{}`，各项之和等于 `skipped`。原因：`report_invalid`（有 `report.json`，但不是 JSON，或者 `meta.goal` 不是字符串、`verdicts.screenReaderUserCanComplete` 不是布尔值、`meta.generatedAt` 不是字符串或 `null`、`meta.url` 不是字符串或 `null`。**一律不做类型转换**，即使同时有正常的 progress.json 也不列出）；`done_without_report`（progress 是 `done` 但没有 `report.json`，不应该发生）；`progress_corrupt`（没有报告，progress.json 也损坏）；`no_report_or_progress`（两个文件都没有，例如中途被杀、没开 `--progress` 的命令行运行）。以后可能增加新的原因 |
 
-- 按目录名倒序（目录名以开始时间开头，所以最新的在前），`runs/` 和 `runs/real/` 混在一起排。
+没有报告时：progress.json 的 `state` 是 `failed` 的照常列出（`generatedAt`、`screenReaderUserCanComplete` 为 `null`），运行中的各个状态也照常列出，`done` 计入 `skipped`。
+
+- 最新的在前：目录名形如 `<开始时间 UTC>-<标签>[-<n>]`，先按开始时间倒序；同一秒开始的运行按后缀数字**按数值**倒序（`-10` 在 `-9` 前面，没有后缀的算 1，排在 `-2` 后面）；再相同时按目录名倒序；不是这种格式的目录名排在最后。`runs/` 和 `runs/real/` 的条目统一排序。
 - 只返回列表需要的这几个字段，详细内容请读各自的 `report.json`。
-- 没有 `runs/` 目录时返回 `{ "runs": [], "skipped": 0 }`。
+- 没有 `runs/` 目录时返回 `{ "runs": [], "skipped": 0, "skippedReasons": {} }`。
 - 命令行运行被强行中断（Ctrl-C、关掉终端）时，服务器不知道它已经停了，它的 `state` 可能一直是 `running`。从网页启动的运行不会这样（服务器会补写 `failed`）。
 
 ## 5. `progress.json`：运行进度
@@ -164,7 +170,7 @@ GET /runs/<runDir>/progress.json
 
 | 字段 | 说明 |
 |---|---|
-| `state` | 审计：`running` → `analyzing` → `done`（不传 `goal` 时前面多一个 `planning_task`：正在确定任务，`goal` 还是 `null`）；修复（§3）：`fixing` →（复测时）`rerunning` → `done`。出错时 `failed` |
+| `state` | 审计：`running` → `analyzing` → `done`（不传 `goal` 时前面多一个 `planning_task`：正在确定任务，`goal` 还是 `null`。命令行跑的真实网站模式最前面多一个 `waiting_for_user`：正在连接 Chrome、等人处理验证码/登录并在终端按回车，此时还没有步骤，`url` 是 `null`；按回车后进入 `running`（或 `planning_task`））；修复（§3）：`fixing` →（复测时）`rerunning` → `done`。出错时 `failed` |
 | `step` | 最后一步的编号（= `timeline` 最后一项的 `i`），还没有步骤时为 `null` |
 | `maxSteps` | 步数上限（本地站点 40，真实网站模式 80）。请读这个字段，不要写死 |
 | `timeline` | 目前为止的所有步骤。和 `report.json` 的 `timeline[]` 由同一个函数生成；运行中 `findingIds` 一律是 `[]`，最终的 id 以 `report.json` 为准 |
@@ -178,7 +184,7 @@ GET /runs/<runDir>/progress.json
 1. 每一步截图保存好之后才写入这一步（`screenshot` 指向的图片一定已经存在；截图失败时 `screenshot` 为 `null`）。
 2. `progress.json` 和 `report.json` 都是原子写入（写到同目录的临时文件再重命名），不会读到写了一半的文件。
 3. 先写完 `report.json`，再写 `state: "done"`。
-4. 审计出错时写 `failed`；子进程崩溃或被杀时，由服务器补写 `failed`（`error` 形如 "The audit stopped unexpectedly: …"），保留已有的 timeline。
+4. 命令行 `audit --progress` 创建运行目录后马上写第一版（`step: null`、空 timeline、`goal`、`maxSteps`，还不知道的 `url` 为 `null`），在连接浏览器和等待按回车之前，所以列表里立刻能看到它。审计出错时写 `failed`；子进程崩溃或被杀时，由服务器补写 `failed`（`error` 形如 "The audit stopped unexpectedly: …"），保留已有的 timeline。
 5. 按脚本运行时整个过程只有十秒左右，每秒读一次可能看不到 `analyzing`，直接从 `running` 跳到 `done`。
 
 ## 6. 错误格式

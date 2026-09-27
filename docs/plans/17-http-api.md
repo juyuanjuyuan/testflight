@@ -183,3 +183,34 @@
 4. `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t` 在旧报告和 `replay` 生成的报告里没有；真实网站模式的 `startedAt` 包含人处理验证码的时间。
 5. 用命令行跑、被 Ctrl-C 中断的运行，列表里可能一直是 `running`（没有服务器补写 `failed`）；网页启动的运行不会。
 6. progress.json 新增 `url`、`goal`（修复写的进度里为 `null`）。
+
+### 前端反馈：运行列表的三个问题（2026-09-27）
+
+**做了什么**
+- `src/api/list.mjs` 数据校验：报告字段严格按类型校验，不做类型转换——`meta.goal` 必须是字符串、`verdicts.screenReaderUserCanComplete` 必须是布尔值、`meta.generatedAt` 必须是字符串或 `null`（缺少也算无效），`meta.url` 必须是字符串或 `null`（可以缺少）；`report.json` 本身不是对象、`meta`/`verdicts` 不是对象也算无效。无效报告一律跳过，即使 progress.json 正常。progress.json 也校验：必须是对象、`state` 在 `PROGRESS_STATES` 里、`url`/`goal`（有的话）是字符串或 `null`。
+  - 有效报告 + 没有 progress.json → `state: "done"`、`progress: "missing"`；有效报告 + progress.json 损坏或 `state` 不合法 → `state: "unknown"`、`progress: "corrupt"`；有效报告 + 正常 progress → 取其 `state`、`progress: "ok"`。
+  - 没有报告：`done` → 跳过（`done_without_report`）；`failed` 和运行中的各状态 → 照常列出；progress 损坏 → 跳过（`progress_corrupt`）；两个都没有 → 跳过（`no_report_or_progress`）。
+  - 响应保留 `skipped`，新增 `skippedReasons`（`{原因: 次数}`，只列出现过的原因，没有时 `{}`）。
+- 排序：按目录名里的开始时间倒序；同一秒按后缀数字按数值倒序（`-10` 在 `-9` 前面，无后缀算 1）；再相同时按目录名倒序；不是这种格式的目录名排最后。`runs/` 和 `runs/real/` 统一排序。
+- 初始进度：`src/report/progress.mjs` 导出 `PROGRESS_STATES`（新增 `waiting_for_user`），测试保证与 schema 的 enum 一致。`src/audit.mjs` 新增 `firstState()`，`audit()` 在 `openSession()` 之前总是先写一版（real 模式 `waiting_for_user`，否则 `running` / 无 goal 时 `planning_task`）；real 模式把 `waitForUser` 包一层，人按回车之后才写 `running`（或 `planning_task`）。`cli.mjs audit --progress` 创建运行目录后马上写第一版（`goal`、`maxSteps`，real 模式 `url` 为 `null`、`step: null`、空 timeline），在调用 `audit()` 之前。
+- 文档：`docs/progress.schema.json`（enum 加 `waiting_for_user`，说明里写了列表才有的 `unknown`）、`docs/API.md`（开头说明、§1 差异表、§4 字段表/排序/示例、§5 state 和写入顺序）。report.json 没有变化，所以 report schema/REPORT_FORMAT/example 不用改。
+
+**验收**
+- 先写测试并确认失败，再实现。`npm test` 132 项全部通过。新增：
+  - 报告字段类型错误的 9 种情况（goal 是数字/缺少、verdict 是字符串 `"false"`/`null`/缺少、generatedAt 是数字/缺少、meta 是数组、没有 verdicts）+ report.json 是 `[]` / `null` + 报告无效但 progress 是 running，全部跳过并计为 `report_invalid`；`generatedAt: null` 的报告有效。
+  - 有效报告 + progress 缺失 / 不是 JSON / state 不合法 / state 是数字 / 是数组 / 正常的 `fixing`。
+  - 没有报告：done（跳过）、failed（列出，字段完整）、waiting_for_user（列出）、progress 损坏 / state 不合法 / goal 类型错误（`progress_corrupt`）、空目录。
+  - 排序：同一秒的无后缀、`-2`、`-3`（在 `runs/real/`）、`-9`、`-10`，以及前后一秒和 `runs/real/` 里更新的一条。
+  - `audit()`：`openSession()` 被调用时 progress.json 已存在（local：running，带 goal/url/maxSteps）；real 模式打开会话时和等待按回车期间都是 `waiting_for_user`（有 goal 和没有 goal 两种），按回车后是 `running` / `planning_task`，之后不再出现 `waiting_for_user`。
+  - CLI：`cli.mjs audit --mode real --progress` 连到一个接受连接但永不回应的假 CDP 端口（`openSession()` 永远不返回），progress.json 已经是 `waiting_for_user`、goal、`maxSteps: 80`、`url: null`、`step: null`，并符合 schema。
+  - 原有测试的变化：`audit()` 的状态序列最前面多一个 `running`（`step: null`）；列表测试多了 `progress` 和 `skippedReasons`。
+- `npm run smoke` 全部通过（包括 `api` 用例）。
+- 对本地真实的 `runs/`（241 个目录）调用 `listRuns`：241 项，`skipped: 0`。
+
+**需要告诉前端**
+1. 列表每项新增 `progress`：`"ok"` / `"missing"` / `"corrupt"`。
+2. `state` 新增两个值：`"unknown"`（有报告但 progress.json 损坏；结论照常显示，只是不知道是否还在修复；只出现在列表里）和 `"waiting_for_user"`（命令行跑的真实网站模式，正在连接 Chrome、等人处理验证码并按回车；这时没有步骤、`url` 是 `null`，progress.json 里也会出现）。请给这两个状态准备显示方式，遇到不认识的 state 也请按"未知"显示。
+3. 响应新增 `skippedReasons`（`{ report_invalid, done_without_report, progress_corrupt, no_report_or_progress }` 中出现过的原因 → 次数），以后可能增加原因。`skipped` 不变，等于各项之和。
+4. 有报告的条目 `screenReaderUserCanComplete` 一定是布尔值、`goal` 一定是字符串；类型不对的报告不再出现在列表里（计入 `report_invalid`）。
+5. 排序改为按开始时间 + 后缀数字（`-10` 在 `-9` 前面），不再是纯字符串倒序。
+6. 命令行 `audit --progress` 的运行一开始就会出现在列表里（之前要等第 0 步）。

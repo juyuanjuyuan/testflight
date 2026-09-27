@@ -7,8 +7,8 @@
   "required": ["state", "step", "maxSteps", "timeline", "rerunDir", "error", "updatedAt"],
   "properties": {
     "state": {
-      "enum": ["planning_task", "running", "analyzing", "fixing", "rerunning", "done", "failed"],
-      "description": "planning_task = no goal was given (POST /api/runs without goal): the task is being worked out from the start page, goal is still null (step 0 may already be in timeline); running = acting step by step; analyzing = detectors/axe/judge; fixing = generating and applying a fix (POST /api/runs/<runDir>/fix); rerunning = the fixed copy is re-audited (see rerunDir); done = report.json is already written; failed = see error"
+      "enum": ["waiting_for_user", "planning_task", "running", "analyzing", "fixing", "rerunning", "done", "failed"],
+      "description": "waiting_for_user = real mode (CLI only): Chrome is being attached or the human is still clearing captcha/login and has not pressed Enter; nothing is recorded yet, url is null; planning_task = no goal was given (POST /api/runs without goal): the task is being worked out from the start page, goal is still null (step 0 may already be in timeline); running = acting step by step; analyzing = detectors/axe/judge; fixing = generating and applying a fix (POST /api/runs/<runDir>/fix); rerunning = the fixed copy is re-audited (see rerunDir); done = report.json is already written; failed = see error. (The run list GET /api/runs also shows a state unknown, which is never written to progress.json: it means this file is corrupt.)"
     },
     "step": { "type": ["integer", "null"], "minimum": 0, "description": "i of the last recorded step (= timeline[-1].i); null before the first step" },
     "maxSteps": { "type": ["integer", "null"], "minimum": 1, "description": "Step limit of the planner (the start step 0 is not counted)" },

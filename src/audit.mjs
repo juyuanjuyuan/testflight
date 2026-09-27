@@ -46,10 +46,15 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
  *          onProgress?:(p:{state:string, trace?:object[], error?:string, maxSteps:number, url:string|null, goal:string})=>void, openSession?:Function,
  *          waitForUser?:()=>Promise<void>}} o
  * runDir: an existing dir to use (the HTTP API creates it first); default a new one under `out`.
- * onProgress: called with state [planning_task (no goal yet) →] running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
+ * onProgress: called with state [waiting_for_user (real mode, before the session opens, until Enter) →] [planning_task (no goal yet) →] running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
  * openSession, llmClient: replace the browser session and the tasker's LLM client (tests only).
  * waitForUser (real mode): resolved once the human has cleared captcha/login; the agent loop starts after it.
  */
+/** The state a run starts in: real mode waits for the human (captcha/login, Enter) first; without a goal the task is picked next. */
+export function firstState({ mode, goal }) {
+  return mode === 'real' ? 'waiting_for_user' : goal ? 'running' : 'planning_task';
+}
+
 export async function audit(o) {
   if (o.mode !== 'real' && !o.url) throw new Error('audit needs a url (only real mode can take over the open tab)');
   const log = o.log || (() => {});
@@ -62,7 +67,7 @@ export async function audit(o) {
   if (o.runDir && !fs.statSync(o.runDir).isDirectory()) throw new Error(`run dir is not a directory: ${o.runDir}`);
   const runDir = o.runDir || newRunDir(o.out, o.label || 'audit');
   try {
-    if (!task.goal) onProgress({ state: 'planning_task', trace });
+    onProgress({ state: firstState(o), trace }); // before the session opens: the run is visible while Chrome attaches
     const res = await execute(o, task, runDir, trace, log, onProgress, { maxSteps, startedAt });
     onProgress({ state: 'done', trace });
     return { runDir, ...res };
@@ -88,9 +93,17 @@ async function pickTask(o, start, stats, log) {
 async function execute(o, task, runDir, trace, log, onProgress, { maxSteps, startedAt }) {
   const tracePath = path.join(runDir, 'trace.jsonl');
   const stats = {};
-  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false, waitForUser: o.waitForUser });
+  let state = firstState(o);
+  // real mode: waiting_for_user until the human presses Enter; then the state the run would have started in locally
+  const waitForUser = async () => {
+    await o.waitForUser?.();
+    state = task.goal ? 'running' : 'planning_task';
+    onProgress({ state, trace });
+  };
+  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false,
+    waitForUser: o.mode === 'real' ? waitForUser : o.waitForUser });
+  if (state === 'waiting_for_user') state = task.goal ? 'running' : 'planning_task'; // a session that never waited (tests)
   let axe = null;
-  let state = task.goal ? 'running' : 'planning_task';
   const push = (step) => {
     const err = validateStep(step);
     if (err) throw new Error(`runner produced invalid step ${step.i}: ${err}`);

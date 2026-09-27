@@ -3,8 +3,8 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { audit, analyze, newRunDir } from './src/audit.mjs';
-import { readTrace } from './src/contracts.mjs';
+import { audit, analyze, newRunDir, firstState } from './src/audit.mjs';
+import { readTrace, MAX_STEPS, MAX_STEPS_REAL } from './src/contracts.mjs';
 import { runFixFlow, runRerun } from './src/fix/commands.mjs';
 import { createProgressWriter } from './src/report/progress.mjs';
 import { siteKeyFromUrl, suggestTasks } from './src/agent/tasker.mjs';
@@ -53,9 +53,13 @@ async function main() {
     const url = real ? args.url : need('url');
     // no goal: a demo site's presets need its site key even when --site is not given
     const site = args.site || (!args.goal && !real ? siteKeyFromUrl(url) ?? undefined : undefined);
+    const onProgress = args.progress ? createProgressWriter(dir) : undefined;
+    // first progress.json right away, before audit() attaches Chrome or waits for Enter (real mode: url known after step 0)
+    onProgress?.({ state: firstState({ mode: args.mode, goal: args.goal }), trace: [], maxSteps: real ? MAX_STEPS_REAL : MAX_STEPS,
+      url: real ? null : url, goal: args.goal ?? null });
     const { runDir, report } = await audit({ url, goal: args.goal, out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
       judgeEnabled: !args['no-judge'], headless: !args.headed, site, label: args.label, log: console.log,
-      onProgress: args.progress ? createProgressWriter(dir) : undefined, waitForUser: real ? waitForEnter : undefined });
+      onProgress, waitForUser: real ? waitForEnter : undefined });
     summary(report); console.log(`→ ${runDir}/report.json`);
     if (args['fail-on'] === 'block' && report.counts.block > 0) process.exit(1);
   } else if (cmd === 'suggest') {

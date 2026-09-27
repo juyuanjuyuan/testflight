@@ -9,7 +9,8 @@ import addFormats from 'ajv-formats';
 import { ROOT } from '../src/paths.mjs';
 import { createStaticServer, listen, HOST } from '../src/server.mjs';
 import { runDirPath } from '../src/api/runs.mjs';
-import { readProgress, createProgressWriter } from '../src/report/progress.mjs';
+import { readProgress, createProgressWriter, PROGRESS_STATES } from '../src/report/progress.mjs';
+import { listRuns } from '../src/api/list.mjs';
 
 const readJSON = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const ajv = new Ajv2020({ strict: true, allowUnionTypes: true, allErrors: true });
@@ -359,7 +360,7 @@ test('fix endpoint: wrong method → 405', async () => {
 
 // ---- P2: GET /api/runs ----
 
-const LIST_FIELDS = ['runDir', 'url', 'goal', 'generatedAt', 'screenReaderUserCanComplete', 'state'].sort();
+const LIST_FIELDS = ['runDir', 'url', 'goal', 'generatedAt', 'screenReaderUserCanComplete', 'state', 'progress'].sort();
 
 test('GET /api/runs: finished, fixing, running, runs/real/ entries newest first; broken dirs are counted in skipped', async () => {
   await withApi(async ({ port, runsDir }) => {
@@ -383,13 +384,14 @@ test('GET /api/runs: finished, fixing, running, runs/real/ entries newest first;
     assert.match(res.headers.get('content-type'), /application\/json/);
     const body = await res.json();
     assert.equal(body.skipped, 3);
+    assert.deepEqual(body.skippedReasons, { report_invalid: 1, no_report_or_progress: 2 });
     assert.deepEqual(body.runs.map((r) => r.runDir), ['2026-09-26T22-00-00-audit', 'real/2026-09-26T21-30-00-audit', '2026-09-26T21-00-00-audit', '2026-09-26T20-00-00-audit']);
     for (const r of body.runs) assert.deepEqual(Object.keys(r).sort(), LIST_FIELDS, `${r.runDir}: only the list fields`);
     const [run, real, fix, done] = body.runs;
-    assert.deepEqual(run, { runDir: '2026-09-26T22-00-00-audit', url: 'http://localhost:8080/shop/original/', goal: 'Buy socks', generatedAt: null, screenReaderUserCanComplete: null, state: 'running' });
+    assert.deepEqual(run, { runDir: '2026-09-26T22-00-00-audit', url: 'http://localhost:8080/shop/original/', goal: 'Buy socks', generatedAt: null, screenReaderUserCanComplete: null, state: 'running', progress: 'ok' });
     const report = readJSON('fixtures/testpage-original/report.json');
     assert.deepEqual(done, { runDir: old.name, url: report.meta.url, goal: report.meta.goal, generatedAt: report.meta.generatedAt,
-      screenReaderUserCanComplete: report.verdicts.screenReaderUserCanComplete, state: 'done' });
+      screenReaderUserCanComplete: report.verdicts.screenReaderUserCanComplete, state: 'done', progress: 'missing' });
     assert.equal(fix.state, 'fixing', 'a run being fixed keeps its audit verdict but shows the live state');
     assert.equal(fix.screenReaderUserCanComplete, report.verdicts.screenReaderUserCanComplete);
     assert.equal(real.url, 'https://example.com/');
@@ -404,11 +406,122 @@ test('GET /api/runs: a failed run with no report is listed as failed; a missing 
     fs.mkdirSync(dir);
     fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify({ state: 'failed', step: null, maxSteps: 25, timeline: [], rerunDir: null, error: 'boom', updatedAt: new Date().toISOString() }));
     const body = await (await fetch(`http://127.0.0.1:${port}/api/runs`)).json();
-    assert.deepEqual(body, { runs: [{ runDir: path.basename(dir), url: null, goal: null, generatedAt: null, screenReaderUserCanComplete: null, state: 'failed' }], skipped: 0 });
+    assert.deepEqual(body, { runs: [{ runDir: path.basename(dir), url: null, goal: null, generatedAt: null, screenReaderUserCanComplete: null, state: 'failed', progress: 'ok' }], skipped: 0, skippedReasons: {} });
     fs.rmSync(runsDir, { recursive: true, force: true });
-    assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/api/runs`)).json(), { runs: [], skipped: 0 });
+    assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/api/runs`)).json(), { runs: [], skipped: 0, skippedReasons: {} });
     fs.mkdirSync(runsDir); // withApi removes it again
   });
+});
+
+// ---- plan 17 frontend feedback: strict list validation, missing vs corrupt progress, skippedReasons, ordering ----
+
+const T = '2026-09-26T21-00-00';
+async function withRunsDir(fn) {
+  const runsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'list-runs-'));
+  try { await fn(runsDir); } finally { fs.rmSync(runsDir, { recursive: true, force: true }); }
+}
+const writeProgress = (dir, doc) => fs.writeFileSync(path.join(dir, 'progress.json'), typeof doc === 'string' ? doc : JSON.stringify(doc));
+const progressDoc = (state, extra = {}) => ({ state, step: null, maxSteps: 40, timeline: [], rerunDir: null, error: null, updatedAt: new Date().toISOString(), ...extra });
+const emptyRun = (runsDir, name) => { const dir = path.join(runsDir, name); fs.mkdirSync(dir); return dir; };
+
+test('GET /api/runs: a report with a wrongly typed goal, verdict or generatedAt is invalid (never coerced) and skipped', async () => {
+  await withRunsDir(async (runsDir) => {
+    const bad = {
+      'goal-number': (r) => { r.meta.goal = 42; },
+      'goal-missing': (r) => { delete r.meta.goal; },
+      'verdict-string': (r) => { r.verdicts.screenReaderUserCanComplete = 'false'; },
+      'verdict-null': (r) => { r.verdicts.screenReaderUserCanComplete = null; },
+      'verdict-missing': (r) => { delete r.verdicts.screenReaderUserCanComplete; },
+      'generated-number': (r) => { r.meta.generatedAt = 1727380000000; },
+      'generated-missing': (r) => { delete r.meta.generatedAt; },
+      'meta-array': (r) => { r.meta = [r.meta]; },
+      'verdicts-missing': (r) => { delete r.verdicts; },
+    };
+    for (const [k, edit] of Object.entries(bad)) finishedRun(runsDir, `${T}-${k}`, edit);
+    fs.writeFileSync(path.join(emptyRun(runsDir, `${T}-report-array`), 'report.json'), '[]');
+    fs.writeFileSync(path.join(emptyRun(runsDir, `${T}-report-null`), 'report.json'), 'null');
+    // a live progress.json must not turn a broken report into a listed run
+    const running = finishedRun(runsDir, `${T}-bad-but-running`, (r) => { r.meta.goal = 1; });
+    writeProgress(running.dir, progressDoc('running'));
+    finishedRun(runsDir, `${T}-generated-null`, (r) => { r.meta.generatedAt = null; });
+    const body = await listRuns(runsDir);
+    assert.deepEqual(body.runs.map((r) => r.runDir), [`${T}-generated-null`], 'only the report with generatedAt null is valid');
+    assert.equal(body.runs[0].generatedAt, null);
+    assert.equal(body.skipped, Object.keys(bad).length + 3);
+    assert.deepEqual(body.skippedReasons, { report_invalid: Object.keys(bad).length + 3 });
+  });
+});
+
+test('GET /api/runs: valid report + missing progress.json is done/missing; corrupt or unknown-state progress is unknown/corrupt', async () => {
+  await withRunsDir(async (runsDir) => {
+    finishedRun(runsDir, `${T}-a-missing`);
+    const corrupt = finishedRun(runsDir, `${T}-b-corrupt`);
+    writeProgress(corrupt.dir, '{"state": "runn');
+    const badState = finishedRun(runsDir, `${T}-c-bad-state`);
+    writeProgress(badState.dir, progressDoc('exploded'));
+    const numState = finishedRun(runsDir, `${T}-d-number-state`);
+    writeProgress(numState.dir, progressDoc(3));
+    const notObject = finishedRun(runsDir, `${T}-e-array`);
+    writeProgress(notObject.dir, '[]');
+    const ok = finishedRun(runsDir, `${T}-f-fixing`);
+    writeProgress(ok.dir, progressDoc('fixing'));
+    const { runs, skipped } = await listRuns(runsDir);
+    assert.equal(skipped, 0);
+    const by = Object.fromEntries(runs.map((r) => [r.runDir.slice(T.length + 1), { state: r.state, progress: r.progress }]));
+    assert.deepEqual(by, {
+      'a-missing': { state: 'done', progress: 'missing' },
+      'b-corrupt': { state: 'unknown', progress: 'corrupt' },
+      'c-bad-state': { state: 'unknown', progress: 'corrupt' },
+      'd-number-state': { state: 'unknown', progress: 'corrupt' },
+      'e-array': { state: 'unknown', progress: 'corrupt' },
+      'f-fixing': { state: 'fixing', progress: 'ok' },
+    });
+    for (const r of runs) assert.equal(typeof r.screenReaderUserCanComplete, 'boolean', 'the verdict still comes from the report');
+  });
+});
+
+test('GET /api/runs: no report — done is skipped, failed and in-progress states are listed, corrupt progress is skipped', async () => {
+  await withRunsDir(async (runsDir) => {
+    writeProgress(emptyRun(runsDir, `${T}-done`), progressDoc('done'));
+    writeProgress(emptyRun(runsDir, `${T}-failed`), progressDoc('failed', { error: 'boom', url: 'http://localhost:8080/shop/original/', goal: 'Buy socks' }));
+    writeProgress(emptyRun(runsDir, `${T}-waiting`), progressDoc('waiting_for_user', { goal: 'Buy socks' }));
+    writeProgress(emptyRun(runsDir, `${T}-corrupt`), 'nope');
+    writeProgress(emptyRun(runsDir, `${T}-bad-state`), progressDoc('exploded'));
+    writeProgress(emptyRun(runsDir, `${T}-bad-goal`), progressDoc('running', { goal: 7 }));
+    emptyRun(runsDir, `${T}-empty`);
+    const body = await listRuns(runsDir);
+    assert.deepEqual(body.runs.map((r) => [r.runDir.slice(T.length + 1), r.state, r.progress]), [['waiting', 'waiting_for_user', 'ok'], ['failed', 'failed', 'ok']]);
+    const failed = body.runs.find((r) => r.state === 'failed');
+    assert.deepEqual(failed, { runDir: `${T}-failed`, url: 'http://localhost:8080/shop/original/', goal: 'Buy socks', generatedAt: null,
+      screenReaderUserCanComplete: null, state: 'failed', progress: 'ok' });
+    assert.equal(body.skipped, 5);
+    assert.deepEqual(body.skippedReasons, { done_without_report: 1, progress_corrupt: 3, no_report_or_progress: 1 });
+  });
+});
+
+test('GET /api/runs: newest start time first; same second sorted by numeric suffix (-10 before -9); runs/ and runs/real/ merged', async () => {
+  await withRunsDir(async (runsDir) => {
+    const base = '2026-09-26T21-00-00-audit';
+    for (const n of [base, `${base}-2`, `${base}-9`, `${base}-10`]) finishedRun(runsDir, n);
+    finishedRun(runsDir, '2026-09-26T21-00-01-audit');
+    finishedRun(runsDir, '2026-09-26T20-59-59-audit-11');
+    fs.mkdirSync(path.join(runsDir, 'real'));
+    finishedRun(path.join(runsDir, 'real'), `${base}-3`);
+    finishedRun(path.join(runsDir, 'real'), '2026-09-26T21-00-02-audit');
+    const { runs } = await listRuns(runsDir);
+    assert.deepEqual(runs.map((r) => r.runDir), [
+      'real/2026-09-26T21-00-02-audit', '2026-09-26T21-00-01-audit',
+      `${base}-10`, `${base}-9`, `real/${base}-3`, `${base}-2`, base,
+      '2026-09-26T20-59-59-audit-11',
+    ]);
+  });
+});
+
+test('progress states: the code list, the schema enum and the list endpoint agree', () => {
+  const schema = readJSON('docs/progress.schema.json');
+  assert.deepEqual([...PROGRESS_STATES].sort(), [...schema.properties.state.enum].sort());
+  assert.ok(PROGRESS_STATES.includes('waiting_for_user'));
+  assert.ok(!PROGRESS_STATES.includes('unknown'), 'unknown is a list state, never written to progress.json');
 });
 
 // ---- plan 18: goal optional, POST /api/tasks/suggest ----

@@ -109,8 +109,8 @@ test('audit(): progress goes running… → analyzing → done, report.json exis
   const { report } = await audit({ url: 'http://localhost:8080/testpage/original/', goal: 'Buy the canvas tote bag', runDir,
     script: trace.slice(1).map((s) => s.action), judgeEnabled: false, onProgress, openSession: fakeSession() });
   const states = seen.map((s) => s.state);
-  assert.deepEqual(states, [...trace.map(() => 'running'), 'analyzing', 'done']);
-  assert.deepEqual(seen.filter((s) => s.state === 'running').map((s) => s.step), trace.map((s) => s.i));
+  assert.deepEqual(states, ['running', ...trace.map(() => 'running'), 'analyzing', 'done'], 'first running is written before the session opens');
+  assert.deepEqual(seen.filter((s) => s.state === 'running').map((s) => s.step), [null, ...trace.map((s) => s.i)]);
   assert.ok(seen.filter((s) => s.state !== 'done').every((s) => !s.reportExists), 'report.json appeared before analysis finished');
   assert.ok(seen.at(-1).reportExists, 'done was written before report.json');
   const final = readProgress(runDir);
@@ -189,4 +189,73 @@ test('progress.json carries the audit url and goal (null until known); markFaile
   fs.writeFileSync(path.join(runDir, 'progress.json'), JSON.stringify({ ...readProgress(runDir), state: 'running' }));
   markFailedIfUnfinished(runDir, 'crashed');
   assert.equal(readProgress(runDir).goal, 'Buy the canvas tote bag');
+});
+
+// ---- plan 17 frontend feedback: first progress.json before the session opens; waiting_for_user in real mode ----
+
+/** fakeSession() that snapshots progress.json when opened and while the human is "solving the captcha". */
+function watchedSession(runDir, seen) {
+  const inner = fakeSession();
+  return async (o) => {
+    seen.atOpen = fs.existsSync(path.join(runDir, 'progress.json')) ? readProgress(runDir) : null;
+    if (o.mode === 'real') await o.waitForUser?.();
+    return inner(o);
+  };
+}
+
+test('audit(): the first progress.json (running, goal, maxSteps, url) is written before the session opens', async () => {
+  const runDir = tmpDir();
+  const seen = {};
+  const url = 'http://localhost:8080/testpage/original/';
+  await audit({ url, goal: 'Buy the canvas tote bag', runDir, script: trace.slice(1).map((s) => s.action), judgeEnabled: false,
+    onProgress: createProgressWriter(runDir), openSession: watchedSession(runDir, seen) });
+  assert.ok(seen.atOpen, 'no progress.json when the session opened');
+  assertValid(seen.atOpen, 'first progress');
+  assert.deepEqual([seen.atOpen.state, seen.atOpen.goal, seen.atOpen.url, seen.atOpen.maxSteps, seen.atOpen.timeline],
+    ['running', 'Buy the canvas tote bag', url, MAX_STEPS, []]);
+});
+
+test('audit(): real mode is waiting_for_user until the human presses Enter, then running (planning_task without a goal)', async () => {
+  for (const goal of ['g', undefined]) {
+    const runDir = tmpDir();
+    const seen = {};
+    const write = createProgressWriter(runDir);
+    const states = [];
+    const waitForUser = async () => { seen.duringWait = readProgress(runDir); };
+    await audit({ mode: 'real', goal, runDir, script: [{ kind: 'press', key: 'Tab', reason: 'x' }], judgeEnabled: false, waitForUser,
+      site: 'testpage', onProgress: (u) => { write(u); states.push(readProgress(runDir).state); assertValid(readProgress(runDir), u.state); },
+      openSession: watchedSession(runDir, seen) }).catch((e) => { if (goal) throw e; }); // no goal: the tasker may fail offline, that is fine here
+    for (const p of [seen.atOpen, seen.duringWait]) {
+      assert.deepEqual([p.state, p.url, p.goal ?? null, p.maxSteps], ['waiting_for_user', null, goal ?? null, MAX_STEPS_REAL], `goal ${goal}`);
+    }
+    assert.equal(states[0], 'waiting_for_user');
+    assert.equal(states[1], goal ? 'running' : 'planning_task', `after Enter: ${states.join(' → ')}`);
+    assert.ok(!states.slice(1).includes('waiting_for_user'), states.join(' → '));
+  }
+});
+
+test('cli audit --mode real --progress: progress.json is waiting_for_user (goal, maxSteps, url null) while Chrome is still being attached', async () => {
+  const { spawn } = await import('node:child_process');
+  const net = await import('node:net');
+  const socks = [];
+  const hang = net.createServer((s) => socks.push(s)); // accepts the CDP connection and never answers: openSession() never returns
+  await new Promise((r) => hang.listen(0, '127.0.0.1', r));
+  const out = tmpDir();
+  const child = spawn(process.execPath, [path.join(ROOT, 'cli.mjs'), 'audit', '--mode', 'real', '--cdp', `http://127.0.0.1:${hang.address().port}`,
+    '--goal', 'Buy socks', '--progress', '--out', out], { stdio: ['pipe', 'ignore', 'ignore'] });
+  try {
+    let p = null;
+    for (let k = 0; k < 100 && !p; k++) {
+      const [dir] = fs.readdirSync(out);
+      if (dir && fs.existsSync(path.join(out, dir, 'progress.json'))) p = readProgress(path.join(out, dir));
+      else await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(p, 'no progress.json within 10 s');
+    assertValid(p, 'cli first progress');
+    assert.deepEqual([p.state, p.goal, p.url, p.maxSteps, p.step], ['waiting_for_user', 'Buy socks', null, MAX_STEPS_REAL, null]);
+  } finally {
+    child.kill('SIGKILL');
+    hang.close();
+    for (const s of socks) s.destroy();
+  }
 });

@@ -6,6 +6,8 @@ import { timelineEntry } from './build.mjs';
 import { writeJsonAtomic } from './atomic.mjs';
 
 export const PROGRESS_FILE = 'progress.json';
+/** Every state progress.json can hold (= docs/progress.schema.json state enum). */
+export const PROGRESS_STATES = ['waiting_for_user', 'planning_task', 'running', 'analyzing', 'fixing', 'rerunning', 'done', 'failed'];
 const FINAL = ['done', 'failed'];
 
 function progressDoc({ state, trace, error = null, rerunDir = null, maxSteps = MAX_STEPS, url = null, goal = null }) {
