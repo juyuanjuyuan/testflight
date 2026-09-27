@@ -34,7 +34,7 @@ const USAGE = `usage:
                       [--fail-on block] [--run-dir <existing dir>] [--progress]            # --progress: keep <runDir>/progress.json live
                       [--trace]                                   # Playwright trace → <runDir>/trace.zip (npx playwright show-trace)
                       # no --goal: the task is picked from the start page (demo-site preset, else AI-generated)
-  node cli.mjs suggest --url <url> [--site sites/shop/fixed] [--mode real]                 # print task suggestions (debugging)
+  node cli.mjs suggest --url <url> [--site sites/shop/fixed] [--mode real] [--generate]    # print task suggestions (debugging); --generate: skip presets
   node cli.mjs audit  --mode real --cdp http://localhost:9222 [--goal "<task>"] [--url <url>] [--out runs/real] [--trace]
                       # takes over the visible tab of scripts/real-chrome.sh; waits for Enter; stops at checkout
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
@@ -66,7 +66,7 @@ async function main() {
   } else if (cmd === 'suggest') {
     const url = need('url');
     const r = args.mode === 'real' ? await suggestTasks({ ...(await readStartPage(url)), url, mode: 'real' })
-      : await suggestForUrl({ url, siteKey: args.site || siteKeyFromUrl(url), log: console.error });
+      : await suggestForUrl({ url, siteKey: args.site || siteKeyFromUrl(url), generate: !!args.generate, log: console.error });
     console.log(JSON.stringify(r, null, 2));
   } else if (cmd === 'replay') {
     const trace = readTrace(fs.readFileSync(need('trace'), 'utf8'));

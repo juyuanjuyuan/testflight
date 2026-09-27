@@ -103,14 +103,15 @@ function usable(data, sentences, mode) {
 }
 
 /**
- * Tasks for a start page. Curated (siteKey has presets) → no model call; otherwise the judge's model route proposes
- * up to MAX_SUGGESTIONS from url/title/pageText only (what the planner sees at step 0), checked in code, one retry.
- * Throws when no usable task comes back. client: fake LLM client (tests only).
- * @param {{url:string, title?:string, pageText?:string|null, mode?:'local'|'real', siteKey?:string|null, stats?:object, client?:object}} o
+ * Tasks for a start page. Curated (siteKey has presets, generate false) → no model call; otherwise the judge's model route
+ * proposes up to MAX_SUGGESTIONS from url/title/pageText only (what the planner sees at step 0), checked in code, one retry.
+ * generate: skip the presets even on a demo site (live demo of generated tasks). Throws when no usable task comes back.
+ * client: fake LLM client (tests only).
+ * @param {{url:string, title?:string, pageText?:string|null, mode?:'local'|'real', siteKey?:string|null, generate?:boolean, stats?:object, client?:object}} o
  * @returns {Promise<{suggestions:{goal:string, source:'curated'|'generated', reason:string, needs:string[]}[], testDataProfile:string|null}>}
  */
-export async function suggestTasks({ url, title = '', pageText = null, mode = 'local', siteKey = null, stats, client }) {
-  const curated = mode === 'real' ? [] : curatedTasks(siteKey, url);
+export async function suggestTasks({ url, title = '', pageText = null, mode = 'local', siteKey = null, generate = false, stats, client }) {
+  const curated = mode === 'real' || generate ? [] : curatedTasks(siteKey, url);
   if (curated.length) return { suggestions: curated, testDataProfile: null };
   const { profile, sentences } = loadTestData(siteKey);
   const obs = { url, title, pageText, mode, dataKinds: DATA_KINDS, maxSuggestions: MAX_SUGGESTIONS };

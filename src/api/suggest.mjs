@@ -23,12 +23,13 @@ export async function readStartPage(url) {
 
 /**
  * Suggestions for a local demo site: its presets if it has any (no browser, no model), else read the page and ask the tasker.
- * @param {{url:string, siteKey:string|null, log?:(msg:string)=>void}} o
+ * generate: always ask the model, even where presets exist.
+ * @param {{url:string, siteKey:string|null, generate?:boolean, log?:(msg:string)=>void}} o
  */
-export async function suggestForUrl({ url, siteKey, log = () => {} }) {
-  const curated = curatedTasks(siteKey, url);
+export async function suggestForUrl({ url, siteKey, generate = false, log = () => {} }) {
+  const curated = generate ? [] : curatedTasks(siteKey, url);
   if (curated.length) return { suggestions: curated, testDataProfile: null };
   const page = await readStartPage(url);
   log(`suggest: read ${page.url} (${page.pageText.length} chars of page text)`);
-  return suggestTasks({ ...page, url, siteKey });
+  return suggestTasks({ ...page, url, siteKey, generate });
 }

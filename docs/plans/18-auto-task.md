@@ -97,3 +97,28 @@
 - `eval/groundtruth/testpage.yaml` 的 `site` 是 `sites/testpage`，实际目录是 `sites/testpage/original`，所以 testpage/original 匹配不到预设，会走生成。
 - `testpage-fixed.yaml` 的预设任务 "Buy the canvas tote bag" 没有卡号：按脚本跑没问题，但由 planner 跑时会在付款处 stuck（planner 正确地拒绝编造卡号）。如果希望自动任务在 testpage 上跑通，需要在这两份 groundtruth 的 goal 里加上卡号（会影响 eval，需要 10 号计划的负责人确认）。
 
+
+### 后续：`generate: true`（demo 现场展示 AI 生成任务，2026-09-27）
+
+前端在 `POST /api/tasks/suggest` 里一律传 `generate: true`（`FRONTEND/src/api/live.ts`），并且只展示 `source: "generated"` 的建议（`FRONTEND/src/App.tsx`）。后端改动：
+
+- `suggestTasks()` / `suggestForUrl()` 新增 `generate`（默认 `false`）：`true` 时跳过 `eval/groundtruth` 的预设，直接调用模型。测试数据照常按站点拼接（shop → `config/test-data/shop.json`）；检查规则（操作步骤类词语、数字、`needs` 类别、长度）和一次重试都没改。
+- API：`generate` 可选，不是布尔值时返回 `400 invalid_generate`（`null` 也算）；`false` 或不传时行为不变。`cli.mjs suggest --generate` 用于调试。
+- 测试：`test/tasker.test.mjs`（shop/original + generate → generated、卡号来自 shop.json、两张卡都能通过 `typedValueInGoal`、编造的卡号通不过、不合格的建议照样丢弃；`false`/不传 → 预设、不调用模型），`test/api.test.mjs`（`generate` 传给 tasker，不传时是 `false`；`"true"`/`1`/`null`/`{}` → 400；不传仍返回预设）。
+
+实测（在单独启动的 8091 端口服务器上，`LLM_CACHE=off`，没有动 8080）：
+
+| 调用 | 耗时 | 返回的任务（去掉拼接的测试数据） | needs |
+|---|---|---|---|
+| 1 | 7.8 秒 | Buy a Canvas Tote Bag / Buy a Wool Beanie / Buy a Stoneware Mug | payment_card, name, address, email |
+| 2 | 11.2 秒 | Buy a canvas tote bag / Buy a wool beanie / Buy a stoneware mug | 同上 |
+| 3 | 10.2 秒 | 同上 | payment_card, address, name, email |
+
+- API 的响应里看不到被丢弃的建议，所以又用同一条代码路径（`readStartPage` + `suggestTasks`，generate，记录模型原始回复）跑了 3 次：7.3 / 11.1 / 15.1 秒，模型每次都只回复一次（没有重试），1 条或 3 条建议，**没有任何一条被检查规则丢弃**。
+- **没有偏离购买流程**：6 次里的 16 条建议全是“买某件商品”，第一条都是帆布包，没有出现“订阅邮件”之类的任务。
+- 一个副作用：模型每次都把 `name` / `address` / `email`（有时还有 `phone`）加进 `needs`，所以任务后面会带上测试姓名、地址、邮箱，而假站结账页只有卡号。这不影响跑通（见下），planner 在最后一步的理由里提到了“页面上没有姓名、地址、邮箱的输入框”。没有为了 demo 改检查规则或 prompt。
+- 用第 1 次调用的第一条任务（"Buy a Canvas Tote Bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242. Use the name Test User. …"）通过 `POST /api/runs` 跑审计：67 秒完成，planner 找到商品、加入购物车（🛒）、打开购物车、结账，第 19 步输入 `4000 0000 0000 0002`，第 21 步按 Pay 之后没有听到任何反馈，第 24 步 stuck。结论“读屏用户不能完成”，block 是 F2（"Card declined" 没有播报，第 21 步）和 F4（🛒），和预设任务的结果一致。`meta.goalSource` 是 `user`（任务是前端提交的，符合 API.md 的说明）。
+
+**demo 注意：** 生成任务的调用也走 LLM 缓存。8080 用默认的 readwrite 或 readonly 跑时，同一个起始页第二次起直接返回缓存里的结果（实测 1–3 秒，三次完全相同），不是现场生成；想每次都现场生成只能用 `LLM_CACHE=off` 启动服务器，但这样审计也不会用缓存。对 demo 来说缓存反而更稳：只要提前生成过一次，断网也能返回同样的任务。
+
+**需要告诉前端：** `generate` 已经支持，现在 shop 上能拿到 `source: "generated"` 的建议，`App.tsx` 里 "The audit service returned only preset tasks" 的报错不会再出现（前提是 8080 重启到新代码）。新错误码 `400 invalid_generate` 只在传了非布尔值时出现。生成的任务比预设的长（带姓名、地址、邮箱，约 220 个字符），输入框需要能完整显示或允许换行。

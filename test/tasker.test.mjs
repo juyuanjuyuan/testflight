@@ -65,6 +65,29 @@ test('generated: suggestions with UI steps or digits are dropped; values come fr
   assert.ok(!typedValueInGoal('5555 5555 5555 4444', s.goal));
 });
 
+test('generate: true on a demo site with presets skips them and asks the model; values from the site profile, same checks', async () => {
+  const client = fakeClient([{ suggestions: [good('Click the Buy button'), good('Buy 2 bags'), good('Buy a bag', ['ssn']), good()] }]);
+  const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/shop/original/', siteKey: 'sites/shop/original', generate: true, client });
+  assert.equal(client.calls.length, 1);
+  assert.equal(r.suggestions.length, 1, 'step words, digits and unknown data kinds are still dropped');
+  const [s] = r.suggestions;
+  assert.equal(s.source, 'generated');
+  assert.equal(r.testDataProfile, 'shop');
+  assert.equal(s.goal, `Buy a canvas tote bag. ${JSON.parse(fs.readFileSync(path.join(ROOT, 'config/test-data/shop.json'), 'utf8')).sentences.payment_card}`);
+  assert.ok(typedValueInGoal('4000 0000 0000 0002', s.goal));
+  assert.ok(typedValueInGoal('4242 4242 4242 4242', s.goal));
+  assert.ok(!typedValueInGoal('5555 5555 5555 4444', s.goal));
+});
+
+test('generate: false (or left out) keeps the presets, the model is never called', async () => {
+  for (const generate of [false, undefined]) {
+    const client = fakeClient([{ suggestions: [good()] }]);
+    const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/shop/original/', siteKey: 'sites/shop/original', generate, client });
+    assert.equal(client.calls.length, 0);
+    assert.equal(r.suggestions[0].source, 'curated');
+  }
+});
+
 test('generated: a site without its own profile uses config/test-data/default.json', async () => {
   const client = fakeClient([{ suggestions: [good('Sign up for the newsletter', ['email'])] }]);
   const r = await suggestTasks({ ...PAGE, siteKey: 'sites/testpage/patched', client });

@@ -119,6 +119,11 @@ function checkFindingIds(ids, { findings }) {
   return ids;
 }
 
+function checkGenerate(generate) {
+  if (generate !== undefined && typeof generate !== 'boolean') throw bad('invalid_generate', 'generate must be true or false.');
+  return generate === true;
+}
+
 function checkRerun(rerun) {
   if (rerun !== undefined && typeof rerun !== 'boolean') throw bad('invalid_rerun', 'rerun must be true or false.');
   return rerun === true;
@@ -127,7 +132,7 @@ function checkRerun(rerun) {
 /**
  * Returns handle(req, res) for /api/*. spawnRun({runDir, argv}) → Promise<{code, signal, stderr}> (injected in tests);
  * ownPort() is this server's port (only its own sites are accepted); log records failures the HTTP client can't see.
- * suggest({url, siteKey}) → Promise<{suggestions}> and suggestTimeoutMs: injectable for tests (the real one opens a browser).
+ * suggest({url, siteKey, generate}) → Promise<{suggestions}> and suggestTimeoutMs: injectable for tests (the real one opens a browser).
  */
 export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {}, suggest = (o) => suggestForUrl({ ...o, log }), suggestTimeoutMs = SUGGEST_TIMEOUT_MS }) {
   let active = false;
@@ -201,11 +206,12 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {}, sugg
   async function suggestTasks(req, res) {
     const body = await readJsonBody(req);
     const { url, site } = checkUrl(body.url, ownPort());
+    const generate = checkGenerate(body.generate);
     let timer;
     const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new ApiError(504, 'suggest_timeout', 'Working out a task took too long. Please describe one.')), suggestTimeoutMs); });
     let result;
     try {
-      result = await Promise.race([suggest({ url, siteKey: site }), late]);
+      result = await Promise.race([suggest({ url, siteKey: site, generate }), late]);
     } catch (e) {
       if (e instanceof ApiError) throw e;
       log(`suggest failed for ${url}: ${e.message}`);

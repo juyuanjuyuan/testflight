@@ -2,6 +2,7 @@
 
 对应前端的需求文档 `docs/frontend/BACKEND_CHANGES.md`，后端计划 17。**P0**（启动运行 + 实时进度）、**P1**（修复和复测，以及报告里的 `fixPolicy`）、**P2**（运行列表，报告里的 `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t`）都已完成。
 计划 18 之后：`POST /api/runs` 的 `goal` 变为可选（不传时先自动确定任务，progress 多一个状态 `planning_task`），并新增 `POST /api/tasks/suggest`（§2.1）。**前端需要能显示 `planning_task` 状态。**
+之后又给 `POST /api/tasks/suggest` 加了可选的 `generate`（§2.1）：`true` 时即使是有预设任务的演示站点也由模型生成。
 前端反馈之后（计划 17 结果一节）：运行列表每项新增 `progress`（`ok` / `missing` / `corrupt`），响应新增 `skippedReasons`；新增两个 `state`：`unknown`（只出现在列表里，表示 progress.json 损坏）和 `waiting_for_user`（真实网站模式等人按回车）；排序改为按开始时间、同一秒按后缀数字。**前端需要能显示这两个新状态。**
 
 所有接口都由 `npm run serve`（默认 8080 端口）提供，和 `/runs`、`/fixtures`、`/viewer` 是同一个服务器。`report.json` 仍然是唯一的最终结果，格式见 `REPORT_FORMAT.md`。
@@ -58,7 +59,7 @@ Content-Type: application/json
 { "url": "http://localhost:8080/shop/original/" }
 ```
 
-→ `200`，同步返回（不创建运行目录）：
+→ `200`，同步返回（不创建运行目录）。下面是不传 `generate` 的结果：
 
 ```json
 { "suggestions": [
@@ -70,6 +71,7 @@ Content-Type: application/json
 | 字段 | 说明 |
 |---|---|
 | `url` | 必填，检查和 `POST /api/runs` 完全相同（只接受本服务器的站点，错误码也相同） |
+| `generate` | 可选，布尔值，默认 `false`。`true` = 跳过 `eval/groundtruth/` 的预设任务，一律由模型根据起始页生成（`source` 都是 `generated`）；测试数据照常按站点从 `config/test-data/` 拼接（假电商站用 `shop.json`：先被拒的卡、再成功的卡），检查规则和没有预设的站点完全相同。不是布尔值（包括 `null`、`"true"`）→ `400 invalid_generate`。`false` 或不传时和以前完全一样 |
 | `suggestions` | 1–3 条，最重要的在前。前端可以展示出来让用户确认或修改，再把选中的 `goal` 传给 `POST /api/runs` |
 | `goal` | 最终任务文本，可以直接用。只写"做什么"，不写"怎么做"（不含 click、button 之类）；卡号、邮箱等测试数据由后端从 `config/test-data/` 拼接，模型不写任何具体的值 |
 | `source` | `curated` = 演示站点预设的任务（`eval/groundtruth/`，不调用模型，结果固定）；`generated` = 模型根据起始页生成 |
@@ -77,6 +79,7 @@ Content-Type: application/json
 | `needs` | 这个任务用到的测试数据类别（`payment_card` / `email` / `name` / `address` / `phone`），`curated` 时为 `[]` |
 
 - 预设任务不需要浏览器，立即返回；生成任务要打开起始页并调用一次模型，大约 5–15 秒。
+- 生成任务的模型调用和其他调用一样走 LLM 缓存（`.cache/llm`，按起始页的网址、标题和页面文字）。服务器用默认的 `LLM_CACHE=readwrite` 或 `readonly` 运行时，同一个页面第二次起直接返回第一次生成的结果（1–3 秒，每次相同）；只有 `LLM_CACHE=off` 才每次都重新生成。
 - 超过 90 秒（`SUGGEST_TIMEOUT_MS`）返回 `504 suggest_timeout`；模型两次都给不出合格的任务返回 `502 suggest_failed`。两种情况都请让用户自己填任务。
 - 不受"同一时间只有一个运行"的限制（它不写任何运行目录）。
 - 用户采用建议后，报告里的 `meta.goalSource` 是 `user`（任务是用户确认后提交的）；只有不传 `goal` 时才会是 `curated` / `generated`。
@@ -200,6 +203,7 @@ GET /runs/<runDir>/progress.json
 | 400 | `unknown_site` | 本服务器上没有这个站点 |
 | 400 | `invalid_goal` | 任务为空或超过 500 字符 |
 | 400 | `invalid_script` | `script` 不是 `eval/keys.*.json` 里已有的文件 |
+| 400 | `invalid_generate` | `/api/tasks/suggest`：`generate` 不是 `true` / `false` |
 | 404 | `run_not_found` | 路径里的 `runDir` 格式不对（必须匹配 `^[\w.-]+$`，不能以 `.` 开头）或不存在 |
 | 404 | `not_found` | 没有这个接口 |
 | 400 | `invalid_findings` | `findingIds` 不是非空数组、有重复，或者包含这次运行没有的 id |
@@ -231,6 +235,7 @@ curl -s localhost:8080/runs/<runDir>/report.json
 ```bash
 curl -s -X POST localhost:8080/api/tasks/suggest -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/shop/original/"}'  # 预设任务
 curl -s -X POST localhost:8080/api/tasks/suggest -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/shop/fixed/"}'     # 生成任务（需要模型 key）
+curl -s -X POST localhost:8080/api/tasks/suggest -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/shop/original/","generate":true}'  # 有预设也生成
 curl -s -X POST localhost:8080/api/runs -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/testpage/fixed/"}'        # planning_task → running → … → done
 ```
 

@@ -605,7 +605,7 @@ test('POST /api/tasks/suggest: passes url + site to the tasker; same URL checks 
     const ok = await post({ url: site() });
     assert.equal(ok.status, 200);
     assert.deepEqual(ok.body, { suggestions: [{ goal: 'Buy a bag.', source: 'generated', reason: 'r', needs: [] }] });
-    assert.deepEqual(calls, [{ url: site(), siteKey: 'sites/shop/fixed' }]);
+    assert.deepEqual(calls, [{ url: site(), siteKey: 'sites/shop/fixed', generate: false }]);
     for (const [body, code] of [[{}, 'invalid_url'], [{ url: 'https://example.com/' }, 'real_site_cli_only'], [{ url: site('nope/x/') }, 'unknown_site']]) {
       const r = await post(body);
       assert.equal(r.status, 400);
@@ -616,6 +616,33 @@ test('POST /api/tasks/suggest: passes url + site to the tasker; same URL checks 
     assert.equal(get.status, 405);
     assert.equal((await get.json()).error.code, 'method_not_allowed');
   }, { suggest });
+});
+
+test('POST /api/tasks/suggest: generate true is passed to the tasker; left out → false; not a boolean → 400 invalid_generate', async () => {
+  const calls = [];
+  const suggest = async (o) => { calls.push(o); return { suggestions: [{ goal: 'Buy a bag.', source: 'generated', reason: 'r', needs: [] }], testDataProfile: 'shop' }; };
+  await withSuggestApi(async ({ post, site }) => {
+    assert.equal((await post({ url: site('shop/original/'), generate: true })).status, 200);
+    assert.equal((await post({ url: site('shop/original/'), generate: false })).status, 200);
+    assert.equal((await post({ url: site('shop/original/') })).status, 200);
+    assert.deepEqual(calls.map((c) => c.generate), [true, false, false]);
+    for (const generate of ['true', 1, null, {}]) {
+      const r = await post({ url: site('shop/original/'), generate });
+      assert.equal(r.status, 400, JSON.stringify(generate));
+      assert.equal(r.body.error.code, 'invalid_generate');
+    }
+    assert.equal(calls.length, 3);
+  }, { suggest });
+});
+
+test('POST /api/tasks/suggest: generate left out on the shop still gives the preset tasks', async () => {
+  await withApi(async ({ port }) => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks/suggest`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: `http://localhost:${port}/shop/original/`, generate: false }) });
+    assert.equal(res.status, 200);
+    const { suggestions } = await res.json();
+    assert.ok(suggestions.every((s) => s.source === 'curated'));
+  });
 });
 
 test('POST /api/tasks/suggest: too slow → 504 suggest_timeout; tasker error → 502 suggest_failed', async () => {
