@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 PORT="${PORT:-8080}"
 BASE="http://localhost:$PORT"
 SHOP_URL="$BASE/shop/original/"
-GOAL="Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
+GOAL="Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."
 AUDIT_TIMEOUT_S="${AUDIT_TIMEOUT_S:-600}"
 FIX_TIMEOUT_S="${FIX_TIMEOUT_S:-900}"
 

@@ -33,7 +33,7 @@ test('demo site with preset tasks: curated goals from eval/groundtruth, the mode
   assert.equal(client.calls.length, 0);
   assert.ok(r.suggestions.length >= 1);
   assert.ok(r.suggestions.every((s) => s.source === 'curated' && s.reason && Array.isArray(s.needs)));
-  assert.equal(r.suggestions[0].goal, 'Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.');
+  assert.equal(r.suggestions[0].goal, 'Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242.');
   assert.equal(r.testDataProfile, null, 'a curated goal carries its own values');
 });
 

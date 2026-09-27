@@ -65,7 +65,7 @@ Content-Type: application/json
 
 ```json
 { "suggestions": [
-  { "goal": "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.",
+  { "goal": "Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242.",
     "source": "curated", "reason": "Preset task of this demo site (main flow, eval/groundtruth/shop-main.yaml).", "needs": [] }
 ] }
 ```

@@ -58,7 +58,7 @@
 
 **方案一：实时运行（首选，需要网络和模型）**
 - 服务器：`npm run serve`（不要设 `LLM_CACHE=readonly`：由上面的结论 3，readonly 下实时修复一定失败）。
-- 前端里填 `http://localhost:8080/shop/original/`，任务**手动填固定的**：`Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.`（不要让它自动生成任务，自动生成的任务每次不同，缓存用不上）。审计完成后点“修复全部阻断问题 + 复测”。等价的命令行就是 `scripts/demo-prep.sh` 里的两次 POST。
+- 前端里填 `http://localhost:8080/shop/original/`，任务**手动填固定的**：`Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242.`（不要让它自动生成任务，自动生成的任务每次不同，缓存用不上）。审计完成后点“修复全部阻断问题 + 复测”。等价的命令行就是 `scripts/demo-prep.sh` 里的两次 POST。
 - planner 大概率全部走缓存（很快），judge 和 fixer 实时调用模型，整个流程约 1.5 分钟。judge 每次的判定可能略有不同，所以 block 问题和 `closedLoop` 不保证和预跑一样。
 
 **方案二：打开提前跑好的运行（兜底，不需要网络和模型）**

@@ -3,7 +3,7 @@
   "mode": "local",
   "site": "sites/testpage/fixed",
   "script": true,
-  "startedAt": "2026-09-27T04:56:29.726Z",
+  "startedAt": "2026-09-27T16:10:07.689Z",
   "maxSteps": 40,
   "goalSource": "user",
   "goalReason": null,

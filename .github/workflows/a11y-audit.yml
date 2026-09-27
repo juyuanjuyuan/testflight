@@ -19,7 +19,7 @@ jobs:
         run: |
           mkdir -p runs/ci-shop-fixed
           node cli.mjs audit --url http://localhost:8080/shop/fixed/ \
-            --goal "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242." \
+            --goal "Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242." \
             --script eval/keys.shop.main.json --no-judge --run-dir runs/ci-shop-fixed --fail-on block
       # Without the judge every candidate is "degrade", so --fail-on block alone can never fail here.
       # The fixed shop has no planted barriers: any finding at all is a regression.
