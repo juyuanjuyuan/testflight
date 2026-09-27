@@ -1,7 +1,7 @@
 # Testflight integration
 
 The active UI uses the HTTP contract at backend commit
-9f05fc84336d7196d6fadf29cff06a31579f4249. Product text is English.
+d6f0fea. Product text is English.
 Legacy mock screens remain on disk but are not imported by the active app.
 
 ## Local connection
@@ -53,19 +53,28 @@ Tests cover request payloads, errors/cancellation, nested artifact paths,
 future statuses, screenshot geometry, and rendered audit/verification states.
 They use controlled responses and server rendering, not a running backend.
 
-## Local backend verified
+## Local backend verified (2026-09-27)
 
-Backend main at e9e1b38 was cloned to /private/tmp/testflight-backend.
-It is running on 127.0.0.1:8080 with Node 22 and the installed Google Chrome.
-All 145 backend tests passed outside the port-restricted sandbox.
-A deterministic HTTP audit completed with run ID 2026-09-27T04-49-39-audit:
-13 actions plus the initial step, 14 screenshots, 2 blocking and 5 degrading
-findings. Task suggestions and the frontend's /api/runs proxy were verified.
+Frontend files in this original project folder and the running backend at
+/private/tmp/testflight-backend are synced with main at d6f0fea.
+The backend listens on http://127.0.0.1:8080; Vite serves this folder at
+http://127.0.0.1:8443 and proxies API and report requests to the backend.
+The existing backend .env, model configuration and run history were preserved.
+The previous local generated-task patch is saved in Git stash; main now
+implements that behavior with validation, so the old patch was not reapplied.
 
-The temporary checkout has no .env. Autonomous planning, judging and repair
-require SCIFORIUM_API_KEY, MODEL_PLANNER and MODEL_JUDGE, as documented in its
-.env.example. Configure secrets locally; do not paste them into chat.
+Validation: 34 frontend tests, TypeScript checks, production build and 169
+backend tests passed. An actual scripted audit through the frontend proxy
+completed as 2026-09-27T15-36-34-audit: 13 actions plus the initial step,
+2 blocking and 5 degrading findings. History, fixtures and the resulting report
+were reachable through port 8443. This check did not invoke AI planning or repair.
 
-Still required: a complete autonomous audit → fix → re-test cycle after model
-configuration, and browser UI interaction checks (including refresh/history).
-The scripted audit validates the runner and HTTP integration, not AI repair.
+To restart the backend in a separate terminal:
+
+    cd /private/tmp/testflight-backend
+    CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" PORT=8080 /Users/paranxiaair/.nvm/versions/node/v22.23.2/bin/node --env-file=.env scripts/serve.mjs
+
+The backend lives in a temporary directory. The original frontend folder is
+still not a Git checkout; updating the backend alone does not update this folder.
+A backup of the frontend before this sync is at
+/private/tmp/frontend-before-main-sync-20260927/.

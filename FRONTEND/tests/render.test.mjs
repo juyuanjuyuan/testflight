@@ -35,7 +35,7 @@ const report = {
   timeline: [], findings: [],
   fixPolicy: { enforced: [{ id: "check", rule: "Only permitted files" }], instructed: [{ id: "prompt", rule: "Preserve design" }] },
 };
-test("report renders distinct agent/user outcomes and dynamic limit; policy boundaries only in the record", () => {
+test("report renders distinct agent/user outcomes and dynamic limit; no policy boxes on report or record", () => {
   const html = renderToStaticMarkup(React.createElement(ReportView, { report, runDir: "run-1", busy: false }));
   assert.match(html, /CAUTION/);
   assert.match(html, /AI-selected task/);
@@ -43,7 +43,7 @@ test("report renders distinct agent/user outcomes and dynamic limit; policy boun
   assert.match(html, /Unavailable/);
   assert.doesNotMatch(html, /not guaranteed by code checks/);
   assert.match(html, /Fix all blocking findings/);
-  assert.match(renderToStaticMarkup(React.createElement(RecordView, { report, runDir: "run-1" })), /not guaranteed by code checks/);
+  assert.doesNotMatch(renderToStaticMarkup(React.createElement(RecordView, { report, runDir: "run-1" })), /not guaranteed by code checks/);
 });
 test("completed child keeps parent in re-test state until comparison is written", () => {
   const progress = { state: "rerunning", timeline: [], step: null, maxSteps: 73, goal: null };

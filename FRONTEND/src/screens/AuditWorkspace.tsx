@@ -63,13 +63,6 @@ function TestDataNote({ meta }: { meta: AuditReport["meta"] }) {
   return <div className="test-data-note"><small>Test data added automatically</small>{meta.goalInput && <p>Your original task: {meta.goalInput}</p>}</div>;
 }
 
-export function Policy({ report }: { report: AuditReport }) {
-  if (!report.fixPolicy) return null;
-  return <div className="policy-grid">{(["enforced", "instructed"] as const).map((kind) => <div key={kind}><h3>{kind === "enforced" ? "Backend checks" : "Instructions to the AI"}</h3>
-    <p className="muted">{kind === "enforced" ? "Checks applied by the backend to proposed edits." : "Requested behavior; not guaranteed by code checks."}</p>
-    <ul>{report.fixPolicy![kind].map((rule) => <li key={rule.id}>{rule.rule}</li>)}</ul></div>)}</div>;
-}
-
 export function ReportView({ report, runDir, onInspect, onFix, busy }: { report: AuditReport; runDir: string; onInspect: (id: string) => void; onFix: (ids?: string[]) => void; busy: boolean }) {
   const elapsed = auditDuration(report);
   const verdict = report.verdicts;
@@ -127,7 +120,7 @@ function Fixes({ report }: { report: AuditReport }) {
 }
 
 export function RecordView({ report, runDir }: { report: AuditReport; runDir: string }) {
-  return <section className="dashboard-screen"><span className="result-label">VERIFICATION RECORD</span><h1>Evidence your team can review.</h1><p>A record of this task, applied edits and the backend re-test comparison. This is not a compliance certification.</p><div className="workspace-actions"><button className="compliance-button" onClick={() => downloadFile(`verification-${runDir.replace(/\//g, "-")}.json`, JSON.stringify(report, null, 2), "application/json")}><Icon name="download" /> Download evidence JSON</button><button className="text-button" onClick={() => window.print()}>Print record</button></div><div className="task-summary"><h2>{report.meta.goal}</h2><TestDataNote meta={report.meta} /><p>{report.meta.url}</p><p>Run: {runDir}</p><p>Generated: {report.meta.generatedAt ? new Date(report.meta.generatedAt).toLocaleString() : "—"}</p><p>Re-test: {report.rerun ? verdictLabel(report.rerun.after.screenReaderUserCanComplete, "Task completable", "Needs attention") : "Not available"}</p>{report.rerun?.after.screenReaderUserCanComplete === null && <p>{inconclusiveMessage(report.rerun.after.inconclusiveReason)}</p>}</div><Fixes report={report} /><Policy report={report} /></section>;
+  return <section className="dashboard-screen"><span className="result-label">VERIFICATION RECORD</span><h1>Evidence your team can review.</h1><p>A record of this task, applied edits and the backend re-test comparison. This is not a compliance certification.</p><div className="workspace-actions"><button className="compliance-button" onClick={() => downloadFile(`verification-${runDir.replace(/\//g, "-")}.json`, JSON.stringify(report, null, 2), "application/json")}><Icon name="download" /> Download evidence JSON</button><button className="text-button" onClick={() => window.print()}>Print record</button></div><div className="task-summary"><h2>{report.meta.goal}</h2><TestDataNote meta={report.meta} /><p>{report.meta.url}</p><p>Run: {runDir}</p><p>Generated: {report.meta.generatedAt ? new Date(report.meta.generatedAt).toLocaleString() : "—"}</p><p>Re-test: {report.rerun ? verdictLabel(report.rerun.after.screenReaderUserCanComplete, "Task completable", "Needs attention") : "Not available"}</p>{report.rerun?.after.screenReaderUserCanComplete === null && <p>{inconclusiveMessage(report.rerun.after.inconclusiveReason)}</p>}</div><Fixes report={report} /></section>;
 }
 
 export default ReportView;
