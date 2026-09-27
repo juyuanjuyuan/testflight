@@ -7,6 +7,11 @@ export const MAX_STEPS_REAL = 80;       // real sites: Tab-only through a big he
 // planner runs end as stuck after this many consecutive steps that heard nothing new and only revisited known elements.
 // Must stay well above a focus-trap probe (prompt rule 6: 3 Tab cycles + Escape ≈ 8 steps on a 2-element trap).
 export const NO_PROGRESS_STEPS = 10;
+// facilitator assist (runner/assist.mjs): at most this many per run; each one adds steps, since the planner spent its
+// budget in a trap the site set (the limit itself stays: every planner prompt carries stepsLeft, so the LLM cache holds)
+export const MAX_ASSISTS = 2;
+export const ASSIST_EXTRA_STEPS = 20;
+export const ASSIST_CLICK_TIMEOUT_MS = 2_000;  // the helper's mouse click; longer = recorded as step.assistError
 export const CHANGE_WINDOW_MS = 1500;   // changes later than this after an action are not attributed to it
 export const SETTLE_MS = 300;           // minimum quiet time before we observe
 export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown
@@ -35,8 +40,8 @@ export const ALLOWED_KEYS = [
   'Tab', 'Shift+Tab', 'Enter', 'Space', 'Escape',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End',
 ];
-// 'start' = initial page load (runner), planner may only emit press|type|done|stuck
-export const ACTION_KINDS = ['start', 'press', 'type', 'done', 'stuck'];
+// 'start' = initial page load (runner), 'assist' = a sighted helper's mouse click (runner), planner may only emit press|type|done|stuck
+export const ACTION_KINDS = ['start', 'press', 'type', 'done', 'stuck', 'assist'];
 export const PLANNER_KINDS = ['press', 'type', 'done', 'stuck'];
 
 export const IMPACTS = ['block', 'degrade', 'none'];
@@ -85,9 +90,10 @@ export const INTERACTIVE_ROLES = [
 
 /**
  * @typedef {Object} Action
- * @property {'start'|'press'|'type'|'done'|'stuck'} kind
+ * @property {'start'|'press'|'type'|'done'|'stuck'|'assist'} kind
  * @property {string=}  key     for press, one of ALLOWED_KEYS
  * @property {string=}  text    for type
+ * @property {string=}  target  for assist: selector of the control the helper clicked with the mouse (runner only, never the planner)
  * @property {boolean=} replace for type: select the field's current content first so `text` replaces it (default: append)
  * @property {boolean=} forcedReplace real mode: the runner set replace (the planner did not), so autofilled text is never kept
  * @property {string}   reason  planner's rationale (shown in the viewer's left column)
@@ -121,6 +127,7 @@ export const INTERACTIVE_ROLES = [
  * @property {boolean=} loadTimeout  a navigation started but 'load' did not fire in time; observed anyway
  * @property {{selector:string, barrierId:string|null, text:string}[]=} unreachableClickables
  *                                   only on a 'stuck' step: visible clickables keyboard can never reach (D6)
+ * @property {string=}  assistError  only on an 'assist' step: why the helper's click failed (degradation, kept for diagnosis)
  */
 
 /**
@@ -156,6 +163,7 @@ export function validateAction(a, { plannerOnly = false } = {}) {
   if (!kinds.includes(a.kind)) return `kind must be one of ${kinds.join('|')}`;
   if (a.kind === 'press' && !ALLOWED_KEYS.includes(a.key)) return `key must be one of ${ALLOWED_KEYS.join(', ')}`;
   if (a.kind === 'type' && (!isStr(a.text) || a.text.length === 0)) return 'type needs non-empty text';
+  if (a.kind === 'assist' && (!isStr(a.target) || a.target.length === 0)) return 'assist needs a target selector';
   if (a.replace !== undefined && (a.kind !== 'type' || typeof a.replace !== 'boolean')) return 'replace must be a boolean and only on type';
   if (!isStr(a.reason)) return 'reason must be a string';
   return null;

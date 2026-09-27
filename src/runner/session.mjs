@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { focusInfo, pageText } from './observe.mjs';
-import { act } from './act.mjs';
+import { act, helperClick } from './act.mjs';
+import { CLOSE_RE } from '../detect/util.mjs';
 import { redactFocusValue, redactSpoken } from './guard.mjs';
 import { runAxe, mergeAxe } from './axe.mjs';
 import { vsrScript, startVsr, readVsr, stopVsr } from './vsr.mjs';
@@ -174,6 +175,7 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       const loadsBefore = loads;
       const saidBefore = await page.evaluate(async () => { window.__a11yRec?.mark(); return window.__vsrReady ? (await window.__vsrModule.virtual.spokenPhraseLog()).length : null; });
       if (action.kind === 'press' || action.kind === 'type') await act(page, action);
+      const assistError = action.kind === 'assist' ? await helperClick(page, action.target) : null;
       const loadTimeout = await settle(loadsBefore);
       const pageLoad = loads !== loadsBefore;
       const changes = pageLoad ? [] : await page.evaluate((w) => window.__a11yRec.collect(w), CHANGE_WINDOW_MS);
@@ -183,11 +185,15 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
       // D6 scan only when stuck: it explains why, and scanning every step would flood real sites with pointer cards
       const unreachable = action.kind === 'stuck' ? { unreachableClickables: await page.evaluate((max) => window.__a11yRec.unreachableClickables(max), MAX_UNREACHABLE) } : {};
       const step = { i, t: Date.now(), action, focusBefore, focusAfter, changes, ...(await spokenSince(saidBefore)), pageLoad, ...unreachable,
-        pageText: pageLoad ? await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }) : null, ...(loadTimeout ? { loadTimeout } : {}), ...(await snapshot()) };
+        pageText: pageLoad ? await pageText(cdpSession, undefined, { redactFieldText: mode === 'real' }) : null, ...(loadTimeout ? { loadTimeout } : {}),
+        ...(assistError ? { assistError } : {}), ...(await snapshot()) };
       if (axe && (pageLoad || changes.length)) axeRuns.push(await runAxe(page));
       current = focusAfter; i++;
       return step;
     },
+    /** Assist: {selector, barrierId, text} of the visible Close/× control in the dialog holding fromSelector, or null. */
+    mouseExit: (fromSelector) => page.evaluate(([sel, src, flags]) => window.__a11yRec.mouseExit(sel, new RegExp(src, flags)),
+      [fromSelector, CLOSE_RE.source, CLOSE_RE.flags]),
     axeResults: () => mergeAxe(axeRuns),
     async close() {
       if (traced.trace) traced = await stopTrace(page.context(), runDir); // before close: the zip is written by this browser connection

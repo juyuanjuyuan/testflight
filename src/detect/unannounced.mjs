@@ -1,12 +1,12 @@
 // D1 — ANNOUNCEMENT layer. New visible text after an action that assistive tech has no programmatic way to convey.
 // Change vs original doc: aria-describedby only counts as "announced" if focus MOVED to the referencing element
 // in this very step. A description that silently changes on an already-focused element is not re-read.
-import { CHANGE_WINDOW_MS, NOISE_REPEAT, focusChanged, dedupe, ev } from './util.mjs';
+import { CHANGE_WINDOW_MS, NOISE_REPEAT, focusChanged, dedupe, ev, byHelper } from './util.mjs';
 
 export function detectUnannounced(trace) {
   const out = [];
   for (const s of trace) {
-    if (s.action.kind === 'start' || s.pageLoad) continue; // a new page is not a state change
+    if (s.action.kind === 'start' || s.pageLoad || byHelper(s)) continue; // a new page is not a state change
     const moved = focusChanged(s);
     for (const c of s.changes) {
       if (!c.visible || c.dtMs > CHANGE_WINDOW_MS || c.repeatCount >= NOISE_REPEAT) continue;

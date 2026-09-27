@@ -3,16 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openSession } from './runner/session.mjs';
 import { blockAction, forceReplace, reachedBoundary } from './runner/guard.mjs';
+import { runnerAction } from './runner/assist.mjs';
 import { nextAction } from './agent/planner.mjs';
 import { suggestTasks, appendTestData, siteKeyFromUrl } from './agent/tasker.mjs';
 import { runDetectors } from './detect/index.mjs';
 import { judge } from './agent/judge.mjs';
 import { buildReport, writeReport } from './report/build.mjs';
-import { MAX_STEPS, MAX_STEPS_REAL, validateStep } from './contracts.mjs';
+import { MAX_STEPS, MAX_STEPS_REAL, ASSIST_EXTRA_STEPS, validateStep } from './contracts.mjs';
 import { RUNS_DIR } from './paths.mjs';
 
 const NO_TASK = 'Could not work out a task for this page. Please describe one.';
-const describeAction = (a) => `${a.kind}${a.replace ? ' (replace)' : ''}${a.key ? ' ' + a.key : ''}${a.text ? ` "${a.text}"` : ''}`;
+const describeAction = (a) => `${a.kind}${a.replace ? ' (replace)' : ''}${a.key ? ' ' + a.key : ''}${a.text ? ` "${a.text}"` : ''}${a.target ? ` ${a.target}` : ''}`;
 
 /** Create and return a fresh runs/<timestamp>-<label> dir; a second run in the same second gets -2, -3… (never shares a dir). */
 export function newRunDir(out = RUNS_DIR, label = 'run') {
@@ -47,9 +48,11 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
  *          onProgress?:(p:{state:string, trace?:object[], error?:string, maxSteps:number, url:string|null, goal:string})=>void, openSession?:Function,
  *          waitForUser?:()=>Promise<void>}} o
  * runDir: an existing dir to use (the HTTP API creates it first); default a new one under `out`.
+ * Local planner runs: a confirmed keyboard trap is closed by a sighted helper's mouse click (runner/assist.mjs); the session
+ * must then offer mouseExit(fromSelector). Each assist raises the step limit by ASSIST_EXTRA_STEPS (meta.maxSteps is the final one).
  * onProgress: called with state [waiting_for_user (real mode, before the session opens, until Enter) →] [planning_task (no goal yet) →] running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
  * trace: Playwright trace to <runDir>/trace.zip (debugging); meta.json records trace or traceError.
- * openSession, llmClient: replace the browser session and the tasker's LLM client (tests only).
+ * openSession, llmClient: replace the browser session and the tasker's and planner's LLM client (tests only).
  * waitForUser (real mode): resolved once the human has cleared captcha/login; the agent loop starts after it.
  */
 /** The state a run starts in: real mode waits for the human (captcha/login, Enter) first; without a goal the task is picked next. */
@@ -60,17 +63,17 @@ export function firstState({ mode, goal }) {
 export async function audit(o) {
   if (o.mode !== 'real' && !o.url) throw new Error('audit needs a url (only real mode can take over the open tab)');
   const log = o.log || (() => {});
-  const maxSteps = o.mode === 'real' ? MAX_STEPS_REAL : MAX_STEPS;
+  const limit = { maxSteps: o.mode === 'real' ? MAX_STEPS_REAL : MAX_STEPS }; // grows by ASSIST_EXTRA_STEPS per assist
   const startedAt = new Date().toISOString();
   const trace = [];
   const task = o.goal ? userTask(o, log) : { goal: null };
   // same url as meta.url: real mode records where the human's tab actually was (known once step 0 is recorded)
-  const onProgress = (u) => o.onProgress?.({ ...u, maxSteps, url: (o.mode === 'real' ? trace[0]?.url : o.url) ?? null, goal: task.goal });
+  const onProgress = (u) => o.onProgress?.({ ...u, maxSteps: limit.maxSteps, url: (o.mode === 'real' ? trace[0]?.url : o.url) ?? null, goal: task.goal });
   if (o.runDir && !fs.statSync(o.runDir).isDirectory()) throw new Error(`run dir is not a directory: ${o.runDir}`);
   const runDir = o.runDir || newRunDir(o.out, o.label || 'audit');
   try {
     onProgress({ state: firstState(o), trace }); // before the session opens: the run is visible while Chrome attaches
-    const res = await execute(o, task, runDir, trace, log, onProgress, { maxSteps, startedAt });
+    const res = await execute(o, task, runDir, trace, log, onProgress, { limit, startedAt });
     onProgress({ state: 'done', trace });
     return { runDir, ...res };
   } catch (e) {
@@ -107,7 +110,20 @@ async function pickTask(o, start, stats, log) {
   return { goal: s.goal, goalSource: s.source, goalReason: s.reason, testDataProfile: res.testDataProfile };
 }
 
-async function execute(o, task, runDir, trace, log, onProgress, { maxSteps, startedAt }) {
+/**
+ * Local planner runs only (runner/assist.mjs): a scripted route must replay exactly, and real sites are never clicked.
+ * An assist whose dialog has no close control to click ends the run: the trap is the reason, and it is reported.
+ */
+async function runnerMove(o, session, trace) {
+  if (o.script || o.mode === 'real') return null;
+  const a = runnerAction(trace);
+  if (a?.kind !== 'assist') return a;
+  const exit = await session.mouseExit(trace[trace.length - 1].focusAfter.selector);
+  return exit ? { ...a, target: exit.selector, reason: `${a.reason}; a sighted helper clicked "${exit.text}" with the mouse` }
+    : { kind: 'stuck', reason: `${a.reason}, and the dialog has no close control a mouse user could click either` };
+}
+
+async function execute(o, task, runDir, trace, log, onProgress, { limit, startedAt }) {
   const tracePath = path.join(runDir, 'trace.jsonl');
   const stats = {};
   let state = firstState(o);
@@ -136,13 +152,14 @@ async function execute(o, task, runDir, trace, log, onProgress, { maxSteps, star
       state = 'running';
       onProgress({ state, trace });
     }
-    for (let n = 0; n < maxSteps; n++) {
+    for (let n = 0; n < limit.maxSteps; n++) {
       const cur = trace[trace.length - 1];
       // boundary first: once at checkout neither the planner nor the script gets another action
       let action = o.mode === 'real' && reachedBoundary(cur.url, cur.title) ? { kind: 'done', reason: 'reached checkout boundary (real-site safety stop)' }
-        : o.script ? o.script[n] : await nextAction({ goal: task.goal, trace, stats, maxSteps });
+        : o.script ? o.script[n] : (await runnerMove(o, s, trace)) ?? await nextAction({ goal: task.goal, trace, stats, maxSteps: limit.maxSteps, client: o.llmClient });
       if (!action) action = { kind: 'stuck', reason: 'script exhausted' };
       if (o.mode === 'real') { const why = blockAction(action, cur.focusAfter); action = why ? { kind: 'stuck', reason: why } : forceReplace(action); }
+      if (action.kind === 'assist') limit.maxSteps += ASSIST_EXTRA_STEPS; // before push: progress shows the new limit
       push(await s.step(action)); // done/stuck steps are recorded too (no key pressed) so the trace ends with the outcome
       if (action.kind === 'done' || action.kind === 'stuck') break;
     }
@@ -153,7 +170,7 @@ async function execute(o, task, runDir, trace, log, onProgress, { maxSteps, star
   if (traced.trace) log(`playwright trace → ${path.join(runDir, traced.trace)}  (npx playwright show-trace <file>)`);
   if (traced.traceError) log(`playwright trace: ${traced.traceError}`);
   fs.writeFileSync(path.join(runDir, 'axe.json'), JSON.stringify(axe, null, 2));
-  const meta = { url: o.mode === 'real' ? trace[0].url : o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script, startedAt, maxSteps,
+  const meta = { url: o.mode === 'real' ? trace[0].url : o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script, startedAt, maxSteps: limit.maxSteps,
     goalSource: task.goalSource, goalReason: task.goalReason, testDataProfile: task.testDataProfile,
     ...(task.testDataAppended ? { goalInput: task.goalInput, testDataAppended: true } : {}) };
   // trace/traceError stay in meta.json: report.json (built from meta) is the frontend contract

@@ -1,10 +1,11 @@
 // D1b — ASSOCIATION layer. Error-like text that no input references via aria-describedby/aria-errormessage.
 // Separate from D1: an error can be announced but still unassociated (user hears it once, can't find it again from the field).
-import { ERROR_RE, dedupe, ev } from './util.mjs';
+import { ERROR_RE, dedupe, ev, byHelper } from './util.mjs';
 
 export function detectAssociation(trace) {
   const out = [];
   for (const s of trace) {
+    if (byHelper(s)) continue;
     for (const c of s.changes) {
       if (!c.visible || !ERROR_RE.test(c.text)) continue;
       if (c.referencedBy.length > 0) continue;

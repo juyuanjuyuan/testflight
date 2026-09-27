@@ -7,6 +7,13 @@ import { SPOKEN_SOURCE } from '../contracts.mjs';
 
 const clip = (s, n) => (s && s.length > n ? s.slice(0, n) + '…' : s || '');
 
+// What a facilitator would say after an assist (runner/assist.mjs). Fixed words, no page content: nothing about what was
+// clicked leaks. Self-explanatory, so the planner prompt (and its LLM cache) stays unchanged.
+export const ASSIST_NOTE = 'You could not leave a dialog with the keyboard. A sighted helper closed it for you with the mouse; '
+  + 'you did not press anything. Continue with the goal from where focus is now.';
+const didOf = (a) => (a.kind === 'press' ? `press ${a.key}` : a.kind === 'type' ? `${a.replace ? 'replace with' : 'type'} "${clip(a.text, 40)}"`
+  : a.kind === 'assist' ? 'nothing (a sighted helper closed a dialog with the mouse)' : a.kind);
+
 export function focusChanged(step) {
   const b = step.focusBefore, a = step.focusAfter;
   if (!b) return true;
@@ -76,7 +83,7 @@ export function buildObservation(goal, trace) {
   const cur = trace[trace.length - 1];
   const lastLoad = [...trace].reverse().find((s) => s.pageLoad && s.pageText);
   const history = trace.slice(-6, -1).map((s) => ({
-    did: s.action.kind === 'press' ? `press ${s.action.key}` : s.action.kind === 'type' ? `${s.action.replace ? 'replace with' : 'type'} "${clip(s.action.text, 40)}"` : s.action.kind,
+    did: didOf(s.action),
     focus: describeFocus(s.focusAfter),
     // a dialog announces all its lines at once; keeping only a few made the planner forget the cart held the tote
     heard: heardInStep(s).slice(0, 12),
@@ -95,5 +102,6 @@ export function buildObservation(goal, trace) {
     pageText: lastLoad ? clip(lastLoad.pageText, 2500) : null,
     pageTextFromStep: lastLoad ? lastLoad.i : null,
     history,
+    ...(cur.action.kind === 'assist' ? { helper: ASSIST_NOTE } : {}),
   };
 }

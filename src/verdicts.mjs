@@ -6,6 +6,8 @@ import { MISSING_DATA_PREFIX, FABRICATED_REASON, INCONCLUSIVE_MISSING_DATA } fro
 //           a person hearing "button" cannot rely on that, so a block finding overrides the agent's luck.
 // A run that stopped because the goal lacked a value (card number, email…) says nothing about the site: both are null
 // (inconclusiveReason says why); its findings still count.
+// A run a sighted helper had to rescue (assist steps, runner/assist.mjs) is not completed even if it reached done:
+// as in a moderated usability test, "completed with assistance" is a failure. assistedSteps lists them (only when any).
 export function runOutcome(trace) {
   const k = trace[trace.length - 1]?.action.kind;
   return k === 'done' || k === 'stuck' ? k : 'max-steps';
@@ -21,7 +23,8 @@ export function missingDataStuck(action) {
 export function computeVerdicts(trace, findings) {
   const outcome = runOutcome(trace);
   const blocks = findings.filter((f) => f.impact === 'block').map((f) => f.id);
-  const agentOk = outcome === 'done';
+  const assistedSteps = trace.filter((s) => s.action.kind === 'assist').map((s) => s.i);
+  const agentOk = outcome === 'done' && assistedSteps.length === 0;
   const inconclusive = missingDataStuck(trace[trace.length - 1]?.action);
   return {
     outcome,
@@ -30,5 +33,6 @@ export function computeVerdicts(trace, findings) {
     blockingFindings: blocks,
     unexplainedStuck: !inconclusive && !agentOk && blocks.length === 0, // stuck but no detector explains it -> look manually / D6
     ...(inconclusive ? { inconclusiveReason: INCONCLUSIVE_MISSING_DATA } : {}),
+    ...(assistedSteps.length ? { assistedSteps } : {}),
   };
 }

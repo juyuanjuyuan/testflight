@@ -22,7 +22,7 @@
         "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" },
         "startedAt": { "type": "string", "format": "date-time", "description": "When the run started. Real mode: includes the time the human spent clearing captcha/login before pressing Enter. Absent in replays and in reports built before plan 17 P2" },
         "finishedAt": { "type": "string", "format": "date-time", "description": "When the run's analysis finished (report written right after). finishedAt - startedAt = how long the audit took. Absent when startedAt is" },
-        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" },
+        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode, plus 20 for each assist step. Show 'used N / maxSteps steps'. Absent in replays and older reports" },
         "goalSource": { "enum": ["user", "curated", "generated"], "description": "Where goal came from: user = typed by the user; curated = preset task of a demo site (eval/groundtruth); generated = proposed by the AI from the start page (no goal given). Absent in replays and older reports" },
         "goalReason": { "type": ["string", "null"], "description": "Why this task was chosen (curated/generated); null when the user gave it. Absent when goalSource is" },
         "testDataProfile": { "type": ["string", "null"], "description": "Test-data profile whose values were appended to the goal (config/test-data/<name>.json, e.g. default, shop): a generated goal, or a user goal with testDataAppended. null otherwise (curated goals, user goals used as typed) and in real mode (no payment or personal data there). Absent when goalSource is" }
@@ -195,16 +195,18 @@
         "screenReaderUserCanComplete": { "type": ["boolean", "null"], "description": "Headline 1: can a screen-reader user complete it? = agent completed AND no blocking finding. null = inconclusive (see inconclusiveReason): show 'not determined', never 'no'" },
         "blockingFindings": { "type": "array", "items": { "type": "string" }, "description": "Ids of block findings" },
         "unexplainedStuck": { "type": "boolean", "description": "Agent got stuck but no detector explains why (needs a human look). false when inconclusive" },
-        "inconclusiveReason": { "enum": ["missing_test_data"], "description": "Present only when agentCanComplete and screenReaderUserCanComplete are null. missing_test_data = the agent stopped because the goal did not give a value it needed (e.g. a card number); that is not a barrier of the site. blockingFindings still apply" }
+        "inconclusiveReason": { "enum": ["missing_test_data"], "description": "Present only when agentCanComplete and screenReaderUserCanComplete are null. missing_test_data = the agent stopped because the goal did not give a value it needed (e.g. a card number); that is not a barrier of the site. blockingFindings still apply" },
+        "assistedSteps": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1, "description": "Present only when a sighted helper had to step in (timeline[].action.kind 'assist'): those steps. The run then never counts as completed (agentCanComplete false even if outcome is done), like 'completed with assistance' in a usability test; the findings after the assist are real barriers the helper let us reach" }
       }
     },
     "action": {
       "type": "object",
       "required": ["kind", "reason"],
       "properties": {
-        "kind": { "enum": ["start", "press", "type", "done", "stuck"] },
+        "kind": { "enum": ["start", "press", "type", "done", "stuck", "assist"], "description": "assist = not the AI: a sighted helper clicked with the mouse (target) to close a dialog the keyboard could not leave, after a keyboard trap was confirmed. Show it differently from the AI's own steps, e.g. 'Helper stepped in'" },
         "key": { "type": "string", "description": "For press: Tab, Shift+Tab, Enter, Space, Escape, Arrow*, Home, End" },
         "text": { "type": "string", "description": "For type: the text typed" },
+        "target": { "type": "string", "description": "For assist: CSS selector of the element the helper clicked, e.g. #joinclose" },
         "replace": { "type": "boolean", "description": "type replaced the field content instead of appending" },
         "forcedReplace": { "type": "boolean", "description": "Real-site safety forced replace (planner did not ask for it)" },
         "reason": { "type": "string", "description": "The planner's one-line reasoning. Show it: this is 'what the AI is thinking'." },

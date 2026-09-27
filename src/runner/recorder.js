@@ -1,6 +1,6 @@
 // Injected with page.addInitScript BEFORE page scripts (otherwise init-time changes are missed).
 // Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen() /
-// unreachableClickables() (D6) / focusVisible() (D5) / fieldValues() (spoken redaction).
+// unreachableClickables() (D6) / focusVisible() (D5) / fieldValues() (spoken redaction) / mouseExit() (assist).
 // Thresholds come from contracts.mjs via window.__A11Y_CONFIG, which session.mjs injects first.
 (() => {
   if (window.__a11yRec) return;
@@ -189,6 +189,21 @@
         out.push({ el, selector: selectorOf(el), barrierId: barrierOf(el), text: text.slice(0, 120) });
       }
       return out.map(({ el, ...u }) => u);
+    },
+    /**
+     * Assist: the control a sighted helper would click to close the dialog holding fromSelector: visible, looks clickable,
+     * named like closeRe (×, Close…). Keyboard reachability does not matter (a trap's handler may skip a real button).
+     * Shortest name first, so a clickable wrapper whose text merely contains "close" loses to the × itself. null if none.
+     */
+    mouseExit(fromSelector, closeRe) {
+      const dialog = document.querySelector(fromSelector)?.closest('dialog,[role="dialog"],[role="alertdialog"],[aria-modal="true"]');
+      if (!dialog) return null;
+      const hits = [...dialog.querySelectorAll('*')]
+        .filter((el) => (el.matches('button,a[href],[role="button"]') || looksClickable(el)) && isVisible(el))
+        .map((el) => ({ el, text: lines(el.innerText).join(' ') || el.getAttribute('aria-label') || el.getAttribute('title') || '' }))
+        .filter((h) => closeRe.test(h.text))
+        .sort((a, b) => a.text.length - b.text.length);
+      return hits.length ? { selector: selectorOf(hits[0].el), barrierId: barrierOf(hits[0].el), text: hits[0].text.slice(0, 120) } : null;
     },
     /** Non-empty values of text-entry fields: session.mjs masks them in what the virtual screen reader said (guard.redactSpoken). */
     fieldValues(max) {

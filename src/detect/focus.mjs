@@ -1,5 +1,5 @@
 // D4 focus lost, D5 focus not visible, D6 pointer-only — OPERATION layer.
-import { dedupe, ev } from './util.mjs';
+import { dedupe, ev, byHelper } from './util.mjs';
 
 // Enter on a same-page fragment link ("Skip to content") whose target is not focusable leaves activeElement on <body>,
 // but the sequential focus start point moved to the target, so the next Tab continues from there: a jump, not a loss.
@@ -27,7 +27,7 @@ export function detectFocusLost(trace) {
 export function detectFocusVisible(trace) {
   const out = [];
   for (const s of trace) {
-    if (s.focusVisible !== false || s.focusAfter.isBody) continue;
+    if (s.focusVisible !== false || s.focusAfter.isBody || byHelper(s)) continue; // after a mouse click :focus-visible may not apply
     out.push({ detector: 'focus-visible', layer: 'operation', steps: [s.i], wcag: ['2.4.7'],
       hint: `no visible focus indicator on "${s.focusAfter.name}"`, evidence: ev(s, s.focusAfter.selector, s.focusAfter.barrierId) });
   }

@@ -15,6 +15,7 @@ import { computeVerdicts } from '../src/verdicts.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { checkEdit, applyEdits } from '../src/fix/apply.mjs';
 import { parseJSON } from '../src/agent/llm.mjs';
+import { probedPopupTrap } from './trap-traces.mjs';
 
 const load = (v) => readTrace(fs.readFileSync(path.join(ROOT, `fixtures/testpage-${v}/trace.jsonl`), 'utf8'));
 const original = load('original');
@@ -238,6 +239,18 @@ test('trap: alternating Tab / Shift+Tab between two elements is not a trap', () 
     step(2, 'Tab', B), step(3, 'Shift+Tab', A), step(4, 'Tab', B), step(5, 'Shift+Tab', A), step(6, 'Escape', A)];
   assert.equal(trace.at(-1).modalOpen, true, 'Escape stays in the dialog, so only the direction rule can clear this');
   assert.deepEqual(runDetectors(trace).filter((c) => c.detector === 'trap'), []);
+});
+
+test('trap: Tab, Shift+Tab and Escape mixed while probing a two-field popup is still a trap', () => {
+  const trace = probedPopupTrap();
+  const t = runDetectors(trace).filter((c) => c.detector === 'trap');
+  assert.equal(t.length, 1);
+  assert.match(t[0].hint, /^trap: Tab cycles among 2 elements/);
+  assert.deepEqual(t[0].wcag, ['2.1.2']);
+  assert.equal(t[0].evidence.barrierId, 'T4');
+  assert.ok(t[0].steps.some((i) => trace[i].action.key === 'Escape'), 'a failed Escape is part of the evidence');
+  assert.equal(runDetectors(trace.slice(0, 6)).filter((c) => c.detector === 'trap').length, 0, 'Tab after Join not seen yet: no loop');
+  assert.equal(runDetectors(trace.slice(0, 7)).filter((c) => c.detector === 'trap').length, 1, 'known as soon as Tab after both fields is seen');
 });
 
 test('judge disabled → deterministic findings with traceable steps; verdicts', async () => {

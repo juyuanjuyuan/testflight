@@ -48,6 +48,7 @@ flowchart LR
 5. **Action** 的 `type` 新增可选 `replace: boolean`：为 true 时 runner 先全选（Control/Meta+A）再输入，用来更正输入框内容；real 模式下 guard 对它同样拒绝敏感输入框。**FocusInfo** 新增可选 `value`：焦点节点在 AX 树里的 value（读屏器聚焦输入框时读出的内容，密码框由浏览器遮蔽为 •），planner 的 `focusValue` 只来自它。real 模式下只保留 planner 本次运行自己输入过、且不敏感的字段的 value，其他字段为 `value: null` 加 `valueRedacted: true`，`pageText` 也不含字段内的文字。
 6. **Step** 新增可选 `shotSize: {w, h, dpr}`：截图的实际像素宽高和 devicePixelRatio（截图失败时没有这个字段）。rect 都是 CSS 像素，× dpr 才是截图像素。本地模式固定 1280×800、dpr 1；real 模式接管的是用户的 Chrome，大小不固定。`report.json` 的 `timeline[].shotSize` 原样带出。
 7. **Step** 的 `spoken` 从一直为空变成虚拟读屏器（`@guidepup/virtual-screen-reader`，由 `src/runner/vsr.mjs` 注入页面）本步的原话，例如 `button, Pay`、`assertive: Card number is invalid`、页面加载后的 `document`。新增可选 `spokenSource`（`'virtual-screen-reader'` 表示 `spoken` 是它的输出；null/缺省表示它没在运行，听到了什么由规则推算）和 `spokenError`（它在这一页启动失败的原因）。它读的是 DOM 里的值，所以密码框的值一律换成 •；real 模式下 planner 没输入过的字段值换成 `(redacted)`（`guard.redactSpoken`）。
+8. **Action** 新增 `assist`（只由 runner 产生，planner 不能输出）和它的 `target`（被点击元素的选择器）；**Step** 新增可选 `assistError`（协助者没点成的原因）。见 §6 的"协助"。
 
 ## 4. 信息隔离（最重要的设计改动）
 
@@ -69,7 +70,7 @@ flowchart LR
 |---|---|---|---|
 | D1 | `unannounced` | 操作后 1500ms 内出现的新可见文字；不在 live region 中；焦点没有移入该元素；也不属于"本步焦点**刚移到**某元素、且该元素的 describedby 指向它"的情况；`repeatCount < 3`；页面跳转那一步跳过 | 原文档只要"被焦点元素的 describedby 引用"就放行。但焦点停在原处时，description 内容变化读屏器不会重读 |
 | D1b | `association` | 看起来像错误的文字（按正则匹配），且 `referencedBy` 为空 | 新增，对应"关联"层 |
-| D2 | `trap` | 焦点序列出现循环（尾部至少重复两整轮），且循环中不经过 body；之后按 Escape 仍留在循环内、弹窗仍打开。hint 分三种：`trap`（没有任何键盘出口，2.1.2）、`esc-only`（有 Close/Cancel 按钮，只是 Esc 不起作用，按 degrade 处理）、`esc-untested`（没试过 Esc，交给 judge 判断） | 原文档的规则是"6 次 Tab 落在不超过 3 个元素上"，会漏掉真实的支付弹窗。另外，只是 Esc 关不掉，并不违反 2.1.2 |
+| D2 | `trap` | 焦点转移图里出现不经过 body 的闭环：Tab 从 A 到 B 记作"A 之后是 B"，Shift+Tab 从 A 到 B 记作"B 之后是 A"，同一元素以最新一次为准，页面跳转后重新建图。所以 Tab、Shift+Tab、Escape 混着按也能认出来（原先要求连续同方向 Tab 重复两整轮，planner 按规则 6 试探时从来凑不齐）；只在两个相邻元素间来回不算闭环。循环内按 Escape 仍留在循环内、弹窗仍打开才算失败，任何一次 Escape 离开了就不报。hint 分三种：`trap`（没有任何键盘出口，2.1.2）、`esc-only`（有 Close/Cancel 按钮，只是 Esc 不起作用，按 degrade 处理）、`esc-untested`（没试过 Esc，交给 judge 判断） | 原文档的规则是"6 次 Tab 落在不超过 3 个元素上"，会漏掉真实的支付弹窗。另外，只是 Esc 关不掉，并不违反 2.1.2 |
 | D3/D3b | `naming` | 控件无名称；名称少于 3 个字符或只含 emoji/符号；不同控件重名 | — |
 | D4 | `focus` | Enter/Space/Escape 之后焦点落到 body，且没有发生页面跳转 | — |
 | D5 | `focus` | `step.focusVisible === false`。runner 在焦点元素旁插入一个不可聚焦的克隆体，比较两者的计算样式（outline、box-shadow、border、背景、颜色、下划线），全部相同即判为不可见（计划 07 方案 A，无新依赖） | runner 目前填 null |
@@ -79,8 +80,9 @@ flowchart LR
 
 ## 6. 两个结论的定义（`src/verdicts.mjs`）
 
-- `agentCanComplete`：planner 最终输出 done。对应"只靠结构信息的 AI agent 能否下单"。
+- `agentCanComplete`：planner 最终输出 done，并且没有人协助过。对应"只靠结构信息的 AI agent 能否下单"。
 - `screenReaderUserCanComplete`：planner 完成了任务，**并且**执行路径上没有 block 级别的问题。LLM 可能猜出 🛒 是加购按钮，但真人读屏用户只会听到"按钮"，不能指望靠猜。
+- 协助（`src/runner/assist.mjs`）：借鉴有主持人的可用性测试。本地站点、由 planner 操作时，每步先由规则判断：焦点在一个已确认的键盘陷阱里（hint 为 `trap`：闭环、Esc 无效、闭环里没有 Close 按钮）且弹窗开着，就不问 planner，而是由"看得见屏幕的协助者"用鼠标点弹窗里名字像关闭的元素（`CLOSE_RE`），记成一步 `assist`，每次协助加 20 步上限，每次运行最多 2 次。找不到可点的关闭元素、或协助后又回到同一个陷阱，就以 stuck 结束。planner 只收到一句固定的话（`observation.ASSIST_NOTE`），看不到被点的是什么。检测器跳过协助步（那不是用户的操作）。有协助的运行 `agentCanComplete` 一律为 false（"需协助完成"算失败），`verdicts.assistedSteps` 列出协助步。预录脚本和真实网站模式从不协助。
 - `unexplainedStuck`：planner 卡住了，但没有检测器能解释原因。遇到这种情况要人工查看，或者补 D6。
 - 无法判断：planner 因为 goal 里缺少需要输入的值而 stuck（reason 以 `missing data:` 开头，或者输入值检查拒绝后的 stuck），这不是网站的问题：前两个结论为 `null`，`inconclusiveReason: "missing_test_data"`，`unexplainedStuck` 为 false，`blockingFindings` 照常。用户 goal 没有数字时，有测试数据配置的本地站点会自动补上测试值（`appendTestData`），尽量避免这种情况。
 

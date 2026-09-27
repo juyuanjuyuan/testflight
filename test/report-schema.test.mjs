@@ -14,6 +14,9 @@ import { analyze } from '../src/audit.mjs';
 import { buildReport } from '../src/report/build.mjs';
 import { compareRuns } from '../src/report/compare.mjs';
 import { mergeAxe } from '../src/runner/axe.mjs';
+import { runDetectors } from '../src/detect/index.mjs';
+import { judge } from '../src/agent/judge.mjs';
+import { probedPopupTrap } from './trap-traces.mjs';
 
 const readJSON = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const schema = readJSON('docs/report.schema.json');
@@ -78,7 +81,13 @@ const axeErrorReport = buildReport({ meta: { goal: 'x' }, trace: original.trace,
 // a planner stuck for missing test data: verdicts null + inconclusiveReason
 const missingData = buildReport({ meta: { goal: 'x', goalInput: 'x', testDataAppended: true, testDataProfile: 'shop', goalSource: 'user', goalReason: null },
   trace: [...original.trace.slice(0, -1), { ...original.trace.at(-1), action: { kind: 'stuck', reason: 'missing data: no card number in the goal' } }], findings: original.findings });
-const live = { 'missing data (live)': missingData, 'original (live)': original.report, 'fixed (live)': fixed.report, 'original + rerun (live)': rerunReport, 'axe error (live)': axeErrorReport };
+// a sighted helper closed a keyboard trap (runner/assist.mjs): action kind 'assist' with target, verdicts.assistedSteps
+const popup = probedPopupTrap().slice(0, 7);
+const helped = { ...popup[6], i: 7, action: { kind: 'assist', target: '#joinclose', reason: 'runner: keyboard trap' }, focusBefore: popup[6].focusAfter,
+  focusAfter: original.trace[3].focusAfter, modalOpen: false };
+const assistedTrace = [...popup, helped, { ...helped, i: 8, action: { kind: 'done', reason: 'confirmation heard' } }];
+const assisted = buildReport({ meta: { goal: 'x', maxSteps: 60 }, trace: assistedTrace, findings: await judge({ goal: 'x', trace: assistedTrace, candidates: runDetectors(assistedTrace), enabled: false }) });
+const live = { 'assisted (live)': assisted, 'missing data (live)': missingData,'original (live)': original.report, 'fixed (live)': fixed.report, 'original + rerun (live)': rerunReport, 'axe error (live)': axeErrorReport };
 
 test('schema compiles in strict mode', () => {
   assert.equal(typeof validate, 'function');

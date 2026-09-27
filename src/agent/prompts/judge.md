@@ -51,8 +51,9 @@ For EACH candidate return:
   Links that lead to equivalent places or that the task does not use → none.
 - trap: hint "trap" = no keyboard exit found; "esc-only" = a Close/Cancel button exists but Escape fails (usually degrade);
   "esc-untested" = decide from context whether the cycle is a normal modal (none) or blocks the task.
-  A trap needs the SAME key (Tab again and again, or Shift+Tab again and again) to keep returning to the same elements.
-  If the steps alternate Tab and Shift+Tab, the user moved back and forth themselves: not a trap → none.
+  The detector already checked that Tab from every element in the cycle lands on another element of it (Shift+Tab from
+  A to B counts as "Tab from B lands on A"), so the steps may mix Tab and Shift+Tab. Merely moving back and forth
+  between two neighbours is never reported.
 - focus-lost: focus fell to the page body after activating something → degrade (block only if what opened cannot be
   reached by keyboard at all).
 - focus-visible: sighted keyboard users cannot see where they are → degrade.

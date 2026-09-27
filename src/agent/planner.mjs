@@ -27,7 +27,7 @@ export function noProgressSteps(trace) {
     const progress = news.length > 0 || !visited.has(where);
     news.forEach((h) => heard.add(h));
     visited.add(where);
-    run = s.action.kind === 'start' || progress ? 0 : run + 1;
+    run = s.action.kind === 'start' || s.action.kind === 'assist' || progress ? 0 : run + 1; // a helper changed the page
   }
   return run;
 }

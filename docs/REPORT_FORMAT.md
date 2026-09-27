@@ -48,7 +48,7 @@
 | `judge` | `false` 时问题没有经过 AI 审核，`userImpact` 为空 |
 | `generatedAt` | 生成时间（ISO 格式） |
 | `startedAt` / `finishedAt` | 运行开始、分析结束的时间（ISO 格式），相减就是"本次审计用时"；修复后重新生成的报告保留审计的这两个时间（`generatedAt` 会更新）。真实网站模式的 `startedAt` 包含人在 Chrome 里处理验证码、按回车之前的时间。`replay` 生成的报告和旧报告里没有这两个字段 |
-| `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 40，真实网站 80。可以显示"用了 14 / 40 步"。`replay` 生成的报告和旧报告里没有 |
+| `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 40，真实网站 80；每有一次协助（`assist`）再加 20。可以显示"用了 14 / 40 步"。`replay` 生成的报告和旧报告里没有 |
 | `goalSource` | 任务从哪里来：`user` = 用户填的；`curated` = 演示站点的预设任务（`eval/groundtruth/`）；`generated` = 用户没填，AI 根据起始页生成。可以在任务旁边显示"AI 生成"之类的标记。`replay` 生成的报告和旧报告里没有 |
 | `goalReason` | 为什么选这个任务（一句英文）；用户填的任务为 `null`。没有 `goalSource` 时也没有 |
 | `testDataProfile` | 拼进 goal 的测试数据配置名（`config/test-data/<名字>.json`，例如 `default`、`shop`）：AI 生成的任务，或者自动补了测试数据的用户任务（`testDataAppended`）。预设任务、原样使用的用户任务以及真实网站模式（不拼接任何支付和个人数据）为 `null`。没有 `goalSource` 时也没有 |
@@ -65,6 +65,7 @@
 | `blockingFindings` | 阻断级问题的 id 列表 | 可以链接到问题清单 |
 | `unexplainedStuck` | AI 卡住了，但没有检测器能解释原因（无法判断时为 `false`） | 为 true 时提示"需要人工查看" |
 | `inconclusiveReason` | 只在两个结论为 `null` 时出现。`missing_test_data`：AI 因为任务里没有给出需要输入的值（例如卡号）而停下，这不是网站的问题。`blockingFindings` 和问题清单照常有效 | `null` 时显示原因，例如"任务里缺少测试数据（如卡号），无法判断" |
+| `assistedSteps` | 只在有人协助过时出现：协助发生在哪几步（`timeline[].action.kind` 为 `assist`）。协助过的运行一律不算完成（`agentCanComplete` 为 `false`，即使 `outcome` 是 `done`），和可用性测试里"需协助完成 = 失败"一样；协助之后发现的问题照常有效，正是协助让我们走到了那里 | 结论旁注明"需要协助"，可以链接到那一步 |
 
 无法判断时 `verdicts` 的样子（`blockingFindings` 照常列出）：
 
@@ -96,7 +97,8 @@
 |---|---|---|
 | `i` | 步骤编号，从 0 开始 | 步骤列表 |
 | `t` | 距离第 0 步的毫秒数（第 0 步是 0），用来做时间轴，例如 00:12。`null` 表示 trace 里没有这一步的时间；旧报告里没有这个字段 | 回放时间轴 |
-| `action.kind` | `start` / `press` / `type` / `done` / `stuck` | 步骤列表 |
+| `action.kind` | `start` / `press` / `type` / `done` / `stuck` / `assist`。`assist` **不是 AI 的操作**：键盘陷阱被规则确认后（Tab 只在几个元素间打转、Esc 无效、没有可 Tab 到的关闭按钮），一位"看得见屏幕的协助者"用鼠标点了关闭按钮，让审计能继续发现后面的问题。本地站点、由 AI 操作时才会出现，每次运行最多 2 次 | 步骤列表；`assist` 建议用不同样式，例如"协助者介入" |
+| `action.target` | 协助者点击的元素（`assist` 时），CSS 选择器，例如 `#joinclose` | 可选 |
 | `action.key` | 按下的键（`press` 时），如 `Tab`、`Enter`、`Escape` | 步骤列表 |
 | `action.text` | 输入的文字（`type` 时） | 步骤列表 |
 | `action.replace` | 为 true 表示替换了输入框原有内容 | 可选 |

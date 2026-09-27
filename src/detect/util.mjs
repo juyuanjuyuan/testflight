@@ -5,7 +5,9 @@ export { CHANGE_WINDOW_MS, NOISE_REPEAT, INTERACTIVE_ROLES, focusChanged };
 
 export const ERROR_RE = /invalid|error|required|incorrect|failed|declined|must|not valid|无效|错误|必填|失败|不正确/i;
 export const CLOSE_RE = /close|cancel|dismiss|back|×|✕|✖|关闭|取消|返回/i;
-export const SYMBOL_ONLY_RE = /^[\p{Extended_Pictographic}\p{S}\p{P}\s\u200d\ufe0f]+$/u;
+// a sighted helper's mouse click (runner/assist.mjs): what follows it is not feedback on anything the keyboard user did
+export const byHelper = (s) => s.action.kind === 'assist';
+export const SYMBOL_ONLY_RE =/^[\p{Extended_Pictographic}\p{S}\p{P}\s\u200d\ufe0f]+$/u;
 
 /** Merge candidates that point at the same element + detector, keeping all step indices. */
 export function dedupe(cands) {
