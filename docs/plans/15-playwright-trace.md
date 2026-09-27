@@ -34,3 +34,15 @@ npx playwright show-trace runs/<id>/trace.zip     # 在 WSL 里需要 WSLg 弹�
 
 - `trace.zip` 在 `runs/` 下，已被 gitignore，不要提交。
 - 真实网站的 trace 里包含该网站的页面快照，同样不能提交。
+
+## 结果
+
+2026-09-27。**状态：完成。**
+
+- `--trace` → `runs/<id>/trace.zip`（testpage 脚本运行约 0.7 MB：goto、11 次按键 + 1 次输入、每步截图、238 个 DOM 快照）。`meta.json` 里记 `"trace": "trace.zip"` 或 `"traceError"`，日志也打印一行。
+  **只写 `meta.json`，不进 `report.json`**，前端契约没有变。
+- 耗时：不加 `--trace` 10.3 s（和之前一样），加了 11.3 s。
+- 开始 trace 的时机是页面准备好之后；real 模式在人按 Enter 之后，所以人处理验证码、登录的过程不会录进去。开始或保存失败都记成 `traceError`，运行照常继续，浏览器也照常关闭。
+- `openSession` 新增 `browserType` 参数（仅测试用），`test/trace.test.mjs` 用假浏览器验证调用顺序是 start → stop（`<runDir>/trace.zip`）→ `browser.close`。
+- **还没验证：** real 模式对真实 Chrome（`connectOverCDP`）能不能 trace，目前只有单元测试覆盖。失败的话会记成 `traceError`，不影响运行。
+- 查看方式：`npx playwright show-trace` 会用 Playwright 自带的 Chromium 打开，已验证能显示时间线、动作和快照。Trace Viewer 依赖 service worker，不支持 service worker 的内嵌浏览器会显示白屏，这时改用 https://trace.playwright.dev 。

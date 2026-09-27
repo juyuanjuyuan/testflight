@@ -79,6 +79,8 @@ npm run serve                   # serves sites/ on http://localhost:8080
 # deterministic run, no LLM:
 node cli.mjs audit --url http://localhost:8080/testpage/original/ --goal "Buy the canvas tote bag" \
   --script eval/keys.testpage.json --no-judge
+# add --trace to any audit to debug it step by step (or drop the zip on https://trace.playwright.dev, parsed locally):
+npx playwright show-trace runs/<id>/trace.zip
 # autonomous run with planner + judge:
 node cli.mjs audit --url http://localhost:8080/shop/original/ --goal "Buy a canvas tote bag" --site sites/shop/original
 node cli.mjs fix   --run runs/<id>
