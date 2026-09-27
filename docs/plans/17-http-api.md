@@ -93,7 +93,7 @@
 
 ## 结果
 
-### P0（2026-09-27 完成；P1、P2 未做，所以 README 里还没勾选）
+### P0（2026-09-27 完成；P2 未做，所以 README 里还没勾选）
 
 **做了什么**
 - `POST /api/runs`（`src/api/runs.mjs`）：校验 → `newRunDir` → 先原子写第一版 progress.json → 子进程 `node cli.mjs audit … --run-dir <dir> --site <site> --progress`（`src/api/spawn.mjs`，输出记到运行目录的 `cli.log`）→ `202 { runDir }`。一次只允许一个运行（`409 run_in_progress`）；子进程退出时如果 progress 不是 done/failed，服务器补写 `failed`（保留 timeline）。
@@ -118,3 +118,41 @@
 7. 按脚本运行只要十秒左右，每秒轮询可能看不到 `analyzing`，会从 `running` 直接跳到 `done`。
 8. 运行目录里多了一个 `cli.log`（后端排查用），前端不要读。
 9. `fixPolicy`（替代 `fix.constraints`）、`GET /api/runs`、修复接口都还没有（P1/P2）。`GET /api/runs` 目前返回 405。
+
+### P1（2026-09-27 完成，连同 P2 里的 `fixPolicy`）
+
+**做了什么**
+- `POST /api/runs/<runDir>/fix`（`src/api/runs.mjs`）：`{findingIds?, rerun?}` 校验 → 检查能否修复（`real_site_no_fix`、`not_fixable`、`nothing_to_fix`、`run_not_finished`）→ 和审计共用同一把锁 → **先**把原运行的 progress 写成 `fixing`（保留审计的 timeline，前端不会读到旧的 `done`）→ 子进程 `node cli.mjs fix --run <dir> --out <runsDir> --progress [--findings …] [--rerun] [--no-judge]` → `202 { runDir }`。子进程退出后，若原运行或复测运行的 progress 不是 done/failed，都补写 `failed`（"The fix/rerun stopped unexpectedly: …"）。`cli.log` 改为追加，修复的输出不会覆盖审计的。
+- `src/fix/commands.mjs`：`runFixFlow`（CLI `fix` 的入口）按 fixing → rerunning → done / failed 报告进度；复测目录用 `newRunDir` 创建并写好第一版 progress（`running`、空 timeline）之后，才在原运行里写 `rerunDir`。`runFix` 支持 `--findings F2,F4`（未知 id 报错）；`runRerun` 接受 `runDir`/`onProgress`/`script`，复测网址由站点目录名推出（`/original/` → `/patched/`，推不出时要求 `--url`，不再静默重测原站点），复测的 `meta.site` 记为修复副本。
+- `fixSite`：只修选中的问题；每次从原站点重新复制副本，所以先把所有 `findings[].fix` 清空（否则会显示上一次修复、但副本里已经不存在的 diff）。**另外修了一个危险的问题**：修复副本目录和站点目录重合（例如通过 API 审计 `/testpage/patched/` 再修复）时，`fixSite` 会先删掉副本目录，也就是站点源码本身。现在直接报错，API 返回 `409 not_fixable`。
+- `fixPolicy`（原属 P2，修复接口会重写 report.json，放在这里更自然）：`src/fix/policy.mjs` 的 `FIX_POLICY` 是唯一出处。`enforced` 三条，`apply.mjs` 拒绝 edit 时的错误信息末尾引用对应规则原文；`instructed` 两条，测试保证它们逐字出现在 `prompts/fixer.md` 里（prompt 本身没改）。`buildReport` 在每份报告里写入 `fixPolicy`；schema（可选字段）、`REPORT_FORMAT.md`、`report.example.json` 同步（规则 13），测试保证 example 里的内容和常量一致。
+- progress writer：`rerunDir` 一旦写入就保留到 done/failed（和 `markFailedIfUnfinished` 的行为一致），`progress.schema.json` 的描述同步。
+
+**验收**
+- `npm test` 87 项通过。新增测试：`findingIds` 过滤（API 参数和 `runFix --findings`）、旧的 fix 被清空、副本目录与站点重合时拒绝、real 模式 409 及其他 409/400、审计和修复共用锁、状态顺序 fixing → rerunning → done（以及不复测时 fixing → done）、**写出 `rerunDir` 那一刻复测目录的 progress 已经存在且是 running**、复测失败时两边都是 failed、子进程被杀时两边都补写 failed、`fixPolicy` 与 apply.mjs 的错误信息和 prompt 一致。测试里的问题 id 一律按 detector + barrierId 查找，不写死 F 编号（fixture 重新生成后编号会变）。
+- `npm run smoke` 全部通过（修复需要模型，所以 smoke 里没有修复用例）。
+- rebase 到队友的计划 08 提交（`maxSteps` 按模式、`shotSize`、真实网站接管）之后，没有冲突，测试和 smoke 都通过。
+- 前端文档第 8 节 P1 的 curl 流程在临时端口 8095 上手动跑通（运行目录都在本地 `runs/`，未提交）：
+  1. 任务用前端文档的 "Buy the canvas tote bag. Pay with card number 4242 4242."，`{"findingIds":["F2","F4"],"rerun":true}`：202；运行中再 POST 返回 409；progress 依次 `fixing` → `rerunning`（带 `rerunDir`，复测目录的 progress 马上能读到，step 从 null 递增）→ `done`；report.json 里 `fixes`（两条都应用成功）、`findings[].fix`、`fixPolicy`、`rerun` 都有值。**但 `rerun.closedLoop` 为 `false`**，原因见下面的问题 1。
+  2. 任务用 "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242."（和 `fixtures/testpage-fixloop` 相同）：这次 judge 把"下单成功提示没有播报"判成 degrade，没有 block 问题，所以 `{"rerun":true}` 正确返回 `409 nothing_to_fix`；改用 `{"findingIds":["F1","F3"],"rerun":true}`（提示没有播报 + 付款后焦点丢失）后 fixing → rerunning → done，**`rerun.closedLoop: true`**，`after.outcome: "done"`，`introduced: []`。
+  3. 复测进行中 `kill -9` 修复子进程：原运行 `failed`，error "The fix stopped unexpectedly: killed by SIGKILL"，`rerunDir` 保留；复测运行 `failed`，error "The rerun stopped unexpectedly: killed by SIGKILL"；锁已释放，没有残留的浏览器进程。
+
+**和前端文档不一致的地方（已写进 docs/API.md §1，需要转告前端）**
+1. 所有错误 `message` 都是英文（包括 `real_site_no_fix` 的 "Real websites are only audited, not fixed."，计划里写的是中文"真实网站只检测，不修复"）。需要中文时按 `code` 翻译。
+2. 新增错误码：`400 invalid_findings` / `invalid_rerun`，`409 not_fixable` / `nothing_to_fix` / `run_not_finished`。没有 `block` 问题又不传 `findingIds` 时是 `409 nothing_to_fix`。
+3. `rerunDir` 进入 `rerunning` 之后，在 `done` / `failed` 里也保留（前端文档说其他时候为 null）。
+4. `findingIds` 可以包含 `degrade` 问题；前端文档示例里的 `F2`、`F4` 只是示意，编号每次运行都不同。
+5. 复测是否用 judge 跟原运行一致；复测总是由 planner 操作。
+6. 报告顶层新增 `fixPolicy`（代替 `fix.constraints`），旧报告没有这个字段。
+
+**问题 1（未处理，属于计划 03 的 planner prompt，之后单独做）：复测时模型输入了任务里没有的完整卡号**
+
+任务是 "Buy the canvas tote bag. Pay with card number 4242 4242."（前端文档第 8 节的原话，8 位的卡号故意是无效的，用来触发"卡号无效"的错误）。
+
+证据（`runs/2026-09-27T02-51-18-rerun/trace.jsonl`，本地运行，未提交）：
+- `meta.json` 的 goal 就是上面这句，和原运行完全相同。
+- 第 6 步：`{"kind":"type","text":"4242 4242 4242 4242","reason":"Typing the card number into the focused Card number field"}`，之后 `focusAfter.value` 是 `"4242 4242 4242 4242"`。这是**第一次**输入卡号，发生在任何错误提示之前，不是听到"卡号无效"后自己改的；`reason` 也没有提到改了卡号。
+- 同一任务的原运行（`runs/2026-09-27T02-50-50-audit`）第 6 步输入的是 `"4242 4242"`（`replace: true`）。
+- 复测的 `stats` 是 `{calls: 26, llmAttempts: 26}`，没有 `cacheHits`，所以是模型当场的回答，不是缓存里别的任务（例如 fixloop 用的 16 位卡号任务）的答案。另外，原运行有 11 次 `cacheHits`（重放了之前验证 P0 时同一任务的回答），它不能当作独立的第二次采样。
+- 后果：有效卡号让付款成功、弹窗关闭，但"Order confirmed"提示没有播报（这次没选修复它），焦点落到 body（第 8 步）；模型之后在 Card number 和 Pay 之间来回 Tab / Shift+Tab，直到 25 步用完，第 25 步 stuck。复测判定 `unexplainedStuck: true`，`closedLoop: false`。所以这次 `closedLoop: false` 不是修复或 API 的问题，而是复测时 planner 没有按任务给的卡号操作，结果测的是另一条路径。
+- 影响：同一个任务修复前后走的路径不同，前后对比就不可靠。之后在计划 03 的范围里处理（例如要求 planner 逐字使用任务里给出的输入值）。这次没有改 planner 的 prompt。
