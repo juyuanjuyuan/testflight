@@ -48,7 +48,7 @@ export function buildReport({ meta, trace, findings, axe = null, rerun = null, f
 }
 
 export function reportMarkdown(r) {
-  const yn = (b) => (b ? '✅ yes' : '❌ no');
+  const yn = (b) => (b === null ? `⚪ inconclusive (${r.verdicts.inconclusiveReason?.replace(/_/g, ' ') ?? 'unknown'})` : b ? '✅ yes' : '❌ no');
   const lines = [
     `## Task audit: ${r.meta.goal}`,
     `- Screen-reader user can complete: **${yn(r.verdicts.screenReaderUserCanComplete)}**`,

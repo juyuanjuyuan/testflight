@@ -1,5 +1,7 @@
 {
   "_comment": "sites/shop/*: the checkout declines the first test card, then accepts the second (same as eval/groundtruth/shop-main.yaml). Overrides default.json.",
+  "_needs": "Data kinds the site asks for at checkout: appended (in this order) to a user goal that has no digits (src/audit.mjs).",
+  "needs": ["payment_card"],
   "sentences": {
     "payment_card": "Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
   }

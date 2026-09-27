@@ -10,6 +10,7 @@ export function compareRuns(before, after) {
   const introduced = [...afterKeys.values()].filter((f) => !beforeKeys.has(keyOf(f))).map((f) => ({ id: f.id, key: keyOf(f), status: 'new' }));
   return {
     before: before.verdicts, after: after.verdicts, status, introduced,
-    closedLoop: !before.verdicts.screenReaderUserCanComplete && after.verdicts.screenReaderUserCanComplete,
+    // strict: an inconclusive run (null, missing test data) never counts as "was failing"
+    closedLoop: before.verdicts.screenReaderUserCanComplete === false && after.verdicts.screenReaderUserCanComplete === true,
   };
 }

@@ -13,10 +13,13 @@ async function readJson(file) {
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringOrNull = (v) => typeof v === 'string' || v === null;
 
+// null verdict only with its reason (e.g. missing_test_data); a bare null is still a broken report
+const inconclusive = (v) => v.screenReaderUserCanComplete === null && typeof v.inconclusiveReason === 'string';
+
 // The report fields the list shows, strictly typed (never coerced): anything else makes the report invalid.
 function validReport(r) {
   return isObject(r) && isObject(r.meta) && isObject(r.verdicts) && typeof r.meta.goal === 'string'
-    && typeof r.verdicts.screenReaderUserCanComplete === 'boolean' && isStringOrNull(r.meta.generatedAt)
+    && (typeof r.verdicts.screenReaderUserCanComplete === 'boolean' || inconclusive(r.verdicts)) && isStringOrNull(r.meta.generatedAt)
     && (r.meta.url === undefined || isStringOrNull(r.meta.url));
 }
 

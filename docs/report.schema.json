@@ -14,7 +14,9 @@
         "mode": { "enum": ["local", "real"], "description": "local = our own test sites; real = a third-party site (detection only, no fixes)" },
         "site": { "type": ["string", "null"], "description": "Source folder of the audited site, e.g. sites/shop/original (local mode only)" },
         "script": { "type": "boolean", "description": "true = keys came from a pre-recorded script, false = the AI planner decided every key" },
-        "goal": { "type": "string", "description": "Task given to the planner, e.g. 'Buy the canvas tote bag'" },
+        "goal": { "type": "string", "description": "Task given to the planner, e.g. 'Buy the canvas tote bag'. When testDataAppended is true this is the user's input plus the appended test values" },
+        "goalInput": { "type": "string", "description": "What the user typed, before test values were appended. Present only when testDataAppended is true" },
+        "testDataAppended": { "const": true, "description": "Present (true) only when the user's goal had no digits and the local site's test values (config/test-data/<site>.json, e.g. a test card) were appended to it; never in real mode" },
         "judge": { "type": "boolean", "description": "false = judge disabled; findings keep deterministic defaults and userImpact is empty" },
         "generatedAt": { "type": "string", "format": "date-time" },
         "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" },
@@ -23,7 +25,7 @@
         "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" },
         "goalSource": { "enum": ["user", "curated", "generated"], "description": "Where goal came from: user = typed by the user; curated = preset task of a demo site (eval/groundtruth); generated = proposed by the AI from the start page (no goal given). Absent in replays and older reports" },
         "goalReason": { "type": ["string", "null"], "description": "Why this task was chosen (curated/generated); null when the user gave it. Absent when goalSource is" },
-        "testDataProfile": { "type": ["string", "null"], "description": "Test-data profile whose values were appended to a generated goal (config/test-data/<name>.json, e.g. default, shop); null for user/curated goals and in real mode (no payment or personal data there). Absent when goalSource is" }
+        "testDataProfile": { "type": ["string", "null"], "description": "Test-data profile whose values were appended to the goal (config/test-data/<name>.json, e.g. default, shop): a generated goal, or a user goal with testDataAppended. null otherwise (curated goals, user goals used as typed) and in real mode (no payment or personal data there). Absent when goalSource is" }
       }
     },
     "verdicts": { "$ref": "#/$defs/verdicts" },
@@ -189,10 +191,11 @@
       "required": ["outcome", "agentCanComplete", "screenReaderUserCanComplete", "blockingFindings", "unexplainedStuck"],
       "properties": {
         "outcome": { "enum": ["done", "stuck", "max-steps"], "description": "How the run ended" },
-        "agentCanComplete": { "type": "boolean", "description": "Headline 2: can an AI agent that only uses structure (keyboard + screen-reader info) complete the task?" },
-        "screenReaderUserCanComplete": { "type": "boolean", "description": "Headline 1: can a screen-reader user complete it? = agent completed AND no blocking finding" },
+        "agentCanComplete": { "type": ["boolean", "null"], "description": "Headline 2: can an AI agent that only uses structure (keyboard + screen-reader info) complete the task? null = inconclusive (see inconclusiveReason)" },
+        "screenReaderUserCanComplete": { "type": ["boolean", "null"], "description": "Headline 1: can a screen-reader user complete it? = agent completed AND no blocking finding. null = inconclusive (see inconclusiveReason): show 'not determined', never 'no'" },
         "blockingFindings": { "type": "array", "items": { "type": "string" }, "description": "Ids of block findings" },
-        "unexplainedStuck": { "type": "boolean", "description": "Agent got stuck but no detector explains why (needs a human look)" }
+        "unexplainedStuck": { "type": "boolean", "description": "Agent got stuck but no detector explains why (needs a human look). false when inconclusive" },
+        "inconclusiveReason": { "enum": ["missing_test_data"], "description": "Present only when agentCanComplete and screenReaderUserCanComplete are null. missing_test_data = the agent stopped because the goal did not give a value it needed (e.g. a card number); that is not a barrier of the site. blockingFindings still apply" }
       }
     },
     "action": {

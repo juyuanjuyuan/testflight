@@ -20,6 +20,12 @@ export const VSR_START_TIMEOUT_MS = 5_000;
 export const SPOKEN_SOURCE = 'virtual-screen-reader';
 // per-attempt LLM timeout by role. The planner is short: a stalled call is cheaper to retry than to wait out.
 export const LLM_TIMEOUT_MS = { planner: 8_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
+/** A planner stuck whose reason starts with this (case-insensitive) means the goal lacked a value it needed: not a barrier. */
+export const MISSING_DATA_PREFIX = 'missing data:';
+/** Stuck reason when the planner kept typing a value the goal does not give (planner.mjs input-value check). */
+export const FABRICATED_REASON = 'planner tried to type a value not given in the goal';
+/** verdicts.inconclusiveReason when the run stopped for missing test data (both headline verdicts are then null). */
+export const INCONCLUSIVE_MISSING_DATA = 'missing_test_data';
 export const MAX_GOAL_CHARS = 500;       // task text, typed by the user or built by the tasker (API rejects longer)
 export const MAX_SUGGESTIONS = 3;       // tasks the tasker proposes per page
 // POST /api/tasks/suggest answers synchronously: page load + one model call with a retry must fit, else 504

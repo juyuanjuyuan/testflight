@@ -1,10 +1,9 @@
 import fs from 'node:fs';
 import { chatJSON } from './llm.mjs';
 import { buildObservation, heardInStep } from './observation.mjs';
-import { validateAction, MAX_STEPS, NO_PROGRESS_STEPS } from '../contracts.mjs';
+import { validateAction, MAX_STEPS, NO_PROGRESS_STEPS, FABRICATED_REASON } from '../contracts.mjs';
 
 const SYSTEM = fs.readFileSync(new URL('./prompts/planner.md', import.meta.url), 'utf8');
-const FABRICATED = 'planner tried to type a value not given in the goal';
 
 const norm = (s) => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -55,5 +54,5 @@ export async function nextAction({ goal, trace, stats, maxSteps = MAX_STEPS, cli
       if (attempt === 1) return { kind: 'stuck', reason: `planner error: ${e.message}`, plannerError: true };
     }
   }
-  return { kind: 'stuck', reason: fabricated ? FABRICATED : 'planner kept producing invalid actions', plannerError: true };
+  return { kind: 'stuck', reason: fabricated ? FABRICATED_REASON : 'planner kept producing invalid actions', plannerError: true };
 }

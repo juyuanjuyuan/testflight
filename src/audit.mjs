@@ -4,7 +4,7 @@ import path from 'node:path';
 import { openSession } from './runner/session.mjs';
 import { blockAction, forceReplace, reachedBoundary } from './runner/guard.mjs';
 import { nextAction } from './agent/planner.mjs';
-import { suggestTasks } from './agent/tasker.mjs';
+import { suggestTasks, appendTestData, siteKeyFromUrl } from './agent/tasker.mjs';
 import { runDetectors } from './detect/index.mjs';
 import { judge } from './agent/judge.mjs';
 import { buildReport, writeReport } from './report/build.mjs';
@@ -41,6 +41,7 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
  * url is optional in real mode (the tab the human has open is audited; meta.url records where it actually started).
  * goal is optional: without it the task is picked after step 0 from what the planner sees then (agent/tasker.mjs);
  * progress shows planning_task until it is known, and meta.goalSource/goalReason/testDataProfile record where it came from.
+ * A user goal may get test values appended (userGoal); progress and meta.goal then carry the full goal, meta.goalInput the input.
  * @param {{url?:string, goal?:string, out?:string, runDir?:string, mode?:'local'|'real', cdp?:string, script?:object[],
  *          judgeEnabled?:boolean, headless?:boolean, trace?:boolean, label?:string, site?:string, log?:(msg:string)=>void,
  *          onProgress?:(p:{state:string, trace?:object[], error?:string, maxSteps:number, url:string|null, goal:string})=>void, openSession?:Function,
@@ -62,7 +63,7 @@ export async function audit(o) {
   const maxSteps = o.mode === 'real' ? MAX_STEPS_REAL : MAX_STEPS;
   const startedAt = new Date().toISOString();
   const trace = [];
-  const task = o.goal ? { goal: o.goal, goalSource: 'user', goalReason: null, testDataProfile: null } : { goal: null };
+  const task = o.goal ? userTask(o, log) : { goal: null };
   // same url as meta.url: real mode records where the human's tab actually was (known once step 0 is recorded)
   const onProgress = (u) => o.onProgress?.({ ...u, maxSteps, url: (o.mode === 'real' ? trace[0]?.url : o.url) ?? null, goal: task.goal });
   if (o.runDir && !fs.statSync(o.runDir).isDirectory()) throw new Error(`run dir is not a directory: ${o.runDir}`);
@@ -76,6 +77,21 @@ export async function audit(o) {
     onProgress({ state: 'failed', trace, error: e.message.split('\n')[0] });
     throw e;
   }
+}
+
+/**
+ * A user goal as the planner gets it: local demo sites with a test-data config get their values appended when the goal
+ * has no digits ("buy one thing" would otherwise stop at the card field). goalInput/testDataAppended only when appended.
+ */
+export function userGoal({ goal, url, site, mode }) {
+  const r = appendTestData({ goal, siteKey: site || siteKeyFromUrl(url), mode: mode || 'local' });
+  return r.appended ? { goal: r.goal, goalInput: goal, testDataAppended: true, testDataProfile: r.profile } : { goal, testDataProfile: null };
+}
+
+function userTask(o, log) {
+  const t = userGoal(o);
+  if (t.testDataAppended) log(`test data appended to the goal (config/test-data/${t.testDataProfile}.json): ${t.goal}`);
+  return { goalSource: 'user', goalReason: null, ...t };
 }
 
 // The tasker sees step 0 exactly as the planner would: url, title and AX page text.
@@ -138,7 +154,8 @@ async function execute(o, task, runDir, trace, log, onProgress, { maxSteps, star
   if (traced.traceError) log(`playwright trace: ${traced.traceError}`);
   fs.writeFileSync(path.join(runDir, 'axe.json'), JSON.stringify(axe, null, 2));
   const meta = { url: o.mode === 'real' ? trace[0].url : o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script, startedAt, maxSteps,
-    goalSource: task.goalSource, goalReason: task.goalReason, testDataProfile: task.testDataProfile };
+    goalSource: task.goalSource, goalReason: task.goalReason, testDataProfile: task.testDataProfile,
+    ...(task.testDataAppended ? { goalInput: task.goalInput, testDataAppended: true } : {}) };
   // trace/traceError stay in meta.json: report.json (built from meta) is the frontend contract
   fs.writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify({ ...meta, goal: task.goal, ...traced }, null, 2));
   onProgress({ state: 'analyzing', trace });

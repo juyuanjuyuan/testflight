@@ -122,3 +122,23 @@
 **demo 注意：** 生成任务的调用也走 LLM 缓存。8080 用默认的 readwrite 或 readonly 跑时，同一个起始页第二次起直接返回缓存里的结果（实测 1–3 秒，三次完全相同），不是现场生成；想每次都现场生成只能用 `LLM_CACHE=off` 启动服务器，但这样审计也不会用缓存。对 demo 来说缓存反而更稳：只要提前生成过一次，断网也能返回同样的任务。
 
 **需要告诉前端：** `generate` 已经支持，现在 shop 上能拿到 `source: "generated"` 的建议，`App.tsx` 里 "The audit service returned only preset tasks" 的报错不会再出现（前提是 8080 重启到新代码）。新错误码 `400 invalid_generate` 只在传了非布尔值时出现。生成的任务比预设的长（带姓名、地址、邮箱，约 220 个字符），输入框需要能完整显示或允许换行。
+
+
+### 后续：缺少测试数据不再算网站的问题（2026-09-27）
+
+起因：demo 测试里用户在前端输入 "buy one thing"，planner 选了帆布包，在付款页因为 goal 里没有卡号而 stuck（"Card number field is required but the goal does not provide a value to enter."），报告判成"读屏用户无法完成"，归因错误。
+
+改动：
+- **自动补测试数据**：`appendTestData()`（`src/agent/tasker.mjs`）+ `userGoal()`（`src/audit.mjs`）。用户填的 goal 里没有任何数字，并且本地站点有自己的测试数据配置（`config/test-data/<站点>.json`，目前只有 `shop.json`，新增 `needs: ["payment_card"]`；没有 `needs` 时用该文件覆盖的类别）时，按本计划的模板把值拼在 goal 后面。progress（从 API 写的第一版起）、`meta.goal`、`meta.json` 都是完整 goal；新增可选 `meta.goalInput`（原文）、`meta.testDataAppended: true`，`meta.testDataProfile` 为配置名。real 模式、goal 有数字、站点没有自己的配置时原样使用。rerun 用 `meta.goal`（已经有数字），不会重复拼接。
+- **无法判断**：planner prompt 规则 2 加了一句：因为 goal 没给需要的值而无法继续时输出 stuck，reason 以 `missing data:` 开头。`src/verdicts.mjs` 识别这种 stuck（前缀不区分大小写）和输入值检查拒绝后的 stuck（`FABRICATED_REASON`，从 planner 移到 `contracts.mjs`），此时 `agentCanComplete` / `screenReaderUserCanComplete` 为 `null`，新增可选 `inconclusiveReason: "missing_test_data"`，`unexplainedStuck` 为 false，`blockingFindings` 照常。
+- 跟着改的：`report.md` 显示 "⚪ inconclusive (missing test data)"；`GET /api/runs` 接受"`null` + 字符串 `inconclusiveReason`"的报告（单独的 `null` 仍然算 `report_invalid`）；`compareRuns` 的 `closedLoop` 改成严格的 `false → true`（修复前无法判断不算闭环；布尔值时结果和以前一样）。
+- schema、`REPORT_FORMAT.md`、`report.example.json`（meta 里的三个新字段是示意）、`API.md`、`ARCHITECTURE.md` 已同步。测试：`test/missing-data.test.mjs`，`api.test.mjs`、`report-schema.test.mjs` 各加了用例。
+
+验证（单独启动的 8091 端口服务器，`LLM_CACHE=off`）：
+- `POST /api/runs` shop/original + "buy one thing"：第一版 progress 的 goal 就是 "buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."，`meta.goalInput` / `testDataAppended` / `testDataProfile: shop` 正确。第一次（缓存开着）planner 在购物车弹窗里没找到 Checkout，被 runner 的无进展规则停下（和数据无关）；第二次（缓存关掉）第 21 步输入 `4000 0000 0000 0002`，按 Pay 后什么都没听到，第 25 步 stuck → `false`，block F2（"Card declined" 没有播报）、F4（🛒），和预设任务的结果一致，这次的 `false` 归因正确。
+- `POST /api/runs` testpage/fixed + "Buy the canvas tote bag"（testpage 没有测试数据配置，故意缺卡号）：第 7 步 `stuck` "missing data: the goal gives no card number" → 两个结论 `null`、`inconclusiveReason: missing_test_data`；`GET /api/runs` 里这条是 `state: done`、`screenReaderUserCanComplete: null`。
+- `npm test` 169/169、`npm run smoke` 全部通过。
+
+**需要通知前端：** ① `verdicts.screenReaderUserCanComplete` / `agentCanComplete`（以及 `rerun.before` / `after` 里的同名字段、`GET /api/runs` 的 `screenReaderUserCanComplete`）**可能是 `null`**，同时有 `verdicts.inconclusiveReason`。前端要分别处理 `true` / `false` / `null`，`null` 显示"无法判断：任务里缺少测试数据"之类，不能用 `!verdict` 显示成"不能完成"（目前 `FRONTEND/src/screens/AuditWorkspace.tsx` 就是这样写的，`FRONTEND/src/api/contracts.ts` 的类型也是 `boolean`）。② 报告 `meta.goalInput` / `meta.testDataAppended`：可以显示用户原文并注明"已自动补充测试数据"，progress 里的 `goal` 会比用户输入的长。
+
+没有改的：testpage 没有加测试数据配置（加了会改变 eval 里 `testpage-fixed.yaml` 那条无卡号任务的行为，需要 10 号计划负责人确认），所以 testpage 上的无数字任务仍会在付款处"无法判断"。

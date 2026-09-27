@@ -3,7 +3,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { audit, analyze, newRunDir, firstState } from './src/audit.mjs';
+import { audit, analyze, newRunDir, firstState, userGoal } from './src/audit.mjs';
 import { readTrace, MAX_STEPS, MAX_STEPS_REAL } from './src/contracts.mjs';
 import { runFixFlow, runRerun } from './src/fix/commands.mjs';
 import { createProgressWriter } from './src/report/progress.mjs';
@@ -57,7 +57,7 @@ async function main() {
     const onProgress = args.progress ? createProgressWriter(dir) : undefined;
     // first progress.json right away, before audit() attaches Chrome or waits for Enter (real mode: url known after step 0)
     onProgress?.({ state: firstState({ mode: args.mode, goal: args.goal }), trace: [], maxSteps: real ? MAX_STEPS_REAL : MAX_STEPS,
-      url: real ? null : url, goal: args.goal ?? null });
+      url: real ? null : url, goal: args.goal ? userGoal({ goal: args.goal, url, site, mode: args.mode }).goal : null });
     const { runDir, report } = await audit({ url, goal: args.goal, out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
       judgeEnabled: !args['no-judge'], headless: !args.headed, trace: !!args.trace, site, label: args.label, log: console.log,
       onProgress, waitForUser: real ? waitForEnter : undefined });

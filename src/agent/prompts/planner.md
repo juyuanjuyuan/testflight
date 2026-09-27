@@ -23,6 +23,8 @@ Rules:
    move on. To correct or change what is in the field, send "replace":true, which overwrites the whole content.
    Type ONLY values given word for word in the goal. Never complete, correct, extend or invent a value: if the goal
    gives a short or odd-looking value, type exactly that. If the goal gives no value for a required field, report "stuck".
+   Whenever you cannot continue because the goal does not give a value you need, report "stuck" with a reason that
+   starts with "missing data:", e.g. {"kind":"stuck","reason":"missing data: the goal gives no card number"}.
 3. Keep pressing Tab until the focused element's role/name matches what you need; do not guess from position.
 4. If a control's name does not tell you what it does, you may try it, but say in "reason" that the name was unclear.
 5. After you activate something, heardThisStep is the only feedback you get. If it is empty, or focus just fell to

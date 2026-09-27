@@ -658,3 +658,29 @@ test('POST /api/tasks/suggest: too slow â†’ 504 suggest_timeout; tasker error â†
     assert.match(r.body.error.message, /Could not work out a task for this page/);
   }, { suggest: async () => { throw new Error('tasker: no usable task after a retry'); } });
 });
+
+test('GET /api/runs: an inconclusive report (verdict null + inconclusiveReason) is listed with a null verdict', async () => {
+  await withRunsDir(async (runsDir) => {
+    finishedRun(runsDir, `${T}-inconclusive`, (r) => {
+      Object.assign(r.verdicts, { agentCanComplete: null, screenReaderUserCanComplete: null, inconclusiveReason: 'missing_test_data' });
+    });
+    const body = await listRuns(runsDir);
+    assert.equal(body.skipped, 0, JSON.stringify(body.skippedReasons));
+    assert.equal(body.runs[0].screenReaderUserCanComplete, null);
+    assert.equal(body.runs[0].state, 'done');
+  });
+});
+
+test('POST /api/runs: a shop goal without digits shows the goal with test data appended from the first progress.json', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post, site }) => {
+    const r = await post('/api/runs', { url: site('shop/original/'), goal: 'buy one thing' });
+    assert.equal(r.status, 202, JSON.stringify(r.body));
+    const p = readProgress(path.join(runsDir, r.body.runDir));
+    assert.equal(p.goal, 'buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.');
+    const { argv } = fake.calls.at(-1);
+    assert.equal(argv[argv.indexOf('--goal') + 1], 'buy one thing', 'the child gets the raw input (it records meta.goalInput)');
+    fake.calls.at(-1).exit({ code: 0, signal: null, stderr: '' });
+    await tick();
+  }, fake);
+});

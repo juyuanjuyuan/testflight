@@ -3,6 +3,7 @@
 对应前端的需求文档 `docs/frontend/BACKEND_CHANGES.md`，后端计划 17。**P0**（启动运行 + 实时进度）、**P1**（修复和复测，以及报告里的 `fixPolicy`）、**P2**（运行列表，报告里的 `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t`）都已完成。
 计划 18 之后：`POST /api/runs` 的 `goal` 变为可选（不传时先自动确定任务，progress 多一个状态 `planning_task`），并新增 `POST /api/tasks/suggest`（§2.1）。**前端需要能显示 `planning_task` 状态。**
 之后又给 `POST /api/tasks/suggest` 加了可选的 `generate`（§2.1）：`true` 时即使是有预设任务的演示站点也由模型生成。
+**缺少测试数据（2026-09-27，需要通知前端）：** ① 用户填的 `goal` 里没有任何数字、而站点有自己的测试数据配置（目前是 shop）时，后端把测试卡号等拼在后面（§2），progress 的 `goal` 和报告的 `meta.goal` 是拼接后的完整任务，用户原文在新的可选字段 `meta.goalInput`，另有 `meta.testDataAppended: true`；② 因为任务里缺少需要输入的值而停下的运行不再判为"不能完成"：报告里 `verdicts.screenReaderUserCanComplete` 和 `agentCanComplete` **可能是 `null`**，同时有新字段 `verdicts.inconclusiveReason: "missing_test_data"`（`rerun.before` / `after` 也一样）。**前端要区分 `true` / `false` / `null`，`null` 显示"无法判断"并说明原因，不能用 `!verdict` 当成"不能完成"**；运行列表（§4）里已完成的运行也可能是 `null`。详见 `REPORT_FORMAT.md` 的 verdicts 一节。
 前端反馈之后（计划 17 结果一节）：运行列表每项新增 `progress`（`ok` / `missing` / `corrupt`），响应新增 `skippedReasons`；新增两个 `state`：`unknown`（只出现在列表里，表示 progress.json 损坏）和 `waiting_for_user`（真实网站模式等人按回车）；排序改为按开始时间、同一秒按后缀数字。**前端需要能显示这两个新状态。**
 
 所有接口都由 `npm run serve`（默认 8080 端口）提供，和 `/runs`、`/fixtures`、`/viewer` 是同一个服务器。`report.json` 仍然是唯一的最终结果，格式见 `REPORT_FORMAT.md`。
@@ -46,6 +47,7 @@ Content-Type: application/json
 - 返回之前运行目录已经创建好，里面已经有第一版 `progress.json`（`state: "running"`、`timeline: []`；不传 `goal` 时是 `state: "planning_task"`、`goal: null`），拿到 `runDir` 马上读不会 404。
 - **不传 `goal`**：子进程打开起始页（第 0 步照常记录，所以 `planning_task` 时 `timeline` 里可能已经有第 0 步），用和 planner 第 0 步完全相同的信息（网址、标题、读屏能读到的页面文字）确定任务，把它写进 progress 的 `goal`，再进入 `running`。演示站点有预设任务时直接用预设（稳定、不调用模型）；否则由模型生成（会多花约 5–10 秒）。确定不了时写 `failed`，`error` 以 "Could not work out a task for this page. Please describe one." 开头。报告里 `meta.goalSource` / `goalReason` / `testDataProfile` 记录任务从哪里来（见 `REPORT_FORMAT.md`）。
 - 自动生成的任务每次可能不同（LLM 缓存也就用不上），demo 主流程请继续传固定的 `goal`。
+- **传了 `goal`，但里面没有任何数字**，并且站点有自己的测试数据配置（`config/test-data/<站点>.json`，目前只有 `shop.json`）：后端把配置里的测试数据按计划 18 的模板拼在后面，例如 `"buy one thing"` → `"buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."`。第一版 progress.json 起 `goal` 就是拼接后的完整任务；报告里 `meta.goal` 是完整任务，`meta.goalInput` 是用户原文，`meta.testDataAppended` 为 `true`，`meta.testDataProfile` 是配置名。`goal` 里有数字（例如自己写了卡号）时原样使用。前端可以显示原文并注明"已自动补充测试数据"。
 - 同一时间只有一个运行。已有运行时返回 `409 run_in_progress`（修复和复测也共用这个限制，见 §3）。
 - 审计在子进程里执行（`node cli.mjs audit … --run-dir <runDir> --progress`），它的输出记在运行目录的 `cli.log`，仅供后端排查，前端不要读。
 - 同一秒内启动两次，第二个目录名会带 `-2` 后缀，不会共用目录。
@@ -136,11 +138,11 @@ GET /api/runs
 | `runDir` | 运行目录名，报告在 `/runs/<runDir>/report.json`。`runs/real/` 下的真实网站运行带 `real/` 前缀（它们不能修复，所以不会用在 `/api/runs/<runDir>/fix` 里） |
 | `url` / `goal` | 有有效的 `report.json` 时取 `meta.url` / `meta.goal`（`goal` 一定是字符串）；运行中取 `progress.json` 的 `url` / `goal`，还不知道时为 `null` |
 | `generatedAt` | `report.json` 的 `meta.generatedAt`（字符串或 `null`）；还没有报告时为 `null`。修复后报告会重新生成，这个时间会更新 |
-| `screenReaderUserCanComplete` | `report.json` 的结论一，有报告时一定是 `true` / `false`；还没有报告时（运行中、分析中、没跑完就失败）为 `null`，不是 `false` |
+| `screenReaderUserCanComplete` | `report.json` 的结论一：`true` / `false`，或者 `null`。还没有报告时（运行中、分析中、没跑完就失败）为 `null`，不是 `false`；**有报告也可能是 `null`**：无法判断（报告里有 `verdicts.inconclusiveReason`，例如 `missing_test_data`），这时 `state` 是 `done` 等已完成的状态，要显示"无法判断"，不能显示成"不能完成" |
 | `state` | 有能读的 `progress.json` 就取它的 `state`（`waiting_for_user` / `planning_task` / `running` / `analyzing` / `fixing` / `rerunning` / `done` / `failed`，见 §5）。已经有报告、正在修复的运行是 `fixing` 或 `rerunning`，结论仍是审计的结论。有报告但没有 `progress.json` 的旧运行（命令行不带 `--progress` 跑的）是 `done`；有报告但 `progress.json` 损坏（不是 JSON、不是对象、`state` 不是上面这些值，或者 `url` / `goal` 不是字符串或 `null`）是 **`unknown`**：结论照常显示，但不知道现在是否还在修复。`unknown` 只出现在列表里，progress.json 里永远不会写它 |
 | `progress` | `progress.json` 的情况：`ok`（能读，`state` 取自它）/ `missing`（没有这个文件，`state` 是 `done`）/ `corrupt`（损坏，`state` 是 `unknown`）。没有报告的条目一定是 `ok` |
 | `skipped` | `runs/` 和 `runs/real/` 下**没有列出的目录**个数（原因见 `skippedReasons`）。这些目录不出现在 `runs` 里，也不会让接口报错 |
-| `skippedReasons` | 按原因统计的 `skipped`，只列出现过的原因，没有跳过时是 `{}`，各项之和等于 `skipped`。原因：`report_invalid`（有 `report.json`，但不是 JSON，或者 `meta.goal` 不是字符串、`verdicts.screenReaderUserCanComplete` 不是布尔值、`meta.generatedAt` 不是字符串或 `null`、`meta.url` 不是字符串或 `null`。**一律不做类型转换**，即使同时有正常的 progress.json 也不列出）；`done_without_report`（progress 是 `done` 但没有 `report.json`，不应该发生）；`progress_corrupt`（没有报告，progress.json 也损坏）；`no_report_or_progress`（两个文件都没有，例如中途被杀、没开 `--progress` 的命令行运行）。以后可能增加新的原因 |
+| `skippedReasons` | 按原因统计的 `skipped`，只列出现过的原因，没有跳过时是 `{}`，各项之和等于 `skipped`。原因：`report_invalid`（有 `report.json`，但不是 JSON，或者 `meta.goal` 不是字符串、`verdicts.screenReaderUserCanComplete` 不是布尔值（`null` 只在同时有字符串 `inconclusiveReason` 时有效）、`meta.generatedAt` 不是字符串或 `null`、`meta.url` 不是字符串或 `null`。**一律不做类型转换**，即使同时有正常的 progress.json 也不列出）；`done_without_report`（progress 是 `done` 但没有 `report.json`，不应该发生）；`progress_corrupt`（没有报告，progress.json 也损坏）；`no_report_or_progress`（两个文件都没有，例如中途被杀、没开 `--progress` 的命令行运行）。以后可能增加新的原因 |
 
 没有报告时：progress.json 的 `state` 是 `failed` 的照常列出（`generatedAt`、`screenReaderUserCanComplete` 为 `null`），运行中的各个状态也照常列出，`done` 计入 `skipped`。
 

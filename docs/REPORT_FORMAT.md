@@ -3,7 +3,7 @@
 后端每跑完一次审计，会在运行目录里生成一个 `report.json`。**前端只需要读这一个文件**，外加它引用的截图。
 
 - 机器可读的完整定义：`docs/report.schema.json`（JSON Schema 2020-12，可以用来校验或生成 TypeScript 类型，例如 `npx json-schema-to-typescript docs/report.schema.json`）
-- 字段齐全的示例：`docs/report.example.json`（基于真实运行数据；judge 的文字和修复部分是按真实格式手写的示意）
+- 字段齐全的示例：`docs/report.example.json`（基于真实运行数据；judge 的文字和修复部分是按真实格式手写的示意；`meta.goalInput` / `testDataAppended` / `testDataProfile` 也是示意，仓库里 testpage 实际没有自己的测试数据配置）
 - 真实运行结果：`fixtures/testpage-original/report.json`（读屏用户无法完成）、`fixtures/testpage-fixed/report.json`（可以完成）、`fixtures/testpage-fixloop/report.json`（真实的"发现 → 修复 → 重跑"：带 judge、`fixes`、`findings[].fix` 和 `rerun`，`closedLoop: true`）
 
 ## 1. 怎么读取
@@ -51,17 +51,31 @@
 | `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 40，真实网站 80。可以显示"用了 14 / 40 步"。`replay` 生成的报告和旧报告里没有 |
 | `goalSource` | 任务从哪里来：`user` = 用户填的；`curated` = 演示站点的预设任务（`eval/groundtruth/`）；`generated` = 用户没填，AI 根据起始页生成。可以在任务旁边显示"AI 生成"之类的标记。`replay` 生成的报告和旧报告里没有 |
 | `goalReason` | 为什么选这个任务（一句英文）；用户填的任务为 `null`。没有 `goalSource` 时也没有 |
-| `testDataProfile` | 生成任务时拼进去的测试数据配置名（`config/test-data/<名字>.json`，例如 `default`、`shop`）；用户填的、预设的任务以及真实网站模式（不拼接任何支付和个人数据）为 `null`。没有 `goalSource` 时也没有 |
+| `testDataProfile` | 拼进 goal 的测试数据配置名（`config/test-data/<名字>.json`，例如 `default`、`shop`）：AI 生成的任务，或者自动补了测试数据的用户任务（`testDataAppended`）。预设任务、原样使用的用户任务以及真实网站模式（不拼接任何支付和个人数据）为 `null`。没有 `goalSource` 时也没有 |
+| `goalInput` | 用户原本输入的任务（补测试数据之前）。只在 `testDataAppended` 为 `true` 时出现，可以用它显示用户输入的原文，旁边注明"已自动补充测试数据" |
+| `testDataAppended` | 只在补了测试数据时出现，值为 `true`：用户的任务里没有任何数字，而本地站点有自己的测试数据配置（例如 `config/test-data/shop.json` 的测试卡号），于是把这些值拼在任务后面，`goal` 是拼接后实际使用的任务。真实网站模式从不补充 |
 
 ### verdicts：两个核心结论
 
 | 字段 | 说明 | 建议展示 |
 |---|---|---|
-| `screenReaderUserCanComplete` | **结论一：读屏用户能否完成任务**。= AI 完成了任务，并且路径上没有阻断级问题 | 最大、最醒目 |
-| `agentCanComplete` | **结论二：只靠结构信息的 AI agent 能否完成**（只用键盘和读屏器能获得的信息） | 紧挨着结论一 |
+| `screenReaderUserCanComplete` | **结论一：读屏用户能否完成任务**。= AI 完成了任务，并且路径上没有阻断级问题。**可能是 `null`**：无法判断（见 `inconclusiveReason`），不能显示成"不能完成" | 最大、最醒目；`null` 时显示"无法判断" |
+| `agentCanComplete` | **结论二：只靠结构信息的 AI agent 能否完成**（只用键盘和读屏器能获得的信息）。和结论一同时为 `null` | 紧挨着结论一 |
 | `outcome` | `done` 完成 / `stuck` 卡住 / `max-steps` 步数用完 | 小字 |
 | `blockingFindings` | 阻断级问题的 id 列表 | 可以链接到问题清单 |
-| `unexplainedStuck` | AI 卡住了，但没有检测器能解释原因 | 为 true 时提示"需要人工查看" |
+| `unexplainedStuck` | AI 卡住了，但没有检测器能解释原因（无法判断时为 `false`） | 为 true 时提示"需要人工查看" |
+| `inconclusiveReason` | 只在两个结论为 `null` 时出现。`missing_test_data`：AI 因为任务里没有给出需要输入的值（例如卡号）而停下，这不是网站的问题。`blockingFindings` 和问题清单照常有效 | `null` 时显示原因，例如"任务里缺少测试数据（如卡号），无法判断" |
+
+无法判断时 `verdicts` 的样子（`blockingFindings` 照常列出）：
+
+```json
+{ "outcome": "stuck", "agentCanComplete": null, "screenReaderUserCanComplete": null,
+  "blockingFindings": ["F4"], "unexplainedStuck": false, "inconclusiveReason": "missing_test_data" }
+```
+
+`rerun.before` / `rerun.after` 也可能是这样；`rerun.closedLoop` 只在修复前为 `false`、修复后为 `true` 时才是 `true`（修复前无法判断不算"闭环"）。
+
+结论可能是 `null` 是后加的变化（以前一定是布尔值），前端要处理：不要用 `!screenReaderUserCanComplete` 判断"不能完成"，要分别判断 `true` / `false` / `null`。
 
 ### counts
 

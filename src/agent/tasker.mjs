@@ -65,6 +65,26 @@ export function loadTestData(siteKey) {
   return { profile: 'default', sentences };
 }
 
+/**
+ * A user goal with test values appended, for a local site that has its own config/test-data/<a>.json: when the goal has
+ * no digit at all (so it carries no values of its own), the sentences of the site's `needs` (default: the kinds the site
+ * file overrides) are appended, as for a generated goal. Real mode and sites without their own file: goal unchanged.
+ * @returns {{goal:string, appended:boolean, profile:string|null}}
+ */
+export function appendTestData({ goal, siteKey, mode = 'local' }) {
+  const same = { goal, appended: false, profile: null };
+  const site = siteKey?.split('/')[1];
+  if (mode === 'real' || /\d/.test(goal) || !site || !NAME.test(site)) return same;
+  const file = path.join(TEST_DATA_DIR, `${site}.json`);
+  if (!fs.existsSync(file)) return same;
+  const own = JSON.parse(fs.readFileSync(insideDir(TEST_DATA_DIR, `${site}.json`), 'utf8'));
+  const needs = Array.isArray(own.needs) ? own.needs : Object.keys(own.sentences ?? {});
+  const unknown = needs.filter((k) => !DATA_KINDS.includes(k));
+  if (unknown.length) throw new Error(`config/test-data/${site}.json: unknown data kind ${unknown.join(', ')} in needs`);
+  const { profile, sentences } = loadTestData(siteKey);
+  return needs.length ? { goal: buildGoal({ goal, needs }, sentences, mode), appended: true, profile } : same;
+}
+
 const withStop = (goal) => (/[.!?]$/.test(goal) ? goal : `${goal}.`);
 
 function buildGoal({ goal, needs }, sentences, mode) {

@@ -82,6 +82,7 @@ flowchart LR
 - `agentCanComplete`：planner 最终输出 done。对应"只靠结构信息的 AI agent 能否下单"。
 - `screenReaderUserCanComplete`：planner 完成了任务，**并且**执行路径上没有 block 级别的问题。LLM 可能猜出 🛒 是加购按钮，但真人读屏用户只会听到"按钮"，不能指望靠猜。
 - `unexplainedStuck`：planner 卡住了，但没有检测器能解释原因。遇到这种情况要人工查看，或者补 D6。
+- 无法判断：planner 因为 goal 里缺少需要输入的值而 stuck（reason 以 `missing data:` 开头，或者输入值检查拒绝后的 stuck），这不是网站的问题：前两个结论为 `null`，`inconclusiveReason: "missing_test_data"`，`unexplainedStuck` 为 false，`blockingFindings` 照常。用户 goal 没有数字时，有测试数据配置的本地站点会自动补上测试值（`appendTestData`），尽量避免这种情况。
 
 ## 7. LLM 层（`src/agent/llm.mjs`）
 

@@ -75,7 +75,10 @@ const original = await liveReport('original');
 const fixed = await liveReport('fixed');
 const rerunReport = { ...original.report, rerun: { runDir: 'runs/x-rerun', ...compareRuns(original.report, fixed.report) } };
 const axeErrorReport = buildReport({ meta: { goal: 'x' }, trace: original.trace, findings: original.findings, axe: mergeAxe([{ error: 'CSP blocked script' }]) });
-const live = { 'original (live)': original.report, 'fixed (live)': fixed.report, 'original + rerun (live)': rerunReport, 'axe error (live)': axeErrorReport };
+// a planner stuck for missing test data: verdicts null + inconclusiveReason
+const missingData = buildReport({ meta: { goal: 'x', goalInput: 'x', testDataAppended: true, testDataProfile: 'shop', goalSource: 'user', goalReason: null },
+  trace: [...original.trace.slice(0, -1), { ...original.trace.at(-1), action: { kind: 'stuck', reason: 'missing data: no card number in the goal' } }], findings: original.findings });
+const live = { 'missing data (live)': missingData, 'original (live)': original.report, 'fixed (live)': fixed.report, 'original + rerun (live)': rerunReport, 'axe error (live)': axeErrorReport };
 
 test('schema compiles in strict mode', () => {
   assert.equal(typeof validate, 'function');

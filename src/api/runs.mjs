@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, SITES_DIR, insideDir } from '../paths.mjs';
-import { newRunDir } from '../audit.mjs';
+import { newRunDir, userGoal } from '../audit.mjs';
 import { readTrace, MAX_GOAL_CHARS, SUGGEST_TIMEOUT_MS } from '../contracts.mjs';
 import { siteDirs } from '../fix/commands.mjs';
 import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../report/progress.mjs';
@@ -158,7 +158,8 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {}, sugg
       const argv = ['audit', '--url', url, ...(goal ? ['--goal', goal] : []), '--run-dir', runDir, '--site', site, '--progress',
         ...(script ? ['--script', script, '--no-judge'] : [])];
       try {
-        createProgressWriter(runDir)({ state: goal ? 'running' : 'planning_task', trace: [], url, goal });
+        // the child gets the raw goal (it records meta.goalInput); progress shows the goal the planner will get
+        createProgressWriter(runDir)({ state: goal ? 'running' : 'planning_task', trace: [], url, goal: goal && userGoal({ goal, url, site }).goal });
         return exited(spawnRun({ runDir, argv })).then((exit) => markFailedIfUnfinished(runDir, exitMessage('audit', exit)));
       } catch (e) {
         markFailedIfUnfinished(runDir, 'The audit could not be started.');
