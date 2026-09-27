@@ -27,7 +27,7 @@ registerHooks({
     return next(url, context);
   },
 });
-const { LiveRun, ReportView, VerificationView } = await import("../src/screens/AuditWorkspace.tsx");
+const { LiveRun, RecordView, ReportView, VerificationView } = await import("../src/screens/AuditWorkspace.tsx");
 const verdict = { outcome: "done", agentCanComplete: true, screenReaderUserCanComplete: false, blockingFindings: ["F1"], unexplainedStuck: false };
 const report = {
   meta: { goal: "Buy a jacket", mode: "local", site: "sites/shop/original", maxSteps: 73, goalSource: "generated" },
@@ -35,14 +35,15 @@ const report = {
   timeline: [], findings: [],
   fixPolicy: { enforced: [{ id: "check", rule: "Only permitted files" }], instructed: [{ id: "prompt", rule: "Preserve design" }] },
 };
-test("report renders distinct agent/user outcomes, dynamic limit and policy boundaries", () => {
+test("report renders distinct agent/user outcomes and dynamic limit; policy boundaries only in the record", () => {
   const html = renderToStaticMarkup(React.createElement(ReportView, { report, runDir: "run-1", busy: false }));
-  assert.match(html, /NEEDS ATTENTION/);
+  assert.match(html, /CAUTION/);
   assert.match(html, /AI-selected task/);
   assert.match(html, /73/);
   assert.match(html, /Unavailable/);
-  assert.match(html, /not guaranteed by code checks/);
+  assert.doesNotMatch(html, /not guaranteed by code checks/);
   assert.match(html, /Fix all blocking findings/);
+  assert.match(renderToStaticMarkup(React.createElement(RecordView, { report, runDir: "run-1" })), /not guaranteed by code checks/);
 });
 test("completed child keeps parent in re-test state until comparison is written", () => {
   const progress = { state: "rerunning", timeline: [], step: null, maxSteps: 73, goal: null };

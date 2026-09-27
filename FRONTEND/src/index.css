@@ -819,6 +819,17 @@ a.main-action { text-decoration: none; }
 .live-workspace .timeline-event code { display: block; font-size: 11px; overflow-wrap: anywhere; margin-top: 8px; }
 .live-workspace .timeline-event small { color: var(--amber); }
 .live-workspace .event-feed { max-height: 560px; overflow-y: auto; }
+/* Report badge: larger centred label with room to the border. */
+.live-workspace .report-status { padding: 0 12px; box-sizing: border-box; text-align: center; font-size: 18px; font-weight: 600; letter-spacing: .06em; line-height: 1.2; }
+/* Fix card: text takes the left half, the button the right half flush to the edge. */
+.live-workspace .fix-cta { grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px; }
+.live-workspace .fix-cta h3 { font-size: 20px; }
+.live-workspace .fix-cta p { font-size: 12px; margin-top: 6px; }
+.live-workspace .fix-cta button { width: 100%; font-size: 13px; }
+@media (max-width: 720px) {
+  .live-workspace .report-status { font-size: 14px; padding: 0 8px; }
+  .live-workspace .fix-cta { grid-template-columns: 1fr; }
+}
 /* Side by side: the feed fills the column height set by the browser panel; contain:size keeps its content from growing the row. */
 @media (min-width: 1001px) {
   .live-workspace .agent-stream { display: flex; flex-direction: column; }

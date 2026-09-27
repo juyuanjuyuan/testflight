@@ -69,7 +69,7 @@ export function ReportView({ report, runDir, onInspect, onFix, busy }: { report:
   const verdict = report.verdicts;
   const executionError = plannerFailure(report);
   return <section className="dashboard-screen"><div className="dashboard-heading report-heading"><div><span className="result-label">AUDIT REPORT · {elapsed == null ? "Duration unavailable" : duration(elapsed)}</span><h1>Audit results</h1></div>
-    <span className={`report-status ${verdict.screenReaderUserCanComplete ? "passed" : "failed"}`}>{executionError ? "AUDIT INCOMPLETE" : verdict.screenReaderUserCanComplete ? "TASK ACCESSIBLE" : "NEEDS ATTENTION"}</span></div>
+    <span className={`report-status ${verdict.screenReaderUserCanComplete ? "passed" : "failed"}`}>{executionError ? "AUDIT INCOMPLETE" : verdict.screenReaderUserCanComplete ? "TASK ACCESSIBLE" : "CAUTION"}</span></div>
     <div className="task-summary"><span>{sourceLabel(report.meta.goalSource)}</span><h2>{report.meta.goal}</h2>{report.meta.goalReason && <p>{report.meta.goalReason}</p>}
       {report.meta.testDataProfile && <small>Test data profile: {report.meta.testDataProfile}</small>}</div>
     {executionError && <div className="notice" role="alert"><b>The audit could not finish.</b><p>{executionError}</p><p>Check the backend model configuration and service connection, then start a new audit. These results do not establish whether the task is accessible.</p></div>}
@@ -84,7 +84,6 @@ export function ReportView({ report, runDir, onInspect, onFix, busy }: { report:
     {canFix(report) && report.counts.block === 0 && !!report.findings.length && <p className="notice">No blocking findings. Open a finding to request a targeted fix.</p>}
     {!canFix(report) && <p className="muted">This report is read-only for repairs. Re-tests must be repaired from their original audit.</p>}
     {!!report.fixes?.length && <Fixes report={report} />}
-    <Policy report={report} />
     <details className="audit-details"><summary>Review recorded steps</summary><Timeline steps={report.timeline} runDir={runDir} /></details>
   </section>;
 }
@@ -96,7 +95,6 @@ export function FindingView({ report, finding, runDir, onBack, onFix, busy }: { 
     <Timeline steps={steps} runDir={runDir} />
     {canFix(report) && <div className="fix-cta"><div><h3>{report.counts.block > 0 ? "Repair the blockers on this path" : "Try a targeted repair"}</h3><p>{report.counts.block > 0 ? "The default repairs all blocking findings, then re-tests the same task." : "The backend will attempt to repair this finding on a copy."}</p></div><button disabled={busy} onClick={() => onFix(report.counts.block > 0 ? undefined : [finding.id])}>Fix &amp; re-test <Icon name="arrow" /></button></div>}
     {canFix(report) && report.counts.block > 0 && <button className="text-button" disabled={busy} onClick={() => onFix([finding.id])}>Fix only this finding &amp; re-test</button>}
-    <Policy report={report} />
   </section>;
 }
 
