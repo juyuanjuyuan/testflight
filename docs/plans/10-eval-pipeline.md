@@ -30,3 +30,11 @@
 
 - 表里的"axe"只统计带 WCAG 标签的规则，best-practice 规则另列，否则对比不公平。
 - 假站障碍中 `detectable: vision-only` 的（文字印在图片上），在我们的"检出"里如实算作漏检，除非 13 做完了。
+
+## 开始前需要处理（计划 18 发现，2026-09-27）
+
+1. **`eval/groundtruth/testpage.yaml` 的站点路径不对。** 文件里写的是 `site: sites/testpage`，实际目录是 `sites/testpage/original`，所以计划 18 的"预设任务"匹配不到这个页面，改为调用模型生成任务。改成正确路径，并确认 `node cli.mjs suggest --url http://localhost:8080/testpage/original/` 返回的是预设任务（`source: "curated"`）。
+2. **两个 testpage 的预设任务里没有卡号。** 用预录按键跑不受影响；但用 planner 跑时，它会在付款那一步停下，因为 planner 只能输入 goal 里原样出现的值，不会自己编造卡号（这是正确的行为）。建议在 `testpage.yaml` 和 `testpage-fixed.yaml` 的 goal 里都加上 "Pay with card number 4242 4242 4242 4242."。
+   - 评分按 `barrierId` 匹配，改 goal 的文字不影响分数；
+   - 但会让已有的 LLM 缓存失效，相关的 fixture 和 smoke 用例如果依赖旧的 goal 文字，要一起更新；
+   - 改完用 planner 在 testpage 的 fixed 版上跑一次，确认能完成购买。
