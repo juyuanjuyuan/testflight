@@ -9,9 +9,10 @@ export type TimelineStep = {
   seen: { text: string; rect?: Rect | null }[]; seenNoise?: string[]; heard: string[];
   screenshot?: string | null; shotSize?: ShotSize | null; findingIds: string[];
 };
+// Both outcomes are null when the backend cannot decide (see inconclusiveReason); null never means "cannot complete".
 export type Verdicts = {
-  outcome: string; agentCanComplete: boolean; screenReaderUserCanComplete: boolean;
-  blockingFindings: string[]; unexplainedStuck: boolean;
+  outcome: string; agentCanComplete: boolean | null; screenReaderUserCanComplete: boolean | null;
+  blockingFindings: string[]; unexplainedStuck: boolean; inconclusiveReason?: string | null;
 };
 export type Edit = { file: string; old: string; new: string };
 export type Finding = {

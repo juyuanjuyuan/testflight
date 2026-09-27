@@ -529,6 +529,11 @@ a.main-action { text-decoration: none; }
   background: rgba(185, 244, 91, 0.07);
 }
 
+.report-status.inconclusive {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
 .report-status strong {
   font-size: 15px;
 }

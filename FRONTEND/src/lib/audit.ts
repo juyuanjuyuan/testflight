@@ -8,6 +8,14 @@ export function stateLabel(state: string): string {
 export function isActive(state: string): boolean {
   return !["done", "failed", "unknown"].includes(state);
 }
+export function verdictLabel(value: boolean | null | undefined, yes: string, no: string): string {
+  return value === true ? yes : value === false ? no : "Inconclusive";
+}
+export function inconclusiveMessage(reason?: string | null): string {
+  return reason === "missing_test_data"
+    ? "Inconclusive: the task is missing test data (for example, a card number). Add it and run again."
+    : "Inconclusive: the backend could not determine whether this task can be completed.";
+}
 export function auditDuration(report: AuditReport): number | null {
   const start = Date.parse(report.meta.startedAt ?? "");
   const end = Date.parse(report.meta.finishedAt ?? "");

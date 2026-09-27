@@ -14,6 +14,8 @@ function initialRun() {
   if (!value) return null;
   try { runPath(value); return value; } catch { return null; }
 }
+// These list states imply a saved report, so a null verdict there means inconclusive rather than pending (docs/API.md §4).
+const hasReportState = (state: string) => ["done", "unknown", "fixing", "rerunning"].includes(state);
 const message = (e: unknown) => e instanceof Error ? e.message : "The request could not be completed.";
 
 export default function App() {
@@ -122,7 +124,7 @@ export default function App() {
       {view === "history" && <section className="dashboard-screen"><div className="dashboard-heading"><div><span className="result-label">AUDIT WORKSPACE</span><h1>Run history</h1></div><button className="text-button" onClick={() => setHistoryRevision((n) => n + 1)}>Refresh</button></div>
         {historyError && <p className="notice" role="alert">{historyError}</p>}{!history && !historyError && <p>Loading runs…</p>}
         {history && !history.runs.length && <p>No recorded runs yet. Start an audit to create one.</p>}
-        <div className="history-list">{history?.runs.map((r) => <button className="history-row" key={r.runDir} onClick={() => openRun(r.runDir)}><div><b>{r.goal ?? "Task not selected yet"}</b><p>{r.url ?? "Waiting for the start page"}</p><small>{r.runDir}</small></div><div><strong>{stateLabel(r.state)}</strong><p>{r.screenReaderUserCanComplete === null ? "No verdict yet" : r.screenReaderUserCanComplete ? "Audit: task completable" : "Audit: needs attention"}</p>{r.progress === "corrupt" && <small>Progress unavailable · saved report available</small>}</div><Icon name="arrow" /></button>)}</div>
+        <div className="history-list">{history?.runs.map((r) => <button className="history-row" key={r.runDir} onClick={() => openRun(r.runDir)}><div><b>{r.goal ?? "Task not selected yet"}</b><p>{r.url ?? "Waiting for the start page"}</p><small>{r.runDir}</small></div><div><strong>{stateLabel(r.state)}</strong><p>{r.screenReaderUserCanComplete === true ? "Audit: task completable" : r.screenReaderUserCanComplete === false ? "Audit: needs attention" : hasReportState(r.state) ? "Audit: inconclusive" : "No verdict yet"}</p>{r.progress === "corrupt" && <small>Progress unavailable · saved report available</small>}</div><Icon name="arrow" /></button>)}</div>
         {!!history?.skipped && <details className="audit-details"><summary>{history.skipped} unreadable run(s) omitted</summary>{Object.entries(history.skippedReasons ?? {}).map(([reason, count]) => <p key={reason}>{reason}: {count}</p>)}</details>}
       </section>}
       {!["setup", "history"].includes(view) && <>

@@ -79,3 +79,35 @@ test("an unrecognized live state renders as processing, not an error", () => {
   assert.match(html, /Processing…/);
   assert.doesNotMatch(html, /Status unavailable|Run failed/);
 });
+const inconclusive = { outcome: "stuck", agentCanComplete: null, screenReaderUserCanComplete: null, blockingFindings: ["F4"], unexplainedStuck: false, inconclusiveReason: "missing_test_data" };
+test("null verdicts render as inconclusive with the missing test data reason, never as No", () => {
+  const html = renderToStaticMarkup(React.createElement(ReportView, { report: { ...report, verdicts: inconclusive }, runDir: "run-1", busy: false }));
+  assert.match(html, /INCONCLUSIVE/);
+  assert.match(html, /report-status inconclusive/);
+  assert.equal(html.match(/<strong>Inconclusive<\/strong>/g)?.length, 2);
+  assert.match(html, /Inconclusive: the task is missing test data \(for example, a card number\)\. Add it and run again\./);
+  assert.doesNotMatch(html, /CAUTION|<strong>No<\/strong>|TASK ACCESSIBLE/);
+  assert.doesNotMatch(html, /no detector explained why/);
+});
+test("null verdict without a known reason is still inconclusive and separate from unexplained stuck", () => {
+  const verdicts = { ...inconclusive, inconclusiveReason: undefined, unexplainedStuck: true };
+  const html = renderToStaticMarkup(React.createElement(ReportView, { report: { ...report, verdicts }, runDir: "run-1", busy: false }));
+  assert.match(html, /<p class="notice inconclusive-notice">Inconclusive: the backend could not determine/);
+  assert.match(html, /<p class="notice">The agent was unable to complete the task, but no detector explained why/);
+  assert.doesNotMatch(html, /missing test data/);
+});
+test("inconclusive re-test comparisons are neither failures nor verified fixes", () => {
+  const rerun = { runDir: "runs/child", before: inconclusive, after: inconclusive, closedLoop: false, status: [], introduced: [] };
+  const html = renderToStaticMarkup(React.createElement(VerificationView, { report: { ...report, rerun } }));
+  assert.match(html, /The re-test was inconclusive\./);
+  assert.equal(html.match(/<strong>Inconclusive<\/strong>/g)?.length, 2);
+  assert.match(html, /Original audit · Inconclusive: the task is missing test data/);
+  assert.match(html, /Re-test · Inconclusive: the task is missing test data/);
+  assert.doesNotMatch(html, /Not completable|still needs attention|FIX VERIFIED/);
+  const partial = renderToStaticMarkup(React.createElement(VerificationView, { report: { ...report, rerun: { ...rerun, after: verdict } } }));
+  assert.match(partial, /<strong>Inconclusive<\/strong>.*<strong>Not completable<\/strong>/);
+  assert.doesNotMatch(partial, /Re-test · Inconclusive/);
+  const record = renderToStaticMarkup(React.createElement(RecordView, { report: { ...report, rerun }, runDir: "run-1" }));
+  assert.match(record, /Re-test: Inconclusive/);
+  assert.doesNotMatch(record, /Needs attention/);
+});

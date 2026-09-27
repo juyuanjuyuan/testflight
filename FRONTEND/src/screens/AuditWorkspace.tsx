@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AuditReport, Finding, Progress, TimelineStep } from "../api/contracts";
 import { artifactUrl } from "../api/live";
-import { auditDuration, plannerFailure, canFix, frameGeometry, sourceLabel, stateLabel } from "../lib/audit";
+import { auditDuration, plannerFailure, canFix, frameGeometry, inconclusiveMessage, sourceLabel, stateLabel, verdictLabel } from "../lib/audit";
 import { clock, downloadFile, duration } from "../lib/format";
 import FrameView from "../components/FrameView";
 import Icon from "../components/Icon";
@@ -69,11 +69,12 @@ export function ReportView({ report, runDir, onInspect, onFix, busy }: { report:
   const verdict = report.verdicts;
   const executionError = plannerFailure(report);
   return <section className="dashboard-screen"><div className="dashboard-heading report-heading"><div><span className="result-label">AUDIT REPORT · {elapsed == null ? "Duration unavailable" : duration(elapsed)}</span><h1>Audit results</h1></div>
-    <span className={`report-status ${verdict.screenReaderUserCanComplete ? "passed" : "failed"}`}>{executionError ? "AUDIT INCOMPLETE" : verdict.screenReaderUserCanComplete ? "TASK ACCESSIBLE" : "CAUTION"}</span></div>
+    <span className={`report-status ${verdict.screenReaderUserCanComplete === true ? "passed" : verdict.screenReaderUserCanComplete === false ? "failed" : "inconclusive"}`}>{executionError ? "AUDIT INCOMPLETE" : verdictLabel(verdict.screenReaderUserCanComplete, "TASK ACCESSIBLE", "CAUTION").toUpperCase()}</span></div>
     <div className="task-summary"><span>{sourceLabel(report.meta.goalSource)}</span><h2>{report.meta.goal}</h2>{report.meta.goalReason && <p>{report.meta.goalReason}</p>}
       {report.meta.testDataProfile && <small>Test data profile: {report.meta.testDataProfile}</small>}</div>
     {executionError && <div className="notice" role="alert"><b>The audit could not finish.</b><p>{executionError}</p><p>Check the backend model configuration and service connection, then start a new audit. These results do not establish whether the task is accessible.</p></div>}
-    <div className="verdict-grid"><div><span>SCREEN READER USER CAN COMPLETE</span><strong>{executionError ? "Not determined" : verdict.screenReaderUserCanComplete ? "Yes" : "No"}</strong></div><div><span>AI AGENT CAN COMPLETE</span><strong>{executionError ? "Not determined" : verdict.agentCanComplete ? "Yes" : "No"}</strong></div></div>
+    <div className="verdict-grid"><div><span>SCREEN READER USER CAN COMPLETE</span><strong>{executionError ? "Not determined" : verdictLabel(verdict.screenReaderUserCanComplete, "Yes", "No")}</strong></div><div><span>AI AGENT CAN COMPLETE</span><strong>{executionError ? "Not determined" : verdictLabel(verdict.agentCanComplete, "Yes", "No")}</strong></div></div>
+    {!executionError && verdict.screenReaderUserCanComplete === null && <p className="notice inconclusive-notice">{inconclusiveMessage(verdict.inconclusiveReason)}</p>}
     {!executionError && verdict.unexplainedStuck && <p className="notice">The agent was unable to complete the task, but no detector explained why. Manual review is needed.</p>}
     {report.meta.judge === false && <p className="notice">AI judging was disabled. Findings use deterministic defaults.</p>}
     <div className="report-metrics"><article><span>BLOCKING</span><strong>{report.counts.block}</strong></article><article><span>DEGRADING</span><strong>{report.counts.degrade}</strong></article><article><span>STEPS / LIMIT</span><strong>{report.timeline[report.timeline.length - 1]?.i ?? "—"} / {report.meta.maxSteps ?? "—"}</strong></article></div>
@@ -101,8 +102,10 @@ export function FindingView({ report, finding, runDir, onBack, onFix, busy }: { 
 export function VerificationView({ report, onReport, onChild, onRecord }: { report: AuditReport; onReport: () => void; onChild?: () => void; onRecord: () => void }) {
   const rerun = report.rerun;
   if (!rerun) return <section className="dashboard-screen"><h1>Fix results</h1><p>No completed re-test comparison is available.</p><Fixes report={report} /><button className="text-button" onClick={onReport}>Back to original report</button></section>;
-  return <section className="verified-screen"><span className="verified-kicker">{rerun.closedLoop ? "FIX VERIFIED" : "RE-TEST COMPLETE"}</span><h1>{rerun.closedLoop ? "The task can now be completed." : rerun.after.screenReaderUserCanComplete ? "The task remains completable." : "The task still needs attention."}</h1><p>Conclusion for the recorded task, based on the backend comparison.</p>
-    <div className="outcome-transition"><strong>{rerun.before.screenReaderUserCanComplete ? "Completable" : "Not completable"}</strong><Icon name="arrow" /><strong>{rerun.after.screenReaderUserCanComplete ? "Completable" : "Not completable"}</strong></div>
+  return <section className="verified-screen"><span className="verified-kicker">{rerun.closedLoop ? "FIX VERIFIED" : "RE-TEST COMPLETE"}</span><h1>{rerun.closedLoop ? "The task can now be completed." : rerun.after.screenReaderUserCanComplete === true ? "The task remains completable." : rerun.after.screenReaderUserCanComplete === false ? "The task still needs attention." : "The re-test was inconclusive."}</h1><p>Conclusion for the recorded task, based on the backend comparison.</p>
+    <div className="outcome-transition"><strong>{verdictLabel(rerun.before.screenReaderUserCanComplete, "Completable", "Not completable")}</strong><Icon name="arrow" /><strong>{verdictLabel(rerun.after.screenReaderUserCanComplete, "Completable", "Not completable")}</strong></div>
+    {rerun.before.screenReaderUserCanComplete === null && <p className="notice inconclusive-notice">Original audit · {inconclusiveMessage(rerun.before.inconclusiveReason)}</p>}
+    {rerun.after.screenReaderUserCanComplete === null && <p className="notice inconclusive-notice">Re-test · {inconclusiveMessage(rerun.after.inconclusiveReason)}</p>}
     {rerun.after.unexplainedStuck && <p className="notice">The agent is stuck without a detected explanation. Manual review is needed.</p>}
     <div className="verified-facts">{rerun.status.map((s) => <span key={s.id}>{s.id}: {s.status}</span>)}<span>{rerun.introduced.length} new finding(s)</span></div>
     <p className="muted">“Resolved” means the finding was not detected on the re-test path. This does not certify the whole website.</p>
@@ -116,7 +119,7 @@ function Fixes({ report }: { report: AuditReport }) {
 }
 
 export function RecordView({ report, runDir }: { report: AuditReport; runDir: string }) {
-  return <section className="dashboard-screen"><span className="result-label">VERIFICATION RECORD</span><h1>Evidence your team can review.</h1><p>A record of this task, applied edits and the backend re-test comparison. This is not a compliance certification.</p><div className="workspace-actions"><button className="compliance-button" onClick={() => downloadFile(`verification-${runDir.replace(/\//g, "-")}.json`, JSON.stringify(report, null, 2), "application/json")}><Icon name="download" /> Download evidence JSON</button><button className="text-button" onClick={() => window.print()}>Print record</button></div><div className="task-summary"><h2>{report.meta.goal}</h2><p>{report.meta.url}</p><p>Run: {runDir}</p><p>Generated: {report.meta.generatedAt ? new Date(report.meta.generatedAt).toLocaleString() : "—"}</p><p>Re-test: {report.rerun ? report.rerun.after.screenReaderUserCanComplete ? "Task completable" : "Needs attention" : "Not available"}</p></div><Fixes report={report} /><Policy report={report} /></section>;
+  return <section className="dashboard-screen"><span className="result-label">VERIFICATION RECORD</span><h1>Evidence your team can review.</h1><p>A record of this task, applied edits and the backend re-test comparison. This is not a compliance certification.</p><div className="workspace-actions"><button className="compliance-button" onClick={() => downloadFile(`verification-${runDir.replace(/\//g, "-")}.json`, JSON.stringify(report, null, 2), "application/json")}><Icon name="download" /> Download evidence JSON</button><button className="text-button" onClick={() => window.print()}>Print record</button></div><div className="task-summary"><h2>{report.meta.goal}</h2><p>{report.meta.url}</p><p>Run: {runDir}</p><p>Generated: {report.meta.generatedAt ? new Date(report.meta.generatedAt).toLocaleString() : "—"}</p><p>Re-test: {report.rerun ? verdictLabel(report.rerun.after.screenReaderUserCanComplete, "Task completable", "Needs attention") : "Not available"}</p>{report.rerun?.after.screenReaderUserCanComplete === null && <p>{inconclusiveMessage(report.rerun.after.inconclusiveReason)}</p>}</div><Fixes report={report} /><Policy report={report} /></section>;
 }
 
 export default ReportView;
