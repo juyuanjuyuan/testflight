@@ -111,3 +111,15 @@ test("inconclusive re-test comparisons are neither failures nor verified fixes",
   assert.match(record, /Re-test: Inconclusive/);
   assert.doesNotMatch(record, /Needs attention/);
 });
+test("automatically appended test data is labelled next to the task with the user's original input", () => {
+  const goal = "Buy one thing. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.";
+  const appended = { ...report, meta: { ...report.meta, goal, goalSource: "user", goalInput: "Buy one thing", testDataAppended: true, testDataProfile: "shop" } };
+  for (const html of [
+    renderToStaticMarkup(React.createElement(ReportView, { report: appended, runDir: "run-1", busy: false })),
+    renderToStaticMarkup(React.createElement(RecordView, { report: appended, runDir: "run-1" })),
+  ]) {
+    assert.match(html, /<h2>Buy one thing\. Pay with card 4000 0000 0000 0002.*<\/h2><div class="test-data-note"><small>Test data added automatically<\/small><p>Your original task: Buy one thing<\/p>/);
+  }
+  const plain = renderToStaticMarkup(React.createElement(ReportView, { report: { ...report, meta: { ...report.meta, goalInput: "ignored" } }, runDir: "run-1", busy: false }));
+  assert.doesNotMatch(plain, /Test data added automatically|Your original task/);
+});

@@ -796,6 +796,9 @@ a.main-action { text-decoration: none; }
 .live-workspace .task-summary, .live-workspace .policy-grid > div { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); margin: 24px 0; }
 .live-workspace .task-summary > span, .live-workspace .verdict-grid span { color: var(--muted); font: 11px 'DM Mono', monospace; text-transform: uppercase; }
 .live-workspace .task-summary h2 { font-size: 22px; margin: 12px 0; }
+.live-workspace .test-data-note { margin: 0 0 12px; }
+.live-workspace .test-data-note small { display: inline-block; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 11px 'DM Mono', monospace; text-transform: uppercase; }
+.live-workspace .test-data-note p { margin: 8px 0 0; color: var(--muted); }
 .live-workspace p { overflow-wrap: anywhere; }
 .live-workspace .muted { color: #a5afa5; font-size: 13px; line-height: 1.7; }
 .live-workspace .notice { padding: 16px 20px; border: 1px solid #79612c; border-radius: 8px; background: #242015; color: #f0d494; text-align: left; }

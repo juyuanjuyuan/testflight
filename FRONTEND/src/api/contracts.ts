@@ -30,7 +30,8 @@ export type Rerun = {
 export type AuditReport = {
   meta: { url?: string | null; goal: string; mode?: string; site?: string | null; script?: boolean; judge?: boolean;
     generatedAt?: string | null; startedAt?: string; finishedAt?: string; maxSteps?: number;
-    goalSource?: string; goalReason?: string | null; testDataProfile?: string | null };
+    goalSource?: string; goalReason?: string | null; testDataProfile?: string | null;
+    goalInput?: string; testDataAppended?: boolean };
   verdicts: Verdicts; counts: { block: number; degrade: number; filteredOut: number; axeViolations: number | null; axeBestPractice?: number | null };
   timeline: TimelineStep[]; findings: Finding[]; fixes?: FixResult[] | null; rerun?: Rerun | null;
   fixPolicy?: { enforced: { id: string; rule: string }[]; instructed: { id: string; rule: string }[] };
