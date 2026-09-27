@@ -4,6 +4,8 @@ We don't score pages. We check whether a screen-reader or keyboard user can actu
 
 Give it a URL. An AI agent that hears only what a screen reader would say works through the site with the keyboard, the way a blind shopper would. Every step records what appeared on screen next to what the user actually heard, so a silent "Card declined" is caught the moment it happens. Blocking problems get a code fix, and the fix only counts if the same task then completes.
 
+![Demo: an AI agent that hears only what a screen reader says audits a shop, gets trapped in a members-only popup at checkout, finds the coupon button cannot be reached by keyboard, fixes the code and re-tests until the purchase completes](docs/demo.gif)
+
 Built at Test Flight, the Glasswing Ventures hackathon, September 26 and 27, 2026.
 
 Team: Jet2Holiday — Juyuan Huang, Mingjun Wu, Jialu Xing, Yiran Liu
