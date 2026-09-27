@@ -1,10 +1,12 @@
 import type { AuditReport, Progress, Rect, ShotSize } from "../api/contracts";
 
+// States the backend may add later are shown as in progress; polling continues until done or failed.
+// "unknown" is the run list's marker for a corrupt progress file, not a working state.
 export function stateLabel(state: string): string {
-  return ({ planning_task: "Choosing a task…", waiting_for_user: "Waiting for user action", running: "Running audit", analyzing: "Analyzing evidence", fixing: "Applying fixes to the site copy", rerunning: "Re-testing the same task", done: "Complete", failed: "Run failed", unknown: "Status unavailable" } as Record<string, string>)[state] ?? "Status unavailable";
+  return ({ planning_task: "Choosing a task…", waiting_for_user: "Waiting for user action", running: "Running audit", analyzing: "Analyzing evidence", fixing: "Applying fixes to the site copy", rerunning: "Re-testing the same task", done: "Complete", failed: "Run failed", unknown: "Status unavailable" } as Record<string, string>)[state] ?? "Processing…";
 }
 export function isActive(state: string): boolean {
-  return ["planning_task", "waiting_for_user", "running", "analyzing", "fixing", "rerunning"].includes(state);
+  return !["done", "failed", "unknown"].includes(state);
 }
 export function auditDuration(report: AuditReport): number | null {
   const start = Date.parse(report.meta.startedAt ?? "");

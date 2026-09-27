@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { liveApi, ApiError, artifactUrl, rerunName } from "../src/api/live.ts";
-import { frameGeometry, stateLabel, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
+import { frameGeometry, stateLabel, isActive, canFix, auditDuration, validateProgress } from "../src/lib/audit.ts";
 
 function mockFetch(t, data, status = 200) {
   const calls = [];
@@ -63,8 +63,13 @@ test("history preserves unknown status, unavailable verdict and future skip reas
   const response = { runs: [{ runDir: "real/run-2", goal: null, state: "future", screenReaderUserCanComplete: null, progress: "corrupt" }], skipped: 1, skippedReasons: { future_reason: 1 } };
   mockFetch(t, response);
   assert.deepEqual(await liveApi.list(), response);
-  assert.equal(stateLabel("future"), "Status unavailable");
+  assert.equal(stateLabel("unknown"), "Status unavailable");
   assert.equal(stateLabel("planning_task"), "Choosing a task…");
+});
+test("unrecognized progress states read as processing and keep the run active", () => {
+  assert.equal(stateLabel("future"), "Processing…");
+  assert.equal(isActive("future"), true);
+  for (const state of ["done", "failed", "unknown"]) assert.equal(isActive(state), false);
 });
 test("screenshot focus coordinates account for pixel ratio", () => {
   assert.deepEqual(frameGeometry({ x: 100, y: 50, w: 200, h: 100 }, { w: 2000, h: 1000, dpr: 2 }).focusBox, [.1, .1, .2, .2]);

@@ -73,3 +73,9 @@ test("planner failure is an incomplete audit, not an accessibility verdict", () 
   assert.doesNotMatch(html, /No barriers were detected/);
   assert.doesNotMatch(html, /<strong>No<\/strong>/);
 });
+test("an unrecognized live state renders as processing, not an error", () => {
+  const progress = { state: "verifying_future", timeline: [], step: 2, maxSteps: 73, goal: "Buy a jacket", updatedAt: "" };
+  const html = renderToStaticMarkup(React.createElement(LiveRun, { progress, child: null, runDir: "run-1", childId: null }));
+  assert.match(html, /Processing…/);
+  assert.doesNotMatch(html, /Status unavailable|Run failed/);
+});
