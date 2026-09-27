@@ -1,8 +1,21 @@
-# ClearAccess — task-level accessibility audit
+<h1 align="center">
+  <img src="docs/banner.svg" width="100%" alt="ClearAccess, task-level accessibility audit. Can a screen-reader user finish checkout? After pressing Pay, the screen shows 'Card declined. Try another card.' while the screen-reader user hears only 'button, Pay' and then nothing.">
+</h1>
+
+<p align="center">
+  <a href="https://github.com/juyuanjuyuan/testflight/actions/workflows/a11y-audit.yml"><img src="https://github.com/juyuanjuyuan/testflight/actions/workflows/a11y-audit.yml/badge.svg" alt="CI: task-level accessibility audit of the fixed shop"></a>
+  <a href="#results-so-far"><img src="https://img.shields.io/badge/barriers%20found-18%2F19-b9f45b?labelColor=1c2230" alt="Barriers found: 18 of 19"></a>
+  <a href="#results-so-far"><img src="https://img.shields.io/badge/axe--core-0%2F19-ff705e?labelColor=1c2230" alt="axe-core found: 0 of 19"></a>
+  <a href="docs/ARCHITECTURE.md"><img src="https://img.shields.io/badge/docs-architecture-0e8c7f?labelColor=1c2230" alt="Docs: architecture"></a>
+  <a href="docs/API.md"><img src="https://img.shields.io/badge/docs-API-0e8c7f?labelColor=1c2230" alt="Docs: API"></a>
+  <img src="https://img.shields.io/badge/LLM-DeepSeek%20via%20Sciforium-6e56cf?labelColor=1c2230" alt="LLM: DeepSeek via Sciforium">
+  <img src="https://img.shields.io/badge/node-22-339933?logo=nodedotjs&logoColor=white&labelColor=1c2230" alt="Node 22">
+  <img src="https://img.shields.io/badge/built%20at-Test%20Flight%202026-e6b758?labelColor=1c2230" alt="Built at Test Flight 2026, Glasswing Ventures">
+</p>
 
 We don't score pages. We check whether a screen-reader or keyboard user can actually **finish checkout**, show exactly where they get stuck, then fix the code and re-run the same task to prove the fix works.
 
-Give it a URL. An AI agent that hears only what a screen reader would say works through the site with the keyboard, the way a blind shopper would. Every step records what appeared on screen next to what the user actually heard, so a silent "Card declined" is caught the moment it happens. Blocking problems get a code fix, and the fix only counts if the same task then completes.
+Give it a URL. An AI agent that hears only what a screen reader would say works through the site with the keyboard, the way a screen-reader user would. Every step records what appeared on screen next to what the user actually heard, so a silent "Card declined" is caught the moment it happens. Blocking problems get a code fix, and the fix only counts if the same task then completes.
 
 ![Demo: an AI agent that hears only what a screen reader says audits a shop, gets trapped in a members-only popup at checkout, finds the coupon button cannot be reached by keyboard, fixes the code and re-tests until the purchase completes](docs/demo.gif)
 
