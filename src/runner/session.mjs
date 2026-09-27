@@ -68,8 +68,9 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
 
   async function snapshot(extra) {
     const shot = await screenshotOrNull(page, runDir, `shots/${String(i).padStart(4, '0')}.png`);
-    return { url: page.url(), title: await page.title(), modalOpen: await page.evaluate(() => window.__a11yRec?.modalOpen() ?? false),
-      focusVisible: null, screenshot: shot, ...extra };
+    const { modalOpen, focusVisible } = await page.evaluate(() => ({ modalOpen: window.__a11yRec?.modalOpen() ?? false,
+      focusVisible: window.__a11yRec?.focusVisible() ?? null })); // null = recorder missing → not checked
+    return { url: page.url(), title: await page.title(), modalOpen, focusVisible, screenshot: shot, ...extra };
   }
 
   async function settle(loadsBefore) {

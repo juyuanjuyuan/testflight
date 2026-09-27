@@ -1,5 +1,6 @@
 // Injected with page.addInitScript BEFORE page scripts (otherwise init-time changes are missed).
-// Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen().
+// Plain browser JS, no imports. Exposes window.__a11yRec with mark() / collect() / describeActive() / modalOpen() /
+// unreachableClickables() (D6) / focusVisible() (D5).
 // Thresholds come from contracts.mjs via window.__A11Y_CONFIG, which session.mjs injects first.
 (() => {
   if (window.__a11yRec) return;
@@ -17,11 +18,21 @@
 
   addEventListener('keydown', () => { lastInputAt = performance.now(); }, true);
   addEventListener('mousedown', () => { lastInputAt = performance.now(); }, true);
+  // attributes of the element at the moment focus arrives, before page handlers add their own focus classes
+  // (MUI's Mui-focusVisible, React Aria's data-focus-visible): the D5 probe gets these, or it would copy the focus style
+  let focusArrival = null;
+  addEventListener('focus', (e) => {
+    if (e.target instanceof Element) focusArrival = { el: e.target, attrs: [...e.target.attributes].map((a) => [a.name, a.value]) };
+  }, true);
 
   const elOf = (n) => (n.nodeType === 1 ? n : n.parentElement);
   const lines = (t) => (t || '').split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const PROBE_ATTR = 'data-a11y-probe';
+  const isProbe = (m) => m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].every((n) => n.nodeType === 1 && n.hasAttribute(PROBE_ATTR));
 
-  function onMutations(muts) {
+  function onMutations(all) {
+    const muts = all.filter((m) => !isProbe(m)); // our own D5 probe is not page activity
+    if (!muts.length) return;
     const now = performance.now();
     lastMutationAt = now;
     // a mutation is 'unprompted' if no action is in flight, or the last key was long ago
@@ -104,6 +115,17 @@
     const a = document.activeElement;
     return !a || a === document.body || a === document.documentElement;
   }
+  // what a sighted keyboard user can see change on focus (D5); outline/border colours only count when drawn
+  const edge = (cs, p) => (!['none', 'hidden'].includes(cs[`${p}Style`]) && parseFloat(cs[`${p}Width`]) > 0
+    ? `${cs[`${p}Style`]} ${cs[`${p}Width`]} ${cs[`${p}Color`]}` : 'none');
+  const look = (cs) => [edge(cs, 'outline'), ...['Top', 'Right', 'Bottom', 'Left'].map((s) => edge(cs, `border${s}`)),
+    cs.boxShadow, cs.backgroundColor, cs.backgroundImage, cs.color, cs.textDecorationLine, cs.opacity, cs.transform].join('|');
+  const noBox = (cs) => cs.content === 'none' || cs.content === 'normal';
+  function looksDifferent(a, b, pseudo) {
+    const ca = getComputedStyle(a, pseudo), cb = getComputedStyle(b, pseudo);
+    if (pseudo && noBox(ca) && noBox(cb)) return false; // pseudo-element not rendered on either
+    return look(ca) + ca.content !== look(cb) + cb.content;
+  }
 
   window.__a11yRec = {
     mark() {
@@ -166,6 +188,31 @@
     },
     modalOpen() {
       return [...document.querySelectorAll('dialog[open],[role="dialog"],[role="alertdialog"],[aria-modal="true"]')].some(isVisible);
+    },
+    /**
+     * D5: does the focused element look different from an unfocused copy of itself? The copy sits next to it (same
+     * cascade) and is removed in this same task, so it is never painted and can never take focus.
+     * null = can't judge from the element's own style: body, focus inside a frame/shadow tree, or an element that is
+     * itself invisible (sr-only / opacity:0 inputs whose ring is drawn on a sibling label).
+     */
+    focusVisible() {
+      if (isActiveBody()) return null;
+      const el = document.activeElement;
+      if (el.shadowRoot || ['IFRAME', 'FRAME', 'OBJECT', 'EMBED'].includes(el.tagName)) return null;
+      const r = el.getBoundingClientRect();
+      if (!isVisible(el) || r.width <= 1 || r.height <= 1) return null;
+      const probe = el.cloneNode(true);
+      if (focusArrival?.el === el) {
+        for (const { name } of [...probe.attributes]) probe.removeAttribute(name);
+        for (const [name, value] of focusArrival.attrs) probe.setAttribute(name, value);
+      }
+      probe.setAttribute(PROBE_ATTR, '');
+      el.after(probe);
+      try {
+        return [null, '::before', '::after'].some((p) => looksDifferent(el, probe, p));
+      } finally {
+        probe.remove();
+      }
     },
   };
 })();

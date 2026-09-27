@@ -6,7 +6,7 @@
     "script": true,
     "goal": "Buy the canvas tote bag",
     "judge": false,
-    "generatedAt": "2026-09-27T01:19:53.458Z"
+    "generatedAt": "2026-09-27T01:44:26.826Z"
   },
   "verdicts": {
     "outcome": "stuck",
@@ -14,13 +14,13 @@
     "screenReaderUserCanComplete": false,
     "blockingFindings": [
       "F4",
-      "F6"
+      "F7"
     ],
     "unexplainedStuck": false
   },
   "counts": {
     "block": 2,
-    "degrade": 4,
+    "degrade": 5,
     "filteredOut": 0,
     "axeViolations": 0,
     "axeBestPractice": 2
@@ -94,7 +94,9 @@
           }
         }
       ],
-      "seenNoise": [],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
       "heard": [],
       "screenshot": "shots/0002.png",
       "findingIds": [
@@ -123,7 +125,9 @@
         "button \"Checkout\""
       ],
       "screenshot": "shots/0003.png",
-      "findingIds": []
+      "findingIds": [
+        "F6"
+      ]
     },
     {
       "i": 4,
@@ -175,7 +179,9 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
+      "seenNoise": [
+        "Free shipping over $50"
+      ],
       "heard": [],
       "screenshot": "shots/0005.png",
       "findingIds": []
@@ -197,7 +203,7 @@
       },
       "seen": [],
       "seenNoise": [
-        "Free shipping over $50"
+        "New arrivals this week"
       ],
       "heard": [
         "button \"Pay\""
@@ -231,9 +237,7 @@
           }
         }
       ],
-      "seenNoise": [
-        "New arrivals this week"
-      ],
+      "seenNoise": [],
       "heard": [],
       "screenshot": "shots/0007.png",
       "findingIds": [
@@ -257,9 +261,7 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\""
       ],
@@ -282,7 +284,9 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
+      "seenNoise": [
+        "Free shipping over $50"
+      ],
       "heard": [
         "button \"Pay\""
       ],
@@ -305,7 +309,9 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
       "heard": [
         "textbox \"Card number\""
       ],
@@ -381,7 +387,7 @@
       "heard": [],
       "screenshot": "shots/0013.png",
       "findingIds": [
-        "F6"
+        "F7"
       ]
     }
   ],
@@ -414,7 +420,7 @@
       "candidateId": "C4"
     },
     {
-      "id": "F6",
+      "id": "F7",
       "detector": "pointer-only",
       "layer": "operation",
       "steps": [
@@ -436,7 +442,7 @@
       "judged": false,
       "axeAlsoFound": true,
       "fix": null,
-      "candidateId": "C6"
+      "candidateId": "C7"
     },
     {
       "id": "F1",
@@ -540,6 +546,30 @@
       "axeAlsoFound": false,
       "fix": null,
       "candidateId": "C5"
+    },
+    {
+      "id": "F6",
+      "detector": "focus-visible",
+      "layer": "operation",
+      "steps": [
+        3
+      ],
+      "wcag": [
+        "2.4.7"
+      ],
+      "hint": "no visible focus indicator on \"Checkout\"",
+      "evidence": {
+        "selector": "#checkout",
+        "barrierId": "T6",
+        "screenshot": "shots/0003.png"
+      },
+      "impact": "degrade",
+      "summary": "no visible focus indicator on \"Checkout\"",
+      "userImpact": "",
+      "judged": false,
+      "axeAlsoFound": false,
+      "fix": null,
+      "candidateId": "C6"
     }
   ],
   "axe": {

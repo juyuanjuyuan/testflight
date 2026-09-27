@@ -2,11 +2,11 @@
   "meta": {
     "url": "http://localhost:8080/testpage/fixed/",
     "mode": "local",
-    "site": null,
+    "site": "sites/testpage/fixed",
     "script": true,
     "goal": "Buy the canvas tote bag",
     "judge": false,
-    "generatedAt": "2026-09-27T01:20:03.302Z"
+    "generatedAt": "2026-09-27T01:44:36.745Z"
   },
   "verdicts": {
     "outcome": "done",
@@ -250,9 +250,7 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [
-        "20% off hats"
-      ],
+      "seenNoise": [],
       "heard": [
         "textbox \"Card number\", Card number is invalid"
       ],
@@ -411,7 +409,9 @@
         "h": 21
       },
       "seen": [],
-      "seenNoise": [],
+      "seenNoise": [
+        "20% off hats"
+      ],
       "heard": [],
       "screenshot": "shots/0014.png",
       "findingIds": []
@@ -467,7 +467,9 @@
           }
         }
       ],
-      "seenNoise": [],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
       "heard": [
         "button \"Checkout\"",
         "Order confirmed"

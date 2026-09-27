@@ -20,9 +20,28 @@ const load = (v) => readTrace(fs.readFileSync(path.join(ROOT, `fixtures/testpage
 const original = load('original');
 const fixed = load('fixed');
 
-test('detectors find all 5 planted barriers on the original page', () => {
+test('detectors find all 6 planted barriers on the original page', () => {
   const ids = new Set(runDetectors(original).map((c) => c.evidence.barrierId).filter(Boolean));
-  assert.deepEqual([...ids].sort(), ['T1', 'T2', 'T3', 'T4', 'T5']);
+  assert.deepEqual([...ids].sort(), ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']);
+});
+
+test('D5: Checkout with outline:none is reported as focus-visible, only on the steps focus sits on it', () => {
+  const d5 = runDetectors(original).filter((c) => c.detector === 'focus-visible');
+  assert.deepEqual(d5.map((c) => c.evidence.barrierId), ['T6']);
+  assert.deepEqual(d5[0].wcag, ['2.4.7']);
+  assert.match(d5[0].hint, /Checkout/);
+  const onCheckout = original.filter((s) => s.focusAfter.selector === '#checkout').map((s) => s.i);
+  assert.ok(onCheckout.length > 0);
+  assert.deepEqual(d5[0].steps, onCheckout);
+});
+
+test('D5: the runner checked every focused control; body is not judged', () => {
+  for (const [name, trace] of [['original', original], ['fixed', fixed]]) {
+    for (const s of trace) {
+      const expected = s.focusAfter.isBody ? null : !(name === 'original' && s.focusAfter.selector === '#checkout');
+      assert.equal(s.focusVisible, expected, `${name} step ${s.i} on ${s.focusAfter.selector}`);
+    }
+  }
 });
 
 test('D6: mouse-only "Apply coupon" is reported as pointer-only on the stuck step', () => {

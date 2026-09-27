@@ -39,9 +39,20 @@ const FORM_SCRIPT = [{ kind: 'press', key: 'Tab', reason: 'to Email' }, { kind: 
   { kind: 'type', text: 'agent@test.dev', reason: 'append to the prefilled Email' }, { kind: 'stuck', reason: 'end' }];
 const valueAt = (trace, i) => trace[i].focusAfter.value;
 
+// D5 probe: one control per focus-style pattern, visited in Tab order. Expected focusVisible per step 1..6.
+// Block buttons: the recorder diffs text by line, so the js button's class change must not share a line with the others.
+const FOCUS = `data:text/html,${encodeURIComponent(`<title>Focus</title><style>
+  button{display:block} .none:focus{outline:none} .ring:focus{outline:none;box-shadow:0 0 0 3px blue}
+  .after{position:relative;outline:none} .after:focus::after{content:'';position:absolute;inset:-3px;border:2px solid red}
+  .js{outline:none} .js.is-focus{background:yellow}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)} .sr:focus + span{outline:2px solid}
+</style><button>default</button><button class=none>none</button><button class=ring>ring</button><button class=after>after</button>
+<button class=js onfocus="this.classList.add('is-focus')">js</button><input class=sr type=checkbox><span>sr-only</span>`)}`;
+const FOCUS_EXPECT = [true, false, true, true, true, null]; // js: page adds the class on focus; sr-only: ring is on the sibling
+
 const CASES = [
   { name: 'testpage/original', script: 'eval/keys.testpage.json', groundtruth: 'eval/groundtruth/testpage.yaml',
-    check: (s) => [s.hits === s.planted && s.planted === 5 || `detected ${s.hits}/${s.planted}, expected 5/5 (missed: ${s.misses.join(' ')})`,
+    check: (s) => [s.hits === s.planted && s.planted === 6 || `detected ${s.hits}/${s.planted}, expected 6/6 (missed: ${s.misses.join(' ')})`,
       s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`] },
   { name: 'testpage/fixed', script: 'eval/keys.testpage.fixed.json', groundtruth: 'eval/groundtruth/testpage-fixed.yaml',
     check: (s, r) => [s.falsePositives === 0 || `${s.falsePositives} false positives, expected 0`,
@@ -71,6 +82,11 @@ const CASES = [
       trace[6].action.replace === true && trace[6].action.forcedReplace === true || `real type action recorded as ${JSON.stringify(trace[6].action)}, expected replace + forcedReplace`,
       !fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8').includes('me@example.com') || 'autofilled value leaked into trace.jsonl',
       !fs.readFileSync(path.join(runDir, 'report.json'), 'utf8').includes('me@example.com') || 'autofilled value leaked into report.json'] },
+  // default ring, outline:none, box-shadow ring, ::after ring, class added by a focus handler, sr-only input (not judged)
+  { name: 'focus-visible', url: FOCUS, goal: 'look around', script: [...FOCUS_EXPECT.map(() => ({ kind: 'press', key: 'Tab', reason: 'next' })), { kind: 'stuck', reason: 'end' }],
+    check: (s, r, trace) => [...FOCUS_EXPECT.map((want, k) => trace[k + 1].focusVisible === want || `step ${k + 1} (${trace[k + 1].focusAfter.name}): focusVisible ${trace[k + 1].focusVisible}, expected ${want}`),
+      trace.every((st) => st.changes.length === 0) || 'the D5 probe copy was recorded as a page change',
+      r.findings.filter((f) => f.detector === 'focus-visible').length === 1 || 'expected exactly one focus-visible finding (the outline:none button)'] },
 ];
 
 // Real mode attaches to a browser the human already opened; stand one up with a CDP port and the page loaded.

@@ -8,3 +8,4 @@ barriers:
   - { id: T3, kind: unannounced, wcag: ["4.1.3", "3.3.1"] }
   - { id: T4, kind: trap,        wcag: ["2.1.2"] }
   - { id: T5, kind: pointer-only, wcag: ["2.1.1"] }
+  - { id: T6, kind: focus-visible, wcag: ["2.4.7"] }
