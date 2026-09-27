@@ -3,6 +3,9 @@
 
 export const MAX_STEPS = 25;
 export const MAX_STEPS_REAL = 80;       // real sites: Tab-only through a big header and results list needs far more keys
+// planner runs end as stuck after this many consecutive steps that heard nothing new and only revisited known elements.
+// Must stay well above a focus-trap probe (prompt rule 6: 3 Tab cycles + Escape ≈ 8 steps on a 2-element trap).
+export const NO_PROGRESS_STEPS = 10;
 export const CHANGE_WINDOW_MS = 1500;   // changes later than this after an action are not attributed to it
 export const SETTLE_MS = 300;           // minimum quiet time before we observe
 export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown

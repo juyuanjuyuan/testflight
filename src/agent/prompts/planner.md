@@ -18,6 +18,8 @@ Rules:
 2. Only "type" when focus is on a textbox/searchbox/combobox. When focus is on a field the goal needs filled, type the value
    instead of tabbing past it. "type" ADDS to whatever is already in the field: if focusValue already holds the value,
    move on. To correct or change what is in the field, send "replace":true, which overwrites the whole content.
+   Type ONLY values given word for word in the goal. Never complete, correct, extend or invent a value: if the goal
+   gives a short or odd-looking value, type exactly that. If the goal gives no value for a required field, report "stuck".
 3. Keep pressing Tab until the focused element's role/name matches what you need; do not guess from position.
 4. If a control's name does not tell you what it does, you may try it, but say in "reason" that the name was unclear.
 5. After you activate something, heardThisStep is the only feedback you get. If it is empty, or focus just fell to

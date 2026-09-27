@@ -109,3 +109,32 @@ LLM 验收（`LLM_CACHE=off`，`--no-judge`，改 prompt 后三组都重跑）�
 - **测试（先写的失败测试）**：新增 1 条单元测试（`forceReplace` 的三个分支）。smoke 的 form 用例在回到预填好的 Email 后先按 End，再输入 `agent@test.dev`。在去掉修复的代码上跑，real 用例失败：value 是 `me@example.comagent@test.dev`，trace 里出现了自动填充的邮箱，动作上也没有 replace 标记。加上修复后，value 只剩 `agent@test.dev`，动作带 `replace: true, forcedReplace: true`。local 用例确认本地仍然是追加。
 - **过程中的发现**：用 Tab 移进输入框时，Chrome 会全选框里的内容，接着输入本来就会覆盖。所以只有光标被移到内容后面（End、方向键、或页面脚本调用 `focus()`）时才真的会追加，测试必须先按 End 才能复现问题。
 - 顺带修了一处：smoke 的 real 用例结束后会删掉临时的 Chromium profile 目录，之前会留在系统临时目录里。
+
+### 补充（第五轮）：不许编造输入值 + 无进展时由 runner 结束
+
+改动范围：`src/agent/planner.mjs`、`src/agent/prompts/planner.md`、`src/contracts.mjs`（只加了常量 `NO_PROGRESS_STEPS`）、`test/planner.test.mjs`（新文件，先写的失败测试）。
+
+1. **不许编造输入值**：`typedValueInGoal(text, goal)` 先去掉首尾空白、统一小写、把连续空白合成一个空格，再检查 text 是不是 goal 的子串。不是子串时，把原因通过 `previousReplyWasInvalid` 反馈给模型，重试一次（和格式非法共用这一次重试）。仍然不符合就输出 `stuck`，reason 为 `planner tried to type a value not given in the goal`，并标 `plannerError: true`。prompt 规则 2 加了一条通用规则：只输入 goal 里原样给出的值，不补全、不修正、不编造；goal 没给出必填字段的值时报 stuck。
+2. **无进展时由 runner 结束**：`noProgressSteps(trace)` 统计 trace 末尾连续的无进展步数。无进展的定义是：这一步听到的内容（`heardInStep`，和 planner 看到的是同一份）都是之前听到过的，而且焦点所在位置（URL + selector + 字段值）之前也到过。输入了新值或者跳转到新页面都算有进展。`nextAction` 在调用模型之前先检查，达到 `NO_PROGRESS_STEPS` 就直接返回 `stuck`，不再调用模型，reason 以 `runner: no progress in N steps` 开头，不标 `plannerError`。脚本模式（`--script`）不经过 `nextAction`，所以不受影响。
+   - **N 取 10，没有用建议的 8**：fixture 里的陷阱，从 Pay 按 Enter 算起，到 4 次 Tab 加 1 次 Escape，一共 6 步无进展。但 prompt 规则 6 让 planner 循环 3 圈再按 Escape：2 个元素的陷阱是 1 + 6 + 1 = 8 步，N=8 时刚好卡在边界上。测试覆盖了这种"3 圈 + Escape"的情况：每个前缀都不到 N，而且 `detectTrap` 的证据里包含那次 Escape。
+3. **测试**（7 条）：`4242 4242` 的 goal 下，输入 `4242 4242 4242 4242` 会被反馈、重试后仍然这样就报 stuck；重试时改正了就接受；搜索类 goal 下输入 `canvas tote` 第一次就放行；连续 N 步无进展时不调用模型直接 stuck，N−1 步时仍会调用模型；输入新值、听到新内容都会把计数清零；fixture 陷阱和"3 圈 + Escape"都能完整检出。`npm test` 共 94 条，全部通过。
+
+LLM 验收（`LLM_CACHE=off`，`--no-judge`，DeepSeek）：
+
+| 用例 | 次 | outcome | SR 用户能完成 | 步数 | 耗时 | LLM 调用 / 用时 | 输入的值 |
+|---|---|---|---|---|---|---|---|
+| fixed，16 位卡号 | 1 | done | true | 8 | 13 s | 8 / 6.9 s | `4242 4242 4242 4242` |
+| fixed，16 位卡号 | 2 | done | true | 8 | 13 s | 8 / 7.0 s | 同上 |
+| fixed，16 位卡号 | 3 | done | true | 8 | 13 s | 8 / 7.0 s | 同上 |
+| original，16 位卡号 | 1 | stuck | false | 10 | 37 s | 10 / 29.2 s | 同上 |
+| original，16 位卡号 | 2 | stuck | false | 11 | 20 s | 11 / 11.3 s | 同上（replace） |
+| original，16 位卡号 | 3 | stuck | false | 11 | 19 s | 11 / 10.6 s | 同上（replace） |
+| original，`4242 4242`² | 1 | stuck | false | 10 | 19 s | 10 / 10.2 s | `4242 4242` |
+| original，`4242 4242`² | 2 | stuck | false | 10 | 16 s | 10 / 7.9 s | `4242 4242` |
+| original，`4242 4242`² | 3 | stuck | false | 10 | 16 s | 10 / 8.2 s | `4242 4242` |
+
+² goal：`Buy the canvas tote bag. Pay with card number 4242 4242.`
+
+- 和前几轮相比没有变差：fixed 3/3 done、8 步；original 3/3 `screenReaderUserCanComplete: false`，10–11 步。所有运行的 stuck 都来自 planner（"按了 Pay 没听到确认"），没有一次是 runner 的无进展判定。
+- 短卡号 goal 下，3 次输入的都是 `4242 4242`。每次运行的 LLM 调用次数都等于步数，说明编造检查一次也没有触发，模型第一次就输入了 goal 里的原值。
+- original 第 2、3 次第一次输入就用了 `replace`（字段是空的，所以没有影响），多出的 1 步是 Pay 之前多按了一次 Tab。original 第 1 次的 29 s LLM 用时里没有失败的尝试（`llmAttempts` = `calls`），只是有几次调用本身比较慢。
