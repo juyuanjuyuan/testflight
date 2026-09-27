@@ -8,7 +8,7 @@
 
 | 前端文档 | 后端的实际行为 | 原因 |
 |---|---|---|
-| `maxSteps` 示例是 30 | 实际是 **25**（`src/contracts.mjs` 的 `MAX_STEPS`，第 0 步 `start` 不计入） | 以代码为准 |
+| `maxSteps` 示例是 30 | 实际是 **25**（`src/contracts.mjs` 的 `MAX_STEPS`，第 0 步 `start` 不计入）；命令行跑的真实网站模式是 **80**（`MAX_STEPS_REAL`） | 以代码为准 |
 | `mode` 由后端按网址判断 | 网页上**只能审计本服务器提供的站点**：主机是 `localhost` 或 `127.0.0.1`、协议是 `http`、端口就是这个服务器的端口，并且路径的前两段对应 `sites/` 下的一个目录（例如 `/shop/original/`）。其他网址返回 `400`，code `real_site_cli_only`；本服务器上不存在的站点返回 `400`，code `unknown_site` | 真实网站需要人先在 Chrome 里处理验证码，再在终端按回车，网页上做不到。真实网站照常用命令行跑 |
 | 服务器监听所有网卡 | **只监听 127.0.0.1** | 接口能让服务器启动浏览器访问网址，不能让同一网络里的其他人调用。WSL 到 Windows 的 localhost 转发不受影响；Vite 代理请指向 `http://localhost:8080` 或 `http://127.0.0.1:8080` |
 | 请求体只有 `url`、`goal` | 另有可选的 `script`（见 §2），前端正常使用时不要传 | demo 和测试用的确定性运行，不调用模型 |
@@ -62,7 +62,7 @@ GET /runs/<runDir>/progress.json
 |---|---|
 | `state` | `running` → `analyzing` → `done`，出错时 `failed`。`fixing`、`rerunning` 属于 P1，目前不会出现 |
 | `step` | 最后一步的编号（= `timeline` 最后一项的 `i`），还没有步骤时为 `null` |
-| `maxSteps` | 步数上限（25） |
+| `maxSteps` | 步数上限（本地站点 25，真实网站模式 80）。请读这个字段，不要写死 |
 | `timeline` | 目前为止的所有步骤。和 `report.json` 的 `timeline[]` 由同一个函数生成；运行中 `findingIds` 一律是 `[]`，最终的 id 以 `report.json` 为准 |
 | `rerunDir` | P1 使用，目前总是 `null` |
 | `error` | `state: "failed"` 时的一句话原因，可以直接显示；其他时候为 `null` |

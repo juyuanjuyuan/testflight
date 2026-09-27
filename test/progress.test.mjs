@@ -7,7 +7,7 @@ import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { ROOT } from '../src/paths.mjs';
-import { readTrace, MAX_STEPS } from '../src/contracts.mjs';
+import { readTrace, MAX_STEPS, MAX_STEPS_REAL } from '../src/contracts.mjs';
 import { audit } from '../src/audit.mjs';
 import { writeJsonAtomic } from '../src/report/atomic.mjs';
 import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../src/report/progress.mjs';
@@ -134,4 +134,17 @@ test('audit(): a failure mid-run writes failed with a one-line error and rethrow
 
 test('audit(): runDir must already exist when given', async () => {
   await assert.rejects(audit({ url: 'http://x/', goal: 'g', runDir: path.join(os.tmpdir(), 'no-such-run-dir-17'), openSession: fakeSession() }), /no-such-run-dir-17/);
+});
+
+test('audit(): real mode writes its own step limit into every progress.json state', async () => {
+  const runDir = tmpDir();
+  const write = createProgressWriter(runDir);
+  const limits = [];
+  await audit({ mode: 'real', goal: 'g', runDir, script: [{ kind: 'press', key: 'Tab', reason: 'x' }], judgeEnabled: false,
+    onProgress: (u) => { write(u); limits.push(readProgress(runDir).maxSteps); }, openSession: fakeSession() });
+  assert.ok(limits.length > 3 && limits.every((m) => m === MAX_STEPS_REAL), `maxSteps written: ${limits.join(', ')}`);
+  assert.equal(markFailedIfUnfinished(runDir, 'x'), false);
+  fs.writeFileSync(path.join(runDir, 'progress.json'), JSON.stringify({ ...readProgress(runDir), state: 'running' }));
+  markFailedIfUnfinished(runDir, 'crashed');
+  assert.equal(readProgress(runDir).maxSteps, MAX_STEPS_REAL, 'a crashed real run keeps its limit');
 });

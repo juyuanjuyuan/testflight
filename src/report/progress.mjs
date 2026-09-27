@@ -8,9 +8,9 @@ import { writeJsonAtomic } from './atomic.mjs';
 export const PROGRESS_FILE = 'progress.json';
 const FINAL = ['done', 'failed'];
 
-function progressDoc({ state, trace, error = null, rerunDir = null }) {
+function progressDoc({ state, trace, error = null, rerunDir = null, maxSteps = MAX_STEPS }) {
   return {
-    state, step: trace.length ? trace[trace.length - 1].i : null, maxSteps: MAX_STEPS,
+    state, step: trace.length ? trace[trace.length - 1].i : null, maxSteps, // audit() passes its limit (real mode: MAX_STEPS_REAL)
     timeline: trace.map((s) => timelineEntry(s, [])), // findings don't exist until analysis: findingIds stay []
     rerunDir, error, updatedAt: new Date().toISOString(),
   };
@@ -41,7 +41,7 @@ export function markFailedIfUnfinished(runDir, error) {
   let prev = null;
   try { prev = readProgress(runDir); } catch { /* missing/corrupt: the failed doc below replaces it, that is the record */ }
   if (prev && FINAL.includes(prev.state)) return false;
-  const doc = { ...progressDoc({ state: 'failed', trace: [], error }), ...(prev ? { step: prev.step, timeline: prev.timeline, rerunDir: prev.rerunDir } : {}) };
+  const doc = { ...progressDoc({ state: 'failed', trace: [], error }), ...(prev ? { step: prev.step, maxSteps: prev.maxSteps, timeline: prev.timeline, rerunDir: prev.rerunDir } : {}) };
   writeJsonAtomic(path.join(runDir, PROGRESS_FILE), doc);
   return true;
 }

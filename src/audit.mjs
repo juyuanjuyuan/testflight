@@ -37,7 +37,7 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
  * url is optional in real mode (the tab the human has open is audited; meta.url records where it actually started).
  * @param {{url?:string, goal:string, out?:string, runDir?:string, mode?:'local'|'real', cdp?:string, script?:object[],
  *          judgeEnabled?:boolean, headless?:boolean, label?:string, site?:string, log?:(msg:string)=>void,
- *          onProgress?:(p:{state:string, trace?:object[], error?:string})=>void, openSession?:Function,
+ *          onProgress?:(p:{state:string, trace?:object[], error?:string, maxSteps:number})=>void, openSession?:Function,
  *          waitForUser?:()=>Promise<void>}} o
  * runDir: an existing dir to use (the HTTP API creates it first); default a new one under `out`.
  * onProgress: called with state running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
@@ -47,12 +47,13 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
 export async function audit(o) {
   if (o.mode !== 'real' && !o.url) throw new Error('audit needs a url (only real mode can take over the open tab)');
   const log = o.log || (() => {});
-  const onProgress = o.onProgress || (() => {});
+  const maxSteps = o.mode === 'real' ? MAX_STEPS_REAL : MAX_STEPS;
+  const onProgress = (u) => o.onProgress?.({ ...u, maxSteps });
   if (o.runDir && !fs.statSync(o.runDir).isDirectory()) throw new Error(`run dir is not a directory: ${o.runDir}`);
   const runDir = o.runDir || newRunDir(o.out, o.label || 'audit');
   const trace = [];
   try {
-    const res = await execute(o, runDir, trace, log, onProgress);
+    const res = await execute(o, runDir, trace, log, onProgress, maxSteps);
     onProgress({ state: 'done', trace });
     return { runDir, ...res };
   } catch (e) {
@@ -61,7 +62,7 @@ export async function audit(o) {
   }
 }
 
-async function execute(o, runDir, trace, log, onProgress) {
+async function execute(o, runDir, trace, log, onProgress, maxSteps) {
   const tracePath = path.join(runDir, 'trace.jsonl');
   const stats = {};
   const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false, waitForUser: o.waitForUser });
@@ -74,7 +75,6 @@ async function execute(o, runDir, trace, log, onProgress) {
     log(`[${step.i}] ${describeAction(step.action)} → ${step.focusAfter.role} "${step.focusAfter.name}"  · ${step.action.reason}`);
     onProgress({ state: 'running', trace });
   };
-  const maxSteps = o.mode === 'real' ? MAX_STEPS_REAL : MAX_STEPS;
   try {
     push(await s.start());
     for (let n = 0; n < maxSteps; n++) {
