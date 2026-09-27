@@ -92,3 +92,57 @@
    - “~100 行可行性脚本”是否在周六之前写的；如果是，要先原样提交再在这里描述，否则删掉这句。
    - 这一行写“Focus-visibility detection will reuse keyboard-a11y-tester (MIT) — TODO: add the exact link”，但计划 07 实际用的是方案 A（自己写的计算样式对比，没有引入 keyboard-a11y-tester），评测表下也写了它没有纳入对比。需要团队确认后删改这句，不然和实际不符。
 4. 计划 12 步骤 6 里的“结果表”“what's real vs mocked”README 里已经有了，不算 TODO；但 “Real-site segment … results are shown from a cached run” 要求 demo 电脑上真的有那次运行（见上面“真实网站段”）。
+
+### 验证：结账页会员弹窗（B9）+ 优惠码 Apply（B10）场景（2026-09-27）
+
+通过 8080 上的 API（`POST /api/runs`，不带 `script`），在 `http://localhost:8080/shop/original/` 上跑任务
+`Buy a Canvas Tote Bag using the coupon code SAVE10. Pay with the test card 4242 4242 4242 4242.`，
+然后 `POST /api/runs/<runDir>/fix`，body 是 `{"rerun":true}`，不传 findingIds。服务器用 `.env` 里的 `LLM_CACHE=readwrite`。
+没有改 `sites/shop/`、`src/` 和 `eval/`。一共跑了 3 次完整流程：第 1 次缓存还是空的，第 2、3 次就是要求的“readwrite 下连续两次”。
+
+| # | 审计 runDir | 审计 | 修复+复测 | 合计 | 复测 runDir | closedLoop |
+|---|---|---|---|---|---|---|
+| 1 | `2026-09-27T17-29-41-audit` | 238 s | 90 s | 328 s | `2026-09-27T17-33-47-rerun` | **true** |
+| 2 | `2026-09-27T17-35-22-audit` | 42 s | 57 s | 99 s | `2026-09-27T17-36-15-rerun` | **true** |
+| 3 | `2026-09-27T17-37-14-audit` | 75 s | 39 s | 114 s | `2026-09-27T17-38-38-rerun` | **true** |
+
+第 1 次慢，是因为 planner 缓存没命中（44 次模型调用，其中 2 次超时重试，浪费 53 s）。第 2、3 次 planner 全部命中缓存，只有 judge 和 fixer 是实时调用（原因见上面的结论 2、3）。第 3 次的审计比第 2 次慢 33 s，全是 judge 那一次调用花的时间（13 s → 45 s）。
+
+**1. 审计：planner 的路径（3 次完全相同，一共 45 步）**
+- 1–11：首页 → Canvas Tote Bag → 在 🛒 上按了 **3 次** Enter（名字看不懂，toast 也没有朗读，它以为没加上）→ 找到 Cart。
+- 12–20：购物车弹窗 → Checkout。购物车里有预置的 Wool Beanie，加上 3 个 tote，所以最后买的是 3 个 tote + 1 个 beanie（总价 $90，用了优惠码后 $81）。demo 时可以顺带提一句，这也是 B1/B2 的后果。
+- 21–23：结账页 Tab 到 Card number，输入卡号，再 Tab 到 Pay。
+- **24：Tab 进入优惠码框，弹出“Members only”弹窗**，焦点在 Email 上。
+- **25–28：Escape、Escape（都没用），Tab → Join，Tab → Email（在两个元素之间来回）。**
+- **29：runner 确认是陷阱，由“看得见屏幕的协助者”点了 ×**（`#joinclose`，计划 19），焦点回到优惠码框。
+- 30：输入 SAVE10。
+- **31–44：一直找 Apply**。Tab 的顺序是 优惠码 → body → Card number → Pay → 优惠码，Apply 从来拿不到焦点；中间也试过 Shift+Tab。
+- **45：stuck**（10 步都没有新进展）。结论：`outcome: stuck`，读屏用户**不能**完成。
+
+检出的问题（3 次完全相同）：
+
+| id | 检测器 | 等级 | 对应障碍 | 步骤 |
+|---|---|---|---|---|
+| F3 | trap | **block** | B9 会员弹窗 | 25, 27, 28 |
+| F4 | weak-name | **block** | B1 🛒 | 5–8 |
+| F8 | pointer-only | **block** | B10 Apply | 45 |
+| F1 | unannounced | degrade | B2 加购 toast | 6 |
+| F5 | weak-name | degrade | B5 数量 “−” | 14–18 |
+| F7 | focus-visible | degrade | B8 | 21–45 |
+
+B7（卡被拒没有朗读）不在这个任务的路径上：这里用的是 4242 卡，不会被拒。
+
+**2. 修复 + 复测**
+- **B9（F3）**：3 次都是在弹窗的 keydown 处理里加一行 `if (e.key === 'Escape') { e.preventDefault(); closeJoin(); return; }`，并把注释里的 “Escape does nothing” 删掉。第 2 次还多了一处修改：给弹窗加了 `aria-modal="true"`。
+  注意：× 仍然是只能用鼠标点的 `<span>`，Tab 也仍然只在 Email 和 Join 之间来回。fixer 只加了 Escape 这个出口，这已经满足 2.1.2，但 demo 时不要说成“× 也能用键盘点了”。
+- **B10（F8）**：3 次都是两处修改：`<span id="apply">` 加上 `role="button" tabindex="0"`，再加一个 keydown 处理，按 Enter 或空格时调用 `apply.click()`。没有改成 `<button>`。
+- B1（F4）：给 🛒 按钮加 `aria-label="Add to cart"`。
+- 复测（3 次路径相同，33 步，没有协助）：第 24 步弹窗出现 → **25 按 Escape 回到优惠码框** → 26 输入 SAVE10 → **27 Tab 到 Apply → 28 按 Enter**，朗读 “Coupon SAVE10 applied: 10% off.” 和 “Total $81.00” → Pay → 33 done（“Thank you! Your order has been placed”）。
+  F3、F4、F8 都是 `resolved`，F1、F5、F7 是 `persists`，`introduced: []`，**`closedLoop: true`**。
+
+**3. 稳定性**：3 次的 planner 路径（审计和复测）、findings、等级，以及对 B9、B10 的修改（除了第 2 次多加的 `aria-modal`）都一样，3 次都是 `closedLoop: true`。fixer 每次都实时调用，所以 rationale 的文字每次不同，但修改本身是一样的。
+
+**4. 风险**（没有遇到卡住的情况，这里只列可能出问题的地方）
+- 审计要走 45 步，而且是在“10 步没进展”之后才以 stuck 结束。第 31–44 步是 planner 在找 Apply，这段是 demo 里最长的空转。缓存命中时总共约 40–75 s，没有缓存时约 4 分钟。
+- judge 和 fixer 在 readwrite 下每次都实时调用，结论 2、3 说的限制在这里一样适用：readonly 下这个场景跑不出修复闭环，所以现场只能用方案一（需要网络）或方案二（打开上面已经跑好的 runDir）。
+- 要稳定走到这条路径，依赖 planner 的缓存。换电脑或者改了任务文字，planner 就会实时调用，路径可能不同（比如先去找优惠码框、不先填卡号）。上面的 runDir 都只在这台电脑上。
