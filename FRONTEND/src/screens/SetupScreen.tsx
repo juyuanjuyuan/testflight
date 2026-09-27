@@ -83,7 +83,7 @@ export default function SetupScreen({
           <Icon name="lock" size={13} />
           {demo
             ? "Demo mode: replaying a recorded run. Set VITE_API_BASE to go live."
-            : "No scripts installed. AccessRun browses as an external visitor."}
+            : "No scripts installed. ClearAccess browses as an external visitor."}
         </p>
       </form>
     </section>

@@ -6,7 +6,7 @@ export default function Brand() {
         <i />
         <i />
       </div>
-      <span>AccessRun</span>
+      <span>ClearAccess</span>
       <b>AI</b>
     </div>
   );

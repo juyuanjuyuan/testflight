@@ -50,7 +50,7 @@ export function LiveRun({ progress, child, runDir, childId }: { progress: Progre
     {progress.state === "fixing" && <p>Generating and applying edits to a separate site copy. This may take a few minutes.</p>}
     {progress.state === "rerunning" && child?.state === "done" && <p>Re-test finished. Waiting for the final comparison…</p>}
     {progress.state === "analyzing" && <p>Evaluating the recorded evidence and preparing the report.</p>}
-    </div><div className="step-count"><strong>{shown.step ?? "—"}</strong><span> / {limit ?? "—"} steps</span></div></div>
+    </div><div className="step-count"><strong>{shown.step ?? "—"}</strong><span> {shown.step === 1 ? "step" : "steps"}</span></div></div>
     <Timeline steps={shown.timeline} runDir={childId && child ? childId : runDir} live />
     <div className="scan-progress-bar"><span style={{ width: `${percent}%` }} /></div>
     <p className="muted">Step budget used · Updated {shown.updatedAt ? new Date(shown.updatedAt).toLocaleTimeString() : "—"}</p>
