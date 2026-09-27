@@ -94,10 +94,10 @@ keyboard-a11y-tester: not included in this comparison.
 | shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
 | shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
 | shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
-| testpage | original | 6 | 4/6 (67%) | 5/6 (83%) | T3 block→degrade, T5 none→block | T1 degrade→block | 0 → 0 | 0 |
+| testpage | original | 6 | 4/6 (67%) | 4/6 (67%) | T3 block→degrade, T5 none→block | T1 degrade→block, T5 none→degrade | 0 → 0 | 0 |
 | testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
 | w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
-| **total** | | 18 | 15/18 (83%) | 16/18 (89%) | | | 0 → 0 | 0 |
+| **total** | | 18 | 15/18 (83%) | 15/18 (83%) | | | 0 → 0 | 0 |
 
 For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
 expectedImpact is scored on the recorded route: e.g. the testpage script types a short card number on purpose, a user's typo; recovering from it is part of the task, and a user who never hears the error cannot correct it and pay, so T3 (unannounced error) and T4 (dialog trap) are block.

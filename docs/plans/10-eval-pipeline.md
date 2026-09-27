@@ -41,6 +41,8 @@
 
 ## 结果（已完成，2026-09-27）
 
+最新数字见文末"后续"第 5 节（重新录制 `eval/traces/` 之后）；下面是第一版的记录。
+
 ### 做了什么
 
 - **开始前的两个问题**（单独 commit）：`testpage.yaml` 的 `site` 改成 `sites/testpage/original`；两个 testpage 的 goal 加上 "Pay with card number 4242 4242 4242 4242."。`cli.mjs suggest --url http://localhost:8080/testpage/original/` 返回 `source: "curated"`；不给 goal、用 planner 在 testpage/fixed 上跑，选中预设任务并完成购买（听到 "Order confirmed"）。`test/tasker.test.mjs` 里原来用 testpage/original 充当"没有预设任务的站点"，改用 `sites/testpage/patched`；fixture 和 smoke 用的是自己的 goal，不受影响。
@@ -323,3 +325,70 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 #### 验收
 
 - `npm test`：152 个全部通过。`node eval/run.mjs --replay eval/traces`：退出码 0，输出和 README 一致。
+
+### 5. 重新录制 `eval/traces/`（2026-09-27，商店页面美化 + shop-main 新 goal）
+
+- 原因：`sites/shop/` 加了本地 SVG 插图、hero 区和页脚（original 和 fixed 同步，可见文字、障碍、`data-barrier` 和元素 id 都不变），读屏能读到的页面文本变了；`shop-main.yaml` 的 goal 改成和 `config/test-data/shop.json` 的 `payment_card` 相同的句子（"Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."，商品部分不变）。
+- 做法：`node eval/run.mjs --save-traces eval/traces`，judge 开启。9 条流程里没有模型调用失败、超时或 judge 错误；有候选的 4 条流程各调用 judge 1 次，所有 finding 都有 judge 结论。之后 `node eval/run.mjs --replay eval/traces` 连跑两次，输出完全一致，并且和录制时的表一致。
+- 和第 4 节相比：
+  - 检出率不变：我们 18/19（95%），axe 0/19，误报 0。axe best-practice 节点数也不变。
+  - judge 关闭的分级一致率不变：15/18（83%）。
+  - judge 开启：16/18（89%）→ **15/18（83%）**。只有 testpage/original 变了：**T5**（pointer-only，expectedImpact none）从一致（judge 给 none）变成 judge 给 degrade；T1 仍然是 degrade→block。假电商站三条流程的 judge 结论和第 4 节完全相同（shop-main 仍只有 B1 degrade→block 不一致）。
+  - testpage 的页面这次没有改，T5 的变化来自重新录制本身：这就是第 1 条说的问题（重新录制后 judge 的提示词里有毫秒级抖动，缓存失效，模型重新回答）。第 1 条里 testpage 5 次重新录制，judge 只有 2 次把 T5 判成 none，可见 T5 的结论本来就不稳定；上一版 trace 正好是 none，这一版是 degrade。
+
+#### 结果表（`node eval/run.mjs --replay eval/traces` 的原样输出）
+
+#### Detection rate: planted barriers vs tools (judge off)
+
+| dataset | variant | tool | planted | detected | missed | false positives |
+|---|---|---|---|---|---|---|
+| shop-main | original | ours (judge off) | 8 | 7 | B3† | 0 |
+| shop-main | original | axe (WCAG rules) | 8 | 0 | B1 B2 B3† B4 B5 B6 B7 B8 | 0 |
+| shop-main | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-main | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-second | original | ours (judge off) | 4 | 4 | – | 0 |
+| shop-second | original | axe (WCAG rules) | 4 | 0 | B5 B8 B9 B10 | 0 |
+| shop-second | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-second | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-popup | original | ours (judge off) | 1 | 1 | – | 0 |
+| shop-popup | original | axe (WCAG rules) | 1 | 0 | B11 | 0 |
+| shop-popup | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-popup | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| testpage | original | ours (judge off) | 6 | 6 | – | 0 |
+| testpage | original | axe (WCAG rules) | 6 | 0 | T1 T2 T3 T4 T5 T6 | 0 |
+| testpage | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| testpage | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| **total** | | ours (judge off) | 19 | 18/19 (95%) | 1 | 0 |
+| **total** | | axe (WCAG rules) | 19 | 0/19 (0%) | 19 | 0 |
+
+† vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors' job; whether they matter is the judge's.
+Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
+axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
+w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.
+keyboard-a11y-tester: not included in this comparison.
+
+#### Impact accuracy: same trace, judge on vs off
+
+| dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |
+|---|---|---|---|---|---|---|---|---|
+| shop-main | original | 7 | 6/7 (86%) | 6/7 (86%) | B7 block→degrade | B1 degrade→block | 0 → 0 | 0 |
+| shop-main | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-second | original | 4 | 4/4 (100%) | 4/4 (100%) | – | – | 0 → 0 | 0 |
+| shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
+| shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| testpage | original | 6 | 4/6 (67%) | 4/6 (67%) | T3 block→degrade, T5 none→block | T1 degrade→block, T5 none→degrade | 0 → 0 | 0 |
+| testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| **total** | | 18 | 15/18 (83%) | 15/18 (83%) | | | 0 → 0 | 0 |
+
+For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
+expectedImpact is scored on the recorded route: e.g. the testpage script types a short card number on purpose, a user's typo; recovering from it is part of the task, and a user who never hears the error cannot correct it and pay, so T3 (unannounced error) and T4 (dialog trap) are block.
+The judge never adds findings and does not raise the detection count: its job is to rate each finding's impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.
+
+Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.
+
+Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge columns need `.env`).
