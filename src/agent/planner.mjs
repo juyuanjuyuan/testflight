@@ -6,9 +6,9 @@ import { validateAction, MAX_STEPS } from '../contracts.mjs';
 const SYSTEM = fs.readFileSync(new URL('./prompts/planner.md', import.meta.url), 'utf8');
 
 /** @returns {Promise<import('../contracts.mjs').Action>} */
-export async function nextAction({ goal, trace, stats }) {
+export async function nextAction({ goal, trace, stats, maxSteps = MAX_STEPS }) {
   const obs = buildObservation(goal, trace);
-  obs.stepsLeft = MAX_STEPS - trace.length;
+  obs.stepsLeft = maxSteps - trace.length;
   let user = JSON.stringify(obs);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {

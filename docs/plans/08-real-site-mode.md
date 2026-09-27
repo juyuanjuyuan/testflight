@@ -34,25 +34,27 @@
 - 被反爬拦截时如实记录，换下一个网站。
 - 真实网站模式下截图尺寸不固定（连的是用户自己的 Chrome，窗口大小和 devicePixelRatio 都不受控，本地模式固定为 1280×800、DPR 1）。每一步要记录截图的宽高，作为 Step 的**可选**字段（例如 `shotSize: {w, h, dpr}`，按 `docs/ARCHITECTURE.md` §3 的规则在 `contracts.mjs`、fixture 和测试里同步），并由 `report/build.mjs` 带到 `timeline[]`；同步更新 `docs/report.schema.json`、`REPORT_FORMAT.md` 和 `report.example.json`（新字段在 schema 里必须是可选的，`npm test` 的 `test/report-schema.test.mjs` 会检查）。**需要前端配合：** viewer 按这个实际尺寸把 `focusRect` / `seen[].rect`（CSS 像素）换算到截图上，而不是假定截图就是 1280×800。本计划不改 `viewer/`，做完后在“结果”一节写明新字段名和含义，交给前端。
 
-## 结果（进行中：代码和安全限制已完成，planner 预跑等 `.env`）
+## 结果
+
+**范围调整（执行中发现，已在此说明）**：在真实网站上跑时暴露了两个阻塞问题，修复它们需要改“可以改”之外的文件：
+- `src/runner/recorder.js`（D6）：`unreachableClickables` 只检查祖先是否可 Tab 到，不检查后代。大型电商的按钮常见结构是 `<span class="button" id=…><input type=submit aria-label="Add to cart">`，外层 span 被误报为“仅鼠标可用”，judge 还把它们判成了 block（候选 1 一次运行 12 条 block 全是误报）。修复：内部含有可聚焦控件（opacity 0 也算）的包裹元素不算。回归用例是 `scripts/smoke.mjs` 里的 `pointer-only`（先写的用例，确认失败后才修）。本地 shop 三个流程修复前后得分一致。
+- 步数：`MAX_STEPS = 25` 对只按 Tab 的 planner 来说连大型网站的页头都走不完。新增 `MAX_STEPS_REAL = 80`（`contracts.mjs`），`planner.mjs` 的 `nextAction` 接收 `maxSteps`（默认仍是 `MAX_STEPS`）。本地模式发给 planner 的消息完全不变，已有的 LLM 缓存仍然有效。
 
 **已完成**
 - 步骤 1：`audit({ waitForUser })`，`cli.mjs` 用 `node:readline` 提示“解决验证码/登录后按回车”（stdin 关闭时也会继续，方便管道）。cookie 弹窗不替用户关。real 模式 `--url` 可选：不传就接管当前**可见**的标签页；传了就先把这个标签页导航过去，再等人。`meta.url` 记录 step 0 的实际 URL。
   - **与计划的差异**：等人发生在 `start()` **之前**（`openSession` 内，选标签页之前），不是之后。原因：`start()` 会记录 step 0（基线、焦点、pageText、截图、axe），如果人在那之后才去过验证码或换页面，step 0 描述的是 agent 从没见过的页面，`current` 焦点也是旧的。
-  - 结束时 `browser.close()` 只断开 CDP 连接（Playwright 对 connectOverCDP 的行为），人的 Chrome 和标签页都保留，CLI 能正常退出。
-- 步骤 2：`scripts/real-chrome.sh [url…]`。macOS / Linux / WSL（WSLg）都能用，单独的 profile（默认 `/tmp/a11y-real-profile`，没有日常登录、银行卡或自动填充），`CDP_PORT`、`A11Y_PROFILE`、`CHROME_BIN` 可覆盖。
-- 步骤 4：guard 测试补上了密码、CVV、有效期字段，以及 checkout/payment/billing 按 URL 或标题停止（`test/pipeline.test.mjs`）。`audit()` 现在**先**检查结账边界，再问 planner：到结账页后不会再调用 LLM，也不会再执行任何动作。端到端验证（本地 shop，real 模式，预录按键）：第 17 步进入 `checkout.html`，第 18 步 `done: reached checkout boundary`，卡号没有输入；data: 页面上往密码框输入被拒绝（`stuck`），trace 里没有这段文字。
-- `shotSize`：见下文“交给前端”。`fixtures/testpage-*` 已用当前 runner 重录（只有 `dtMs` 抖动和新增的 `shotSize` 不同）。`npm test` 57/57，`npm run smoke` 7/7。
-- 步骤 3 的连通测试（**预录 Tab，没有 planner**）：候选 1、候选 2 的首页都能正常加载（没有反爬拦截页），接管、回车开始、记录、断开都正常。结果在 `runs/real/*-conn-cand{1,2}`（已 gitignore）。
+  - 结束时 `browser.close()` 只断开 CDP 连接，人的 Chrome 和标签页都保留，CLI 能正常退出。
+- 步骤 2：`scripts/real-chrome.sh [url…]`。macOS / Linux / WSL（WSLg）都能用，单独的 profile（默认 `/tmp/a11y-real-profile`，没有日常登录、银行卡或自动填充）。
+- 步骤 4：guard 测试补上了密码、CVV、有效期字段，以及 checkout/payment/billing 按 URL 或标题停止。`audit()` 现在**先**检查结账边界，再问 planner：到结账页后不会再调用 LLM，也不会再执行任何动作。在本地 shop 上用 real 模式验证过：进入 `checkout.html` 后下一步就是 `done: reached checkout boundary`，卡号没有输入；往密码框输入被拒绝，trace 里没有这段文字。
+- 步骤 3、5：在两个网站上预跑（用户给了 2 个；计划建议 3–5 个，之后可以再加）。每次交给 planner 之前，都先加载页面确认不是验证码或反爬页。结果在 `runs/real/`（已 gitignore），LLM 响应在 `.cache/llm`。
+  - **候选 1**：没有反爬拦截，搜索成功（第 6–7 步），但 80 步用完也没走到商品。原因是 planner 只会按 Tab、不会用跳转链接；页面 AX 文本开头是页脚标题，planner 误以为自己“卡在页脚”，来回按 Shift+Tab 和 Home。**不适合 demo。** 真实问题：搜索分类下拉框没有名称；搜索提交后焦点掉到 body。
+  - **候选 2（选为 demo）**：57 步完成，约 2 分钟。第 54 步在商品页按下 “Add to Bag”，屏幕上出现 “Adding to Bag…”，随后打开了一个“已加入购物袋”面板（`modalOpen: true`）。但焦点掉到 body，读屏用户**什么都没听到**（`heard` 只有 “(focus on page body)”）。agent 只是继续按 Tab 才碰巧发现了 close 按钮和 “View Shopping Bag (1)”。报告里是 F170 `focus-lost`（degrade）。这正是“加购成功但未播报”，而且流程稳定、画面清楚。judge 从 172 个候选里过滤掉了 150 个。
+- `shotSize`：见下文“交给前端”。`fixtures/testpage-*` 已用当前 runner 重录（只有 `dtMs` 抖动和新增的 `shotSize` 不同）。
 
-**未完成（阻塞）**
-- 步骤 3 的 planner 连通测试和步骤 5 的预跑：这台机器上没有 `.env`（没有 Sciforium key），也没有 LLM 缓存。有了 `.env` 之后运行：
-  ```bash
-  scripts/real-chrome.sh https://<site>/          # 单独开一个终端
-  node cli.mjs audit --mode real --cdp http://localhost:9222 --goal "Search for a tote bag and add it to the cart" --out runs/real --label cand1
-  ```
-- 验收里的“加购成功但未播报”还没跑出来，所以本计划还没勾选。
+**给计划 09 的观察**
+- 候选 2 的 22 条 degrade 里有 17 条是搜索框下拉的“热门搜索 / 自动补全建议没有播报”，属于噪音，应该过滤掉或合并成一条。
+- 弹窗打开但焦点没有移进去、也没有播报（候选 2 第 54 步），目前只表现为 `focus-lost`，没有单独的检测。按钮自己的文字从 “Add to Bag” 变成 “Adding to Bag…” 和第 35 步的同名文字被合并成一个候选，judge 判为 none。
+- 本 `.env` 里 `MODEL_JUDGE` 和 `MODEL_PLANNER` 是同一个 DeepSeek 模型，所以 judge 实际跑在 DeepSeek 上，不是 GLM。
+- （与本计划无关、之前就存在）本地 shop 的 popup 流程在 `--no-judge` 下没检出 B11。
 
-**给计划 09 的观察**：候选 1 上预录 Tab 后 `stuck` 且关闭 judge 时，D6 报了 9 个 pointer-only 的 block 候选（首页卡片）。这些要靠 judge 过滤。搜索分类下拉框没有名称（`combobox ""`），这是真实问题。
-
-**交给前端（viewer 需要配合）**：`timeline[].shotSize = {w, h, dpr}`，表示截图的实际像素宽高和 devicePixelRatio；没有截图时为 `null`，旧报告里没有这个字段（按 1280×800、dpr 1 处理）。`focusRect`、`seen[].rect` 都是 **CSS 像素**，画框时用：`rect × dpr × (显示宽度 / shotSize.w)`。本地模式固定 `{1280, 800, 1}`；真实网站模式下，Retina Mac 上候选 1 实测是 `{w: 2560, h: 1522, dpr: 2}`，所以按 1280 缩放会整体错位一倍。详见 `docs/REPORT_FORMAT.md` §4。
+**交给前端（viewer 需要配合）**：`timeline[].shotSize = {w, h, dpr}`，表示截图的实际像素宽高和 devicePixelRatio；没有截图时为 `null`，旧报告里没有这个字段（按 1280×800、dpr 1 处理）。`focusRect`、`seen[].rect` 都是 **CSS 像素**，画框时用：`rect × dpr × (显示宽度 / shotSize.w)`。本地模式固定 `{1280, 800, 1}`；真实网站模式在 Retina Mac 上实测是 `{w: 2560, h: 1522, dpr: 2}`，所以按 1280 缩放会整体错位一倍。详见 `docs/REPORT_FORMAT.md` §4。demo 用的真实网站报告只在跑的这台机器上：`runs/real/<运行目录>/report.json`，通过 `npm run serve` 访问 `/runs/real/<运行目录>/report.json`。

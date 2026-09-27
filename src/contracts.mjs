@@ -2,6 +2,7 @@
 // Changing a field: tell the whole team, update fixtures/, update docs/ARCHITECTURE.md §3, run `npm test`.
 
 export const MAX_STEPS = 25;
+export const MAX_STEPS_REAL = 80;       // real sites: Tab-only through a big header and results list needs far more keys
 export const CHANGE_WINDOW_MS = 1500;   // changes later than this after an action are not attributed to it
 export const SETTLE_MS = 300;           // minimum quiet time before we observe
 export const NOISE_REPEAT = 3;         // same element changing >= this often without input = carousel/countdown
