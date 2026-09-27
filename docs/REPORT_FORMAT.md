@@ -4,7 +4,7 @@
 
 - 机器可读的完整定义：`docs/report.schema.json`（JSON Schema 2020-12，可以用来校验或生成 TypeScript 类型，例如 `npx json-schema-to-typescript docs/report.schema.json`）
 - 字段齐全的示例：`docs/report.example.json`（基于真实运行数据；judge 的文字和修复部分是按真实格式手写的示意）
-- 真实运行结果：`fixtures/testpage-original/report.json`（读屏用户无法完成）、`fixtures/testpage-fixed/report.json`（可以完成）
+- 真实运行结果：`fixtures/testpage-original/report.json`（读屏用户无法完成）、`fixtures/testpage-fixed/report.json`（可以完成）、`fixtures/testpage-fixloop/report.json`（真实的"发现 → 修复 → 重跑"：带 judge、`fixes`、`findings[].fix` 和 `rerun`，`closedLoop: true`）
 
 ## 1. 怎么读取
 
@@ -121,12 +121,12 @@
 | `evidence.screenshot` | 证据截图 |
 | `axeAlsoFound` | axe 是否也发现了这个问题。我们的问题大多是 false，这正是差异化所在 |
 | `judged` | false 表示没有经过 AI 审核，严重程度是默认值 |
-| `fix` | 修复方案，没跑修复时为 null。`fix.edits` 是 `[{file, old, new}]`，可以显示成"修改前 / 修改后"的对比 |
+| `fix` | 修复方案。没跑修复、或者这条问题的 edit 一条都没应用成功时为 null（原因见 `fixes[].errors`）。`fix.edits` 是 `[{file, old, new}]`，**只包含真正应用到修复副本上的 edit**，可以直接显示成"修改前 / 修改后"的对比；`fix.rationale` 是 fixer 的一句话理由 |
 | `hint`、`candidateId`、`evidence.selector`、`evidence.barrierId` | 技术细节，可以不显示 |
 
 ### fixes 和 rerun：修复后重跑
 
-`fixes` 是每条修复的执行结果：`{finding, applied, errors, rationale}`，`applied` 为 0 表示这条修复没成功。
+`fixes` 是每条修复的执行结果：`{finding, applied, errors, rationale}`，每条阻断问题一项。`applied` 为 0 表示这条修复没成功；`applied` 大于 0 时 `errors` 也可能不为空（例如某条 edit 因为会删掉可见文字被拒绝，其余的应用了）。运行 `fix` 后，后端会重新生成 `report.json`，`fixes` 和 `findings[].fix` 就有值了，`rerun` 此时为 null（修复变了，旧的重跑结果作废）。
 
 `rerun` 是修复后用同一个任务重跑的对比：
 
@@ -136,7 +136,7 @@
 | `before` / `after` | 修复前后的两个结论，结构和 `verdicts` 一样。适合并排显示"否 → 能" |
 | `status` | 每条原有问题的状态：`resolved` 已解决 / `persists` 仍存在，`id` 对应本报告的 findings |
 | `introduced` | 修复后新出现的问题（id 指向重跑那次运行自己的报告） |
-| `runDir` | 重跑那次运行的目录，可以链接过去查看它的完整报告 |
+| `runDir` | 重跑那次运行的目录，相对仓库根目录，例如 `runs/2026-09-27T00-54-18-rerun`，它的报告在 `/runs/<运行目录名>/report.json`。固定数据（`fixtures/`）里的 `runDir` 指向没有提交的运行，链接会打不开 |
 
 `status[].key` 是后端内部用的匹配键，**请不要解析它**。
 
@@ -170,5 +170,5 @@
 
 ## 7. 目前的已知情况
 
-- 运行 `fix` 之后，`findings[].fix` 暂时还不会自动写回 `report.json`，后端正在补（计划 04）。在那之前，修复相关的展示请先用 `docs/report.example.json` 开发。
+- 修复相关的展示可以用 `fixtures/testpage-fixloop/report.json`（真实数据）开发。testpage 上只有一条阻断问题，所以那里只有一条修复；`docs/report.example.json` 里有两条（手写示意）。
 - `viewer/sample/report.json` 的 timeline 里缺少 `seenNoise` 字段，真实报告里始终有这个字段。

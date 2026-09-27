@@ -18,11 +18,11 @@ export function checkEdit(e) {
   return lost.length ? `edit removes visible text/literals: ${lost.slice(0, 3).map((t) => JSON.stringify(t)).join(', ')}` : null;
 }
 
-/** @returns {{applied:number, errors:string[]}} — mutates files under siteDir */
+/** @returns {{applied:number, errors:string[], appliedEdits:object[]}} — mutates files under siteDir */
 export function applyEdits(siteDir, edits) {
   const errors = [];
-  let applied = 0;
-  if (!Array.isArray(edits)) return { applied: 0, errors: ['edits must be an array'] };
+  const appliedEdits = [];
+  if (!Array.isArray(edits)) return { applied: 0, errors: ['edits must be an array'], appliedEdits };
   for (const e of edits) {
     if (typeof e?.file !== 'string' || typeof e.old !== 'string' || typeof e.new !== 'string' || !e.old) {
       errors.push(`invalid edit shape: ${JSON.stringify(e).slice(0, 120)}`); continue;
@@ -36,7 +36,7 @@ export function applyEdits(siteDir, edits) {
     const bad = checkEdit(e);
     if (bad) { errors.push(`${e.file}: ${bad}`); continue; }
     fs.writeFileSync(file, src.replace(e.old, () => e.new));
-    applied++;
+    appliedEdits.push({ file: e.file, old: e.old, new: e.new });
   }
-  return { applied, errors };
+  return { applied: appliedEdits.length, errors, appliedEdits };
 }

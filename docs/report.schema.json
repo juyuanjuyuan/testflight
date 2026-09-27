@@ -67,7 +67,7 @@
       ]
     },
     "fixes": {
-      "description": "Per-finding result of `fix`. null until a fix has been run for this report.",
+      "description": "Per-finding result of `fix` (one entry per block finding). null until a fix has been run for this report; `fix` rewrites report.json with it.",
       "oneOf": [
         { "type": "null" },
         {
@@ -76,8 +76,8 @@
             "type": "object", "required": ["finding", "applied", "errors"],
             "properties": {
               "finding": { "type": "string", "description": "Finding id, e.g. F2" },
-              "applied": { "type": "integer", "minimum": 0, "description": "Number of edits applied; 0 = fix failed" },
-              "errors": { "type": "array", "items": { "type": "string" } },
+              "applied": { "type": "integer", "minimum": 0, "description": "Number of edits applied to the patched copy; 0 = fix failed (see errors)" },
+              "errors": { "type": "array", "items": { "type": "string" }, "description": "Why edits of the last attempt were rejected (e.g. would remove visible text). Can be non-empty even when applied > 0." },
               "rationale": { "type": ["string", "null"] }
             }
           }
@@ -91,7 +91,7 @@
         {
           "type": "object", "required": ["before", "after", "status", "introduced", "closedLoop"],
           "properties": {
-            "runDir": { "type": "string", "description": "Run folder of the rerun (its own report.json lives there)" },
+            "runDir": { "type": "string", "description": "Repo-relative run folder of the rerun, e.g. runs/2026-09-27T00-54-18-rerun (served at /runs/<id>/report.json)" },
             "before": { "$ref": "#/$defs/verdicts" },
             "after": { "$ref": "#/$defs/verdicts" },
             "status": {
@@ -212,7 +212,7 @@
           }
         },
         "fix": {
-          "description": "null until `fix` ran. Edits are search/replace on the site's source.",
+          "description": "null until `fix` ran, and null when no edit for this finding could be applied. Edits are search/replace on the site's source; only edits actually applied to the patched copy are listed.",
           "oneOf": [
             { "type": "null" },
             {

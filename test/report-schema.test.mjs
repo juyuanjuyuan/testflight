@@ -81,9 +81,30 @@ test('schema compiles in strict mode', () => {
   assert.equal(typeof validate, 'function');
 });
 
-for (const rel of ['fixtures/testpage-original/report.json', 'fixtures/testpage-fixed/report.json', 'docs/report.example.json']) {
+// testpage-fixloop: a real audit → fix → rerun run, so fixes, findings[].fix and rerun are covered by real data.
+const FIXTURE_REPORTS = ['fixtures/testpage-original/report.json', 'fixtures/testpage-fixed/report.json', 'fixtures/testpage-fixloop/report.json'];
+for (const rel of [...FIXTURE_REPORTS, 'docs/report.example.json']) {
   test(`${rel} matches the schema`, () => assertValid(readJSON(rel), rel));
 }
+
+test('fixture reports contain no local absolute paths and every screenshot they reference exists', () => {
+  for (const rel of FIXTURE_REPORTS) {
+    const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    assert.ok(!text.includes(ROOT), `${rel} contains the local repo path ${ROOT}`);
+    const r = JSON.parse(text);
+    for (const shot of [...r.timeline.map((t) => t.screenshot), ...r.findings.map((f) => f.evidence.screenshot)].filter(Boolean)) {
+      assert.ok(fs.existsSync(path.join(ROOT, path.dirname(rel), shot)), `${rel} references missing ${shot}`);
+    }
+  }
+});
+
+test('fixloop fixture: fixes, findings[].fix and a closed loop are present', () => {
+  const r = readJSON('fixtures/testpage-fixloop/report.json');
+  assert.ok(r.fixes.length > 0 && r.fixes.every((f) => f.applied > 0));
+  assert.ok(r.findings.some((f) => f.fix?.edits.length > 0));
+  assert.equal(r.rerun.closedLoop, true);
+  assert.match(r.rerun.runDir, /^runs\/[^/]+$/, 'runDir is repo-relative, as the viewer links to it');
+});
 
 for (const [label, report] of Object.entries(live)) {
   test(`report built by buildReport: ${label} matches the schema`, () => assertValid(report, label));

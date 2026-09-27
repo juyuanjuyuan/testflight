@@ -1,0 +1,485 @@
+{
+  "meta": {
+    "url": "http://localhost:8080/testpage/original/",
+    "mode": "local",
+    "site": "sites/testpage/original",
+    "script": false,
+    "goal": "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242.",
+    "judge": true,
+    "generatedAt": "2026-09-27T00:52:40.428Z"
+  },
+  "verdicts": {
+    "outcome": "stuck",
+    "agentCanComplete": false,
+    "screenReaderUserCanComplete": false,
+    "blockingFindings": [
+      "F1"
+    ],
+    "unexplainedStuck": false
+  },
+  "counts": {
+    "block": 1,
+    "degrade": 2,
+    "filteredOut": 0,
+    "axeViolations": 0,
+    "axeBestPractice": 2
+  },
+  "timeline": [
+    {
+      "i": 0,
+      "action": {
+        "kind": "start",
+        "reason": "open page"
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "(focus on page body)",
+      "focusRect": null,
+      "seen": [],
+      "seenNoise": [],
+      "heard": [
+        "(focus on page body)"
+      ],
+      "screenshot": "shots/0000.png",
+      "findingIds": []
+    },
+    {
+      "i": 1,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "Tabbing to reach the add-to-cart button for the tote bag"
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"🛒\"",
+      "focusRect": {
+        "x": 32,
+        "y": 213,
+        "w": 33,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
+      "heard": [
+        "button \"🛒\""
+      ],
+      "screenshot": "shots/0001.png",
+      "findingIds": [
+        "F2"
+      ]
+    },
+    {
+      "i": 2,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "Activating the cart button to add the Canvas Tote Bag to the cart."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"🛒\"",
+      "focusRect": {
+        "x": 32,
+        "y": 213,
+        "w": 33,
+        "h": 21
+      },
+      "seen": [
+        {
+          "text": "Added to cart",
+          "rect": {
+            "x": 32,
+            "y": 242,
+            "w": 640,
+            "h": 19
+          }
+        }
+      ],
+      "seenNoise": [],
+      "heard": [],
+      "screenshot": "shots/0002.png",
+      "findingIds": [
+        "F1",
+        "F2"
+      ]
+    },
+    {
+      "i": 3,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "Activating the cart button to add the Canvas Tote Bag to the cart."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"🛒\"",
+      "focusRect": {
+        "x": 32,
+        "y": 213,
+        "w": 33,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "20% off hats"
+      ],
+      "heard": [],
+      "screenshot": "shots/0003.png",
+      "findingIds": [
+        "F2"
+      ]
+    },
+    {
+      "i": 4,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "Cart button gave no feedback; tabbing to the Checkout button to continue."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"Checkout\"",
+      "focusRect": {
+        "x": 32,
+        "y": 269,
+        "w": 72,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "Free shipping over $50"
+      ],
+      "heard": [
+        "button \"Checkout\""
+      ],
+      "screenshot": "shots/0004.png",
+      "findingIds": []
+    },
+    {
+      "i": 5,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "Activating the Checkout button to proceed with buying the tote bag."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "textbox \"Card number\"",
+      "focusRect": {
+        "x": 581,
+        "y": 364,
+        "w": 185,
+        "h": 21
+      },
+      "seen": [
+        {
+          "text": "Card number Pay",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1280,
+            "h": 800
+          }
+        }
+      ],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
+      "heard": [
+        "textbox \"Card number\"",
+        "Card number Pay"
+      ],
+      "screenshot": "shots/0005.png",
+      "findingIds": []
+    },
+    {
+      "i": 6,
+      "action": {
+        "kind": "type",
+        "text": "4242 4242 4242 4242",
+        "replace": true,
+        "reason": "Filling the card number field with the provided card number"
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "textbox \"Card number\"",
+      "focusRect": {
+        "x": 581,
+        "y": 364,
+        "w": 185,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "20% off hats"
+      ],
+      "heard": [],
+      "screenshot": "shots/0006.png",
+      "findingIds": []
+    },
+    {
+      "i": 7,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "Card number is filled; tabbing to find the Pay button."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"Pay\"",
+      "focusRect": {
+        "x": 771,
+        "y": 364,
+        "w": 39,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "Free shipping over $50"
+      ],
+      "heard": [
+        "button \"Pay\""
+      ],
+      "screenshot": "shots/0007.png",
+      "findingIds": []
+    },
+    {
+      "i": 8,
+      "action": {
+        "kind": "press",
+        "key": "Enter",
+        "reason": "Activating the Pay button to submit the card payment."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "(focus on page body)",
+      "focusRect": null,
+      "seen": [
+        {
+          "text": "Order confirmed",
+          "rect": {
+            "x": 32,
+            "y": 242,
+            "w": 640,
+            "h": 19
+          }
+        }
+      ],
+      "seenNoise": [
+        "New arrivals this week"
+      ],
+      "heard": [
+        "(focus on page body)"
+      ],
+      "screenshot": "shots/0008.png",
+      "findingIds": [
+        "F1",
+        "F3"
+      ]
+    },
+    {
+      "i": 9,
+      "action": {
+        "kind": "press",
+        "key": "Tab",
+        "reason": "Focus fell to page body; tabbing to locate the Pay button again."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"🛒\"",
+      "focusRect": {
+        "x": 32,
+        "y": 213,
+        "w": 33,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "20% off hats"
+      ],
+      "heard": [
+        "button \"🛒\""
+      ],
+      "screenshot": "shots/0009.png",
+      "findingIds": [
+        "F2"
+      ]
+    },
+    {
+      "i": 10,
+      "action": {
+        "kind": "stuck",
+        "reason": "Pressed Pay after entering card 4242 4242 4242 4242, but heard no confirmation — focus fell to page body and the page appears reset to the cart button, so I cannot confirm the order was placed."
+      },
+      "url": "http://localhost:8080/testpage/original/",
+      "focus": "button \"🛒\"",
+      "focusRect": {
+        "x": 32,
+        "y": 213,
+        "w": 33,
+        "h": 21
+      },
+      "seen": [],
+      "seenNoise": [
+        "Free shipping over $50"
+      ],
+      "heard": [],
+      "screenshot": "shots/0010.png",
+      "findingIds": [
+        "F2"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "detector": "unannounced",
+      "layer": "announcement",
+      "steps": [
+        2,
+        8
+      ],
+      "wcag": [
+        "4.1.3"
+      ],
+      "hint": "\"Added to cart\" appeared 3ms after Enter; not in a live region, focus not moved to it, not described by newly focused element",
+      "evidence": {
+        "selector": "#toast",
+        "barrierId": "T2",
+        "text": "Added to cart",
+        "screenshot": "shots/0002.png"
+      },
+      "impact": "block",
+      "summary": "The \"Added to cart\" and \"Order confirmed\" toasts (#toast) are plain divs with no live-region role, no focus move, and no aria-describedby, so they are never announced.",
+      "userImpact": "A screen-reader user gets no feedback that the tote was added or that the card payment succeeded, so they cannot tell whether the order was placed and abandon the purchase.",
+      "judged": true,
+      "axeAlsoFound": true,
+      "fix": {
+        "edits": [
+          {
+            "file": "index.html",
+            "old": "<div id=\"toast\" data-barrier=\"T2\"></div>",
+            "new": "<div id=\"toast\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\" data-barrier=\"T2\"></div>"
+          }
+        ],
+        "rationale": "The #toast element is a plain div, so updates to its text ('Added to cart', 'Order confirmed') are not announced by screen readers. Adding role=\"status\" with aria-live=\"polite\" (and aria-atomic=\"true\" so the whole message is read) makes it a live region that announces these status messages without changing any visible text or behavior."
+      },
+      "candidateId": "C1"
+    },
+    {
+      "id": "F2",
+      "detector": "weak-name",
+      "layer": "presence",
+      "steps": [
+        1,
+        2,
+        3,
+        9,
+        10
+      ],
+      "wcag": [
+        "2.4.6",
+        "4.1.2"
+      ],
+      "hint": "button name \"🛒\" is very short or symbols/emoji only",
+      "evidence": {
+        "selector": "#add",
+        "barrierId": "T1",
+        "text": "🛒",
+        "screenshot": "shots/0001.png"
+      },
+      "impact": "degrade",
+      "summary": "The add-to-cart control's accessible name is only the emoji \"🛒\" (#add), giving no indication that it adds the Canvas Tote Bag to the cart.",
+      "userImpact": "A screen-reader user hears only \"shopping cart button\" and must guess that this control adds the tote to the cart, making the first step of the purchase uncertain.",
+      "judged": true,
+      "axeAlsoFound": false,
+      "fix": null,
+      "candidateId": "C2"
+    },
+    {
+      "id": "F3",
+      "detector": "focus-lost",
+      "layer": "operation",
+      "steps": [
+        8
+      ],
+      "wcag": [
+        "2.4.3"
+      ],
+      "hint": "after Enter on \"Pay\", focus fell back to <body>",
+      "evidence": {
+        "selector": "#pay",
+        "barrierId": "T4",
+        "screenshot": "shots/0008.png"
+      },
+      "impact": "degrade",
+      "summary": "After Enter on the Pay button (#pay), focus is dropped to <body> instead of staying on the control or moving to the confirmation, forcing the user to re-tab from the top.",
+      "userImpact": "A screen-reader user loses their place after paying and must navigate back through the page to find out what happened, adding confusion to an already unconfirmed order.",
+      "judged": true,
+      "axeAlsoFound": false,
+      "fix": null,
+      "candidateId": "C3"
+    }
+  ],
+  "axe": {
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "wcag": false,
+        "nodes": 1
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "wcag": false,
+        "nodes": 5
+      }
+    ]
+  },
+  "fixes": [
+    {
+      "finding": "F1",
+      "applied": 1,
+      "errors": [],
+      "rationale": "The #toast element is a plain div, so updates to its text ('Added to cart', 'Order confirmed') are not announced by screen readers. Adding role=\"status\" with aria-live=\"polite\" (and aria-atomic=\"true\" so the whole message is read) makes it a live region that announces these status messages without changing any visible text or behavior."
+    }
+  ],
+  "rerun": {
+    "runDir": "runs/2026-09-27T00-54-18-rerun",
+    "before": {
+      "outcome": "stuck",
+      "agentCanComplete": false,
+      "screenReaderUserCanComplete": false,
+      "blockingFindings": [
+        "F1"
+      ],
+      "unexplainedStuck": false
+    },
+    "after": {
+      "outcome": "done",
+      "agentCanComplete": true,
+      "screenReaderUserCanComplete": true,
+      "blockingFindings": [],
+      "unexplainedStuck": false
+    },
+    "status": [
+      {
+        "id": "F1",
+        "key": "unannounced|T2",
+        "status": "resolved"
+      },
+      {
+        "id": "F2",
+        "key": "weak-name|T1",
+        "status": "persists"
+      },
+      {
+        "id": "F3",
+        "key": "focus-lost|T4",
+        "status": "persists"
+      }
+    ],
+    "introduced": [],
+    "closedLoop": true
+  },
+  "stats": {
+    "cacheHits": 10,
+    "llmAttempts": 1,
+    "calls": 1,
+    "ms": 5659
+  }
+}

@@ -580,7 +580,7 @@
     {
       "finding": "F2",
       "applied": 2,
-      "errors": [],
+      "errors": ["index.html: edit removes visible text/literals: \"Card number is invalid\""],
       "rationale": "Announce the error and link it to the field."
     }
   ],

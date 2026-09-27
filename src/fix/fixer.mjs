@@ -20,27 +20,29 @@ function relevantFiles(files, finding) {
 
 /**
  * Fix every block finding on a COPY of the site. Original stays untouched so the demo can be repeated.
+ * Sets `f.fix` to the edits actually applied (null if none were), so the viewer never shows a diff that is not in patched/.
+ * `client` replaces the LLM client (tests only).
  * @returns {Promise<{finding:string, applied:number, errors:string[], rationale?:string}[]>}
  */
-export async function fixSite({ findings, originalDir, patchedDir, stats = {} }) {
+export async function fixSite({ findings, originalDir, patchedDir, stats = {}, client }) {
   fs.rmSync(patchedDir, { recursive: true, force: true });
   fs.cpSync(originalDir, patchedDir, { recursive: true });
   const results = [];
   for (const f of findings.filter((x) => x.impact === 'block')) {
-    let feedback = null, res = { applied: 0, errors: ['not attempted'] }, rationale;
+    let feedback = null, res = { applied: 0, errors: ['not attempted'], appliedEdits: [] }, rationale;
     for (let attempt = 0; attempt < 2 && res.applied === 0; attempt++) {
       const files = relevantFiles(listFiles(patchedDir), f); // re-read: earlier fixes changed the files
       try {
-        const { data } = await chatJSON({ role: 'fixer', system: SYSTEM, stats,
+        const { data } = await chatJSON({ role: 'fixer', system: SYSTEM, stats, client,
           user: JSON.stringify({ finding: { summary: f.summary, detector: f.detector, wcag: f.wcag, hint: f.hint, evidence: f.evidence },
             files, previousAttemptErrors: feedback }) });
-        rationale = data.rationale;
-        res = applyEdits(patchedDir, data.edits);
-        f.fix = { edits: data.edits, rationale };
-      } catch (e) { res = { applied: 0, errors: [e.message] }; }
+        rationale = typeof data?.rationale === 'string' ? data.rationale : null;
+        res = applyEdits(patchedDir, data?.edits);
+      } catch (e) { res = { applied: 0, errors: [e.message], appliedEdits: [] }; }
       feedback = res.errors;
     }
-    results.push({ finding: f.id, ...res, rationale });
+    f.fix = res.applied ? { edits: res.appliedEdits, rationale } : null;
+    results.push({ finding: f.id, applied: res.applied, errors: res.errors, rationale });
   }
   return results;
 }
