@@ -26,7 +26,17 @@ const fakeClient = (edits) => ({ chat: { completions: { create: async () => (
 const toastEdit = { file: 'index.html', old: '<div id="toast" data-barrier="T2"></div>', new: '<div id="toast" data-barrier="T2" role="status"></div>' };
 const missingEdit = { file: 'index.html', old: '<p id="nope">', new: '<p id="nope" role="alert">' };
 
-/** A run folder like `audit` leaves behind, built from the recorded original-page trace. F1 is made a block finding too. */
+// Finding ids are renumbered whenever a fixture is re-recorded: look them up by what they are (detector + planted barrier).
+const idOf = (findings, detector, barrierId) => {
+  const f = findings.find((x) => x.detector === detector && x.evidence.barrierId === barrierId);
+  assert.ok(f, `no ${detector} finding on barrier ${barrierId}`);
+  return f.id;
+};
+
+/**
+ * A run folder like `audit` leaves behind, built from the recorded original-page trace. The unannounced toast is made a
+ * block finding too. Returns ids: toast (unannounced T2), cardErr (unannounced T3, degrade), trap (dialog trap T4, block).
+ */
 async function makeRun() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fix-'));
   const runDir = path.join(tmp, 'run');
@@ -38,13 +48,14 @@ async function makeRun() {
   fs.writeFileSync(path.join(runDir, 'axe.json'), JSON.stringify({ violations: [] }));
   await analyze({ trace, goal: 'buy', meta, runDir, judgeEnabled: false, axe: { violations: [] }, stats: { calls: 3 } });
   const findings = readJSON(path.join(runDir, 'findings.json'));
-  findings.find((f) => f.id === 'F1').impact = 'block';
+  const ids = { toast: idOf(findings, 'unannounced', 'T2'), cardErr: idOf(findings, 'unannounced', 'T3'), trap: idOf(findings, 'trap', 'T4') };
+  findings.find((f) => f.id === ids.toast).impact = 'block';
   fs.writeFileSync(path.join(runDir, 'findings.json'), JSON.stringify(findings));
-  return { tmp, runDir, patched: path.join(tmp, 'patched') };
+  return { tmp, runDir, patched: path.join(tmp, 'patched'), ids };
 }
 
 test('fix writes the applied fix plan back into report.json, from any working directory', async () => {
-  const { tmp, runDir, patched } = await makeRun();
+  const { tmp, runDir, patched, ids } = await makeRun();
   const originalSrc = fs.readFileSync(ORIGINAL, 'utf8');
   const cwd = process.cwd();
   process.chdir(tmp); // meta.site is repo-relative: must not depend on cwd
@@ -53,16 +64,15 @@ test('fix writes the applied fix plan back into report.json, from any working di
     const report = readJSON(path.join(runDir, 'report.json'));
     assert.deepEqual(report.fixes, fixes);
     const byId = Object.fromEntries(report.findings.map((f) => [f.id, f]));
-    const f1 = fixes.find((x) => x.finding === 'F1');
-    assert.equal(f1.applied, 1);
-    assert.deepEqual(byId.F1.fix, { edits: [toastEdit], rationale: 'announce the toast' }, 'only edits that were applied are shown as the diff');
-    assert.equal(fixes.find((x) => x.finding === 'F4').applied, 0);
-    assert.equal(byId.F4.fix, null, 'no edit applied → no fix shown; the reason is in fixes[].errors');
-    assert.equal(byId.F2.fix, null, 'degrade findings are not fixed');
+    assert.equal(fixes.find((x) => x.finding === ids.toast).applied, 1);
+    assert.deepEqual(byId[ids.toast].fix, { edits: [toastEdit], rationale: 'announce the toast' }, 'only edits that were applied are shown as the diff');
+    assert.equal(fixes.find((x) => x.finding === ids.trap).applied, 0);
+    assert.equal(byId[ids.trap].fix, null, 'no edit applied → no fix shown; the reason is in fixes[].errors');
+    assert.equal(byId[ids.cardErr].fix, null, 'degrade findings are not fixed');
     assert.equal(report.meta.judge, false, 'meta of the original report is kept');
     assert.deepEqual(report.stats, { calls: 3 }, 'stats of the original report are kept');
     assert.equal(report.rerun, null);
-    assert.deepEqual(readJSON(path.join(runDir, 'findings.json')).find((f) => f.id === 'F1').fix, byId.F1.fix);
+    assert.deepEqual(readJSON(path.join(runDir, 'findings.json')).find((f) => f.id === ids.toast).fix, byId[ids.toast].fix);
     assert.match(fs.readFileSync(path.join(patched, 'index.html'), 'utf8'), /role="status"/);
     assert.equal(fs.readFileSync(ORIGINAL, 'utf8'), originalSrc, 'original site untouched');
     assert.match(fs.readFileSync(path.join(runDir, 'report.md'), 'utf8'), /Task audit/);
@@ -86,15 +96,15 @@ test('fix never applies an edit that deletes visible text', async () => {
 });
 
 test('fix --findings: only the chosen findings are fixed, an earlier fix is cleared, unknown ids are rejected', async () => {
-  const { tmp, runDir, patched } = await makeRun();
+  const { tmp, runDir, patched, ids } = await makeRun();
   try {
-    await runFix({ run: runDir, patched }, { client: fakeClient([toastEdit]) }); // F1 fixed
-    const { fixes } = await runFix({ run: runDir, patched, findings: 'F4,F2' }, { client: fakeClient([missingEdit]) });
-    assert.deepEqual(fixes.map((f) => f.finding).sort(), ['F2', 'F4'], 'a chosen degrade finding is fixed too; F1 is not');
+    await runFix({ run: runDir, patched }, { client: fakeClient([toastEdit]) }); // the toast is fixed
+    const { fixes } = await runFix({ run: runDir, patched, findings: `${ids.trap},${ids.cardErr}` }, { client: fakeClient([missingEdit]) });
+    assert.deepEqual(fixes.map((f) => f.finding).sort(), [ids.trap, ids.cardErr].sort(), 'a chosen degrade finding is fixed too; the toast is not');
     const report = readJSON(path.join(runDir, 'report.json'));
-    assert.equal(report.findings.find((f) => f.id === 'F1').fix, null, 'patched/ was rebuilt without F1, so its old fix must not be shown');
+    assert.equal(report.findings.find((f) => f.id === ids.toast).fix, null, 'patched/ was rebuilt without the toast fix, so it must not be shown');
     assert.doesNotMatch(fs.readFileSync(path.join(patched, 'index.html'), 'utf8'), /role="status"/);
-    await assert.rejects(runFix({ run: runDir, patched, findings: 'F4,F99' }, { client: fakeClient([]) }), /F99/);
+    await assert.rejects(runFix({ run: runDir, patched, findings: `${ids.trap},F99` }, { client: fakeClient([]) }), /F99/);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -144,7 +154,7 @@ const rerunOpts = { script: fixedTrace.slice(1).map((s) => s.action), openSessio
 const tryProgress = (dir) => { try { return readProgress(dir); } catch { return null; } };
 
 test('fix + rerun with progress: fixing → rerunning (rerun dir already has its progress) → done; rerun written back', async () => {
-  const { tmp, runDir, patched } = await makeRun();
+  const { tmp, runDir, patched, ids } = await makeRun();
   const originalSteps = readTrace(fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8')).length;
   const seen = [];
   const progressFor = (dir) => {
@@ -172,7 +182,7 @@ test('fix + rerun with progress: fixing → rerunning (rerun dir already has its
     assert.equal(rerun.closedLoop, true);
     assert.equal(path.basename(rerun.runDir), rerunDir);
     assert.ok(!path.isAbsolute(rerun.runDir));
-    assert.equal(report.fixes.find((f) => f.finding === 'F1').applied, 1);
+    assert.equal(report.fixes.find((f) => f.finding === ids.toast).applied, 1);
     assert.ok(report.fixPolicy);
     const rerunMeta = readJSON(path.join(tmp, rerunDir, 'report.json')).meta;
     assert.equal(rerunMeta.url, 'http://localhost:8080/testpage/patched/');
