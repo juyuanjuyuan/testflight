@@ -54,6 +54,12 @@ const FOCUS = `data:text/html,${encodeURIComponent(`<title>Focus</title><style>
 <button class=js onfocus="this.classList.add('is-focus')">js</button><input class=sr type=checkbox><span>sr-only</span>`)}`;
 const FOCUS_EXPECT = [true, false, true, true, true, null]; // js: page adds the class on focus; sr-only: ring is on the sibling
 
+// D6 probe: a clickable wrapper around a real control (common on big shops: <span class=button><input type=submit>)
+// is reachable through that control; a bare clickable div, or one holding only a hidden input, is not.
+const POINTER = `data:text/html,${encodeURIComponent(`<title>Pointer</title><style>.c{cursor:pointer;display:block;margin:8px}</style>
+<span class=c onclick="0" id=wrap><input type=submit aria-label="Add to cart" style="opacity:0;position:absolute"><span>Add to cart</span></span>
+<div class=c onclick="0" id=coupon>Apply coupon</div><div class=c onclick="0" id=hid><input type=hidden><span>Hidden only</span></div>`)}`;
+
 const CASES = [
   { name: 'testpage/original', script: 'eval/keys.testpage.json', groundtruth: 'eval/groundtruth/testpage.yaml',
     check: (s) => [s.hits === s.planted && s.planted === 6 || `detected ${s.hits}/${s.planted}, expected 6/6 (missed: ${s.misses.join(' ')})`,
@@ -86,6 +92,9 @@ const CASES = [
       trace[6].action.replace === true && trace[6].action.forcedReplace === true || `real type action recorded as ${JSON.stringify(trace[6].action)}, expected replace + forcedReplace`,
       !fs.readFileSync(path.join(runDir, 'trace.jsonl'), 'utf8').includes('me@example.com') || 'autofilled value leaked into trace.jsonl',
       !fs.readFileSync(path.join(runDir, 'report.json'), 'utf8').includes('me@example.com') || 'autofilled value leaked into report.json'] },
+  { name: 'pointer-only', url: POINTER, goal: 'add to cart', script: [{ kind: 'stuck', reason: 'scan' }],
+    check: (s, r, trace) => [JSON.stringify(trace[1].unreachableClickables.map((u) => u.selector)) === '["#coupon","#hid"]'
+      || `unreachable ${JSON.stringify(trace[1].unreachableClickables.map((u) => u.selector))}, expected ["#coupon","#hid"] (the wrapper holds a focusable input)`] },
   // default ring, outline:none, box-shadow ring, ::after ring, class added by a focus handler, sr-only input (not judged)
   { name: 'focus-visible', url: FOCUS, goal: 'look around', script: [...FOCUS_EXPECT.map(() => ({ kind: 'press', key: 'Tab', reason: 'next' })), { kind: 'stuck', reason: 'end' }],
     check: (s, r, trace) => [...FOCUS_EXPECT.map((want, k) => trace[k + 1].focusVisible === want || `step ${k + 1} (${trace[k + 1].focusAfter.name}): focusVisible ${trace[k + 1].focusVisible}, expected ${want}`),

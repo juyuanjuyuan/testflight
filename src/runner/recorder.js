@@ -100,6 +100,7 @@
     }
   }
   // keyboard-reachable = Tab can land on it; tabindex=-1 is focusable by script but never by Tab
+  const FOCUSABLE = 'a[href],area[href],button,input,select,textarea,summary,iframe,[tabindex],[contenteditable]';
   function tabbable(el) {
     if (el.disabled) return false;
     if ((el.tagName === 'A' || el.tagName === 'AREA') && !el.hasAttribute('href') && !el.hasAttribute('tabindex')) return false;
@@ -180,6 +181,8 @@
         // inside something Tab can reach (text inside a button/link): the ancestor is the control
         let reachable = false;
         for (let e = el; e && e !== document.body; e = e.parentElement) if (tabbable(e)) { reachable = true; break; }
+        // or holding one: a clickable wrapper around a real <input>/<button> is reached through it (opacity 0 still takes focus)
+        if (!reachable) reachable = [...el.querySelectorAll(FOCUSABLE)].some((d) => tabbable(d) && d.checkVisibility({ checkVisibilityCSS: true }));
         if (reachable || out.some((o) => o.el.contains(el))) continue;
         const text = lines(el.innerText).join(' ') || el.getAttribute('aria-label') || el.getAttribute('title') || '';
         out.push({ el, selector: selectorOf(el), barrierId: barrierOf(el), text: text.slice(0, 120) });
