@@ -164,7 +164,7 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 | T5 只能鼠标点的 Apply coupon | 买帆布包 | none | 优惠券是可选的，买包不需要（按你的决定）。 |
 | T6 Checkout outline:none | 买帆布包 | degrade | 同 B8。 |
 
-**⚠️ 需要你确认的 5 处：**
+**⚠️ 需要你确认的 5 处（已确认，见下面第 4 节；上表 B1、T1、shop-second 的 B5/B8 已改）：**
 - **B1 / T1**：block 还是 degrade？表情符号 🛒 读屏会读成 "shopping cart"，用户可能猜得到；testpage 上 T1 甚至不是必经步骤。
 - **shop-second 的 B5 / B8**：只是 Tab 经过、不操作的控件，算 none 还是 degrade？
 - **T3 / T4**：按"录制路线"（短卡号）是 block；按"goal 里给的正确卡号"两者都碰不到，应该是 none。现在按录制路线填。
@@ -177,7 +177,7 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 - 旧的消融表（"detected off → on"、"dropped by judge"）被分级表取代；`results.json` 里仍保留 `dropped`、`llmCalls`、`cacheHits`。
 - README 的 Results 换成这两张表，表下说明 judge 的作用是按任务判断影响，不是提高检出数。
 
-#### 结果表（`node eval/run.mjs --replay eval/traces` 的原样输出，连跑两次完全一致，judge 全部命中缓存）
+#### 结果表（确认 expectedImpact 之前的版本，已被第 4 节取代）
 
 #### Detection rate: planted barriers vs tools (judge off)
 
@@ -245,3 +245,81 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 
 - `npm test`：152 个全部通过；`npm run smoke`：9 个用例全部 ok。
 - `node eval/run.mjs --replay eval/traces`：退出码 0，输出和 README 一致；`SCIFORIUM_API_KEY=` 时 judge 开启的列显示 skipped，退出码 0。
+
+### 4. 确认后的 expectedImpact（2026-09-27）
+
+- **B1、T1 → degrade**。读屏器按 Unicode 名称把 🛒 读成 "shopping cart"，用户能猜到和购物车有关，但分不清是"加入"还是"查看"，属于降级。testpage 上不加购也能付款，更不会阻断。设计时的 `impact: block`（B1）保留不动，它记录的是埋障碍时的意图。judge 的 prompt 没有改（属于计划 09）。
+- **只是 Tab 经过的控件，按这条规则判断**（已写进 `eval/groundtruth/*.yaml` 的文件头注释）：障碍只在使用该控件时才出现，而本任务不用它 → `none`；按 Tab 经过时就会造成困扰（例如名称缺失或无法理解）→ `degrade`。
+  - **B5（shop-second）→ degrade**：这是命名障碍。每次 Tab 经过，读屏都会念出 "−"、"+"，没有商品名，听的人不知道这是什么控件。属于"经过时就会造成困扰"。
+  - **B8（shop-second）→ degrade**：`outline:none` 不需要操作控件就会暴露。视力正常的键盘用户按 Tab 经过卡号框和 Pay 时，焦点指示消失两次，不知道焦点停在哪里、还要按几次 Tab。对读屏用户没有影响；这和 main 流程里 B8 判 degrade 的理由一致。
+  - 这两个我不再拿不准，不需要去问前端队友。
+- **T3、T4 保持 block**。`testpage.yaml` 里注明：评分以录制路线为准，录制路线故意输错卡号，模拟用户打错字；从错误中恢复是任务的一部分，用户听不到错误提示就无法改正和付款。同样的说明由 `eval/run.mjs` 输出到表下，README 里也有。
+- 没有重新录制 `eval/traces/`（见第 1 节）。
+
+#### 结果表（`node eval/run.mjs --replay eval/traces` 的原样输出，连跑两次完全一致，judge 全部命中缓存）
+
+#### Detection rate: planted barriers vs tools (judge off)
+
+| dataset | variant | tool | planted | detected | missed | false positives |
+|---|---|---|---|---|---|---|
+| shop-main | original | ours (judge off) | 8 | 7 | B3† | 0 |
+| shop-main | original | axe (WCAG rules) | 8 | 0 | B1 B2 B3† B4 B5 B6 B7 B8 | 0 |
+| shop-main | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-main | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-second | original | ours (judge off) | 4 | 4 | – | 0 |
+| shop-second | original | axe (WCAG rules) | 4 | 0 | B5 B8 B9 B10 | 0 |
+| shop-second | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-second | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-popup | original | ours (judge off) | 1 | 1 | – | 0 |
+| shop-popup | original | axe (WCAG rules) | 1 | 0 | B11 | 0 |
+| shop-popup | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-popup | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| testpage | original | ours (judge off) | 6 | 6 | – | 0 |
+| testpage | original | axe (WCAG rules) | 6 | 0 | T1 T2 T3 T4 T5 T6 | 0 |
+| testpage | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| testpage | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| **total** | | ours (judge off) | 19 | 18/19 (95%) | 1 | 0 |
+| **total** | | axe (WCAG rules) | 19 | 0/19 (0%) | 19 | 0 |
+
+† vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors' job; whether they matter is the judge's.
+Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
+axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
+w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.
+keyboard-a11y-tester: not included in this comparison.
+
+#### Impact accuracy: same trace, judge on vs off
+
+| dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |
+|---|---|---|---|---|---|---|---|---|
+| shop-main | original | 7 | 6/7 (86%) | 6/7 (86%) | B7 block→degrade | B1 degrade→block | 0 → 0 | 0 |
+| shop-main | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-second | original | 4 | 4/4 (100%) | 4/4 (100%) | – | – | 0 → 0 | 0 |
+| shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
+| shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| testpage | original | 6 | 4/6 (67%) | 5/6 (83%) | T3 block→degrade, T5 none→block | T1 degrade→block | 0 → 0 | 0 |
+| testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| **total** | | 18 | 15/18 (83%) | 16/18 (89%) | | | 0 → 0 | 0 |
+
+For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
+expectedImpact is scored on the recorded route: e.g. the testpage script types a short card number on purpose, a user's typo; recovering from it is part of the task, and a user who never hears the error cannot correct it and pay, so T3 (unannounced error) and T4 (dialog trap) are block.
+The judge never adds findings and does not raise the detection count: its job is to rate each finding's impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.
+
+Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.
+
+Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge columns need `.env`).
+
+#### 解读
+
+- **分级一致率：judge 关 15/18（83%），judge 开 16/18（89%）**。确认前是 11/18 → 16/18。
+- judge 开启时的合计没有下降，但构成变了：shop-second 的 B5、B8 现在一致了（judge 给的是 degrade），B1、T1 变成了不一致（judge 给 block，标准答案是 degrade）。也就是说，按确认后的标准，judge 在"表情符号名称"这类障碍上判得偏重。
+- judge 关闭时从 11 升到 15，是因为 weak-name 的默认等级本来就是 degrade，这 4 处改完后正好和默认一致。所以 judge 相对默认等级的提升从 +5 缩小到 +1：judge 纠正了 B7、T3（block）和 T5（none），但把 B1、T1 判重了。
+- 检出率不受影响：我们 18/19（95%），axe 0/19，误报 0。
+
+#### 验收
+
+- `npm test`：152 个全部通过。`node eval/run.mjs --replay eval/traces`：退出码 0，输出和 README 一致。

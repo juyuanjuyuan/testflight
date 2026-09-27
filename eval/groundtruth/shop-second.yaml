@@ -9,8 +9,10 @@ goal: "Apply the coupon SAVE10 at checkout"
 # expectedImpact = what this barrier does to THIS file's task (goal + scripted route); the judge should reproduce it:
 # block = a keyboard/screen-reader user cannot finish the task; degrade = can finish, with confusion or extra work;
 # none = not on the task path (the detectors should still find it). Rationale: docs/plans/10-eval-pipeline.md, 结果.
+# Controls the route only Tabs past: none if the barrier only shows when the control is used; degrade if it already
+# gets in the way while tabbing past (e.g. a missing or unintelligible name).
 barriers:
-  - { id: B5,  kind: weak-name,    wcag: ["4.1.2", "2.4.6"],   expectedImpact: none,    impact: degrade, flow: second, detectable: ours, note: "shared with main: cart quantity buttons named '−' / '+'" }
-  - { id: B8,  kind: focus-visible, wcag: ["2.4.7"],            expectedImpact: none,    impact: degrade, flow: second, detectable: ours, note: "shared with main: outline:none on the payment form's card field and Pay button" }
+  - { id: B5,  kind: weak-name,    wcag: ["4.1.2", "2.4.6"],   expectedImpact: degrade, impact: degrade, flow: second, detectable: ours, note: "shared with main: cart quantity buttons named '−' / '+'" }
+  - { id: B8,  kind: focus-visible, wcag: ["2.4.7"],            expectedImpact: degrade, impact: degrade, flow: second, detectable: ours, note: "shared with main: outline:none on the payment form's card field and Pay button" }
   - { id: B9,  kind: trap,         wcag: ["2.1.2"],            expectedImpact: block,   impact: block,   flow: second, detectable: ours, note: "checkout: 'Members only' popup opens on coupon focus; Tab bounces Email↔Join, Escape ignored, × is mouse-only" }
   - { id: B10, kind: pointer-only, wcag: ["2.1.1"],            expectedImpact: block,   impact: block,   flow: second, detectable: ours, note: "checkout: coupon 'Apply' is a clickable <span>, never focusable (needs plan 06)" }

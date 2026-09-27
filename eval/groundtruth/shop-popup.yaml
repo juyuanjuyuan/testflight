@@ -9,5 +9,7 @@ goal: "Open the Canvas Tote Bag product page"
 # expectedImpact = what this barrier does to THIS file's task (goal + scripted route); the judge should reproduce it:
 # block = a keyboard/screen-reader user cannot finish the task; degrade = can finish, with confusion or extra work;
 # none = not on the task path (the detectors should still find it). Rationale: docs/plans/10-eval-pipeline.md, 结果.
+# Controls the route only Tabs past: none if the barrier only shows when the control is used; degrade if it already
+# gets in the way while tabbing past (e.g. a missing or unintelligible name).
 barriers:
   - { id: B11, kind: trap, wcag: ["2.1.2"],            expectedImpact: block,   impact: block, flow: popup, detectable: ours, note: "list page: newsletter popup on load; Tab bounces Email↔Subscribe, Escape ignored, × is mouse-only" }

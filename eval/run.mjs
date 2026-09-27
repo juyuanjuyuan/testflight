@@ -160,6 +160,7 @@ function render(results, { judgeOn, replay }) {
     'keyboard-a11y-tester: not included in this comparison.', '',
     '### Impact accuracy: same trace, judge on vs off', '', impactTable(results, judgeOn), '',
     'For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow\'s task. Judge off = each detector\'s fixed default level, shown as the baseline.',
+    'expectedImpact is scored on the recorded route: e.g. the testpage script types a short card number on purpose, a user\'s typo; recovering from it is part of the task, and a user who never hears the error cannot correct it and pay, so T3 (unannounced error) and T4 (dialog trap) are block.',
     'The judge never adds findings and does not raise the detection count: its job is to rate each finding\'s impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.'];
   if (judgeOn) {
     out.push('', `Judge-on numbers depend on the model (\`MODEL_JUDGE\`); verdicts are cached in \`.cache/llm\`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.`);

@@ -88,18 +88,19 @@ keyboard-a11y-tester: not included in this comparison.
 
 | dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |
 |---|---|---|---|---|---|---|---|---|
-| shop-main | original | 7 | 5/7 (71%) | 7/7 (100%) | B1 block→degrade, B7 block→degrade | – | 0 → 0 | 0 |
+| shop-main | original | 7 | 6/7 (86%) | 6/7 (86%) | B7 block→degrade | B1 degrade→block | 0 → 0 | 0 |
 | shop-main | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
-| shop-second | original | 4 | 2/4 (50%) | 2/4 (50%) | B5 none→degrade, B8 none→degrade | B5 none→degrade, B8 none→degrade | 0 → 0 | 0 |
+| shop-second | original | 4 | 4/4 (100%) | 4/4 (100%) | – | – | 0 → 0 | 0 |
 | shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
 | shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
 | shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
-| testpage | original | 6 | 3/6 (50%) | 6/6 (100%) | T1 block→degrade, T3 block→degrade, T5 none→block | – | 0 → 0 | 0 |
+| testpage | original | 6 | 4/6 (67%) | 5/6 (83%) | T3 block→degrade, T5 none→block | T1 degrade→block | 0 → 0 | 0 |
 | testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
 | w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
-| **total** | | 18 | 11/18 (61%) | 16/18 (89%) | | | 0 → 0 | 0 |
+| **total** | | 18 | 15/18 (83%) | 16/18 (89%) | | | 0 → 0 | 0 |
 
 For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
+expectedImpact is scored on the recorded route: e.g. the testpage script types a short card number on purpose, a user's typo; recovering from it is part of the task, and a user who never hears the error cannot correct it and pay, so T3 (unannounced error) and T4 (dialog trap) are block.
 **What the judge is for:** it never adds findings and does not raise the detection count; its job is to rate each finding's impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.
 
 Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.

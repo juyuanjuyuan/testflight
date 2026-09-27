@@ -11,8 +11,10 @@ goal: "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declin
 # expectedImpact = what this barrier does to THIS file's task (goal + scripted route); the judge should reproduce it:
 # block = a keyboard/screen-reader user cannot finish the task; degrade = can finish, with confusion or extra work;
 # none = not on the task path (the detectors should still find it). Rationale: docs/plans/10-eval-pipeline.md, 结果.
+# Controls the route only Tabs past: none if the barrier only shows when the control is used; degrade if it already
+# gets in the way while tabbing past (e.g. a missing or unintelligible name).
 barriers:
-  - { id: B1, kind: weak-name,     wcag: ["4.1.2"],            expectedImpact: block,   impact: block,   flow: main, detectable: ours,        note: "product page: add-to-cart button named only 🛒" }
+  - { id: B1, kind: weak-name,     wcag: ["4.1.2"],            expectedImpact: degrade, impact: block,   flow: main, detectable: ours,        note: "product page: add-to-cart button named only 🛒" }
   - { id: B2, kind: unannounced,   wcag: ["4.1.3"],            expectedImpact: degrade, impact: degrade, flow: main, detectable: ours,        note: "product page: 'Canvas Tote Bag added to cart' toast not in a live region" }
   - { id: B3, kind: text-in-image, wcag: ["1.4.5", "1.1.1"],   expectedImpact: none,    impact: degrade, flow: main, detectable: vision-only, note: "list page: sale text printed on an image, alt is only 'Summer sale'" }
   - { id: B4, kind: unannounced,   wcag: ["4.1.3"],            expectedImpact: degrade, impact: degrade, flow: main, detectable: ours,        note: "cart dialog: quantity and subtotal update silently" }
