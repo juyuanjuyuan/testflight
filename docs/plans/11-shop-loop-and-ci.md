@@ -76,4 +76,4 @@ audit 和 rerun 都用 `--script eval/keys.shop.main.json`，开 judge，`LLM_CA
 - workflow 改成审计假站 fixed 的主流程：`--script eval/keys.shop.main.json --no-judge --fail-on block`。
 - **发现：不开 judge 时，所有候选都是 degrade**（`judge.mjs` 里 `enabled: false` 就直接 `toFinding(c)`），所以 `--fail-on block` 在 CI 里永远不会失败，原来 testpage 那步也一样。验证过：在 original 上跑同一条命令，9 条 degrade，exit 0。为此加了一步 "Fail on any finding"：fixed 没有埋任何障碍，出现任何 block 或 degrade 都算回归。
 - 用已提交的代码在本地验证过（`BASELINE_MS=2000`）：fixed 0 条问题，通过；original 这一步 exit 1。
-- GitHub Actions：（push 后填写）
+- GitHub Actions：`49f9994` 的 run 36291368568 通过，所有步骤都是绿的，包括 "Audit the shop's checkout flow" 和 "Fail on any finding"。
