@@ -1,0 +1,10 @@
+{
+  "description": "Delivers a sleek, trustworthy English-language frontend web experience designed to engage users and enhance project proposals effectively.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
