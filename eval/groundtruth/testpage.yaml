@@ -1,7 +1,7 @@
-# Tiny page used only by tests (sites/testpage). Not the demo shop.
-site: sites/testpage
+# Tiny page used only by tests (sites/testpage/original). Not the demo shop.
+site: sites/testpage/original
 variant: original
-goal: "Buy the canvas tote bag"
+goal: "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242."
 barriers:
   - { id: T1, kind: weak-name,   wcag: ["4.1.2"] }
   - { id: T2, kind: unannounced, wcag: ["4.1.3"] }

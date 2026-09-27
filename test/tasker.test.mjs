@@ -67,7 +67,7 @@ test('generated: suggestions with UI steps or digits are dropped; values come fr
 
 test('generated: a site without its own profile uses config/test-data/default.json', async () => {
   const client = fakeClient([{ suggestions: [good('Sign up for the newsletter', ['email'])] }]);
-  const r = await suggestTasks({ ...PAGE, siteKey: 'sites/testpage/original', client });
+  const r = await suggestTasks({ ...PAGE, siteKey: 'sites/testpage/patched', client });
   assert.equal(r.testDataProfile, 'default');
   const { sentences } = loadTestData(null);
   assert.equal(r.suggestions[0].goal, `Sign up for the newsletter. ${sentences.email}`);
@@ -183,14 +183,16 @@ async function auditSeen(o) {
     judgeEnabled: false, onProgress, openSession: fakeSession(), ...o }).catch((e) => ({ error: e }));
   return { seen, runDir, ...res };
 }
+// preset of eval/groundtruth/testpage-fixed.yaml; sites/testpage/patched (the fixer's output) has no preset
+const TESTPAGE_GOAL = 'Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242.';
 const collapse = (states) => states.filter((s, k) => s !== states[k - 1]);
 
 test('audit() without a goal: planning_task → running → analyzing → done; the curated goal reaches progress and report meta', async () => {
   const { seen, report } = await auditSeen({ site: 'sites/testpage/fixed' });
   assert.deepEqual(collapse(seen.map((p) => p.state)), ['planning_task', 'running', 'analyzing', 'done']);
   assert.ok(seen.filter((p) => p.state === 'planning_task').every((p) => p.goal === null));
-  assert.ok(seen.filter((p) => p.state !== 'planning_task').every((p) => p.goal === 'Buy the canvas tote bag'));
-  assert.equal(report.meta.goal, 'Buy the canvas tote bag');
+  assert.ok(seen.filter((p) => p.state !== 'planning_task').every((p) => p.goal === TESTPAGE_GOAL));
+  assert.equal(report.meta.goal, TESTPAGE_GOAL);
   assert.equal(report.meta.goalSource, 'curated');
   assert.equal(typeof report.meta.goalReason, 'string');
   assert.equal(report.meta.testDataProfile, null);
@@ -199,7 +201,7 @@ test('audit() without a goal: planning_task → running → analyzing → done; 
 
 test('audit() without a goal on a site with no preset: generated goal, source and profile in meta; the tasker saw step 0', async () => {
   const client = fakeClient([{ suggestions: [good()] }]);
-  const { report, seen } = await auditSeen({ site: 'sites/testpage/original', llmClient: client });
+  const { report, seen } = await auditSeen({ site: 'sites/testpage/patched', llmClient: client });
   assert.equal(client.calls.length, 1);
   const sent = JSON.parse(client.calls[0]);
   assert.equal(sent.pageText, trace[0].pageText);
@@ -214,7 +216,7 @@ test('audit() without a goal on a site with no preset: generated goal, source an
 
 test('audit() without a goal: no usable task → failed with a readable one-line error, rethrown', async () => {
   const client = fakeClient([{ suggestions: [good('Click Buy')] }]);
-  const { seen, error } = await auditSeen({ site: 'sites/testpage/original', llmClient: client });
+  const { seen, error } = await auditSeen({ site: 'sites/testpage/patched', llmClient: client });
   assert.match(error.message, /Could not work out a task for this page/);
   const last = seen.at(-1);
   assert.equal(last.state, 'failed');

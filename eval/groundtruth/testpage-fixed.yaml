@@ -1,5 +1,5 @@
 # Fixed variant: nothing planted. Every finding here is a false positive.
 site: sites/testpage/fixed
 variant: fixed
-goal: "Buy the canvas tote bag"
+goal: "Buy the canvas tote bag. Pay with card number 4242 4242 4242 4242."
 barriers: []
