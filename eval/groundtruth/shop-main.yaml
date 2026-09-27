@@ -7,7 +7,7 @@
 site: sites/shop/original
 variant: original
 flow: main
-goal: "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242."
+goal: "Buy a canvas tote bag. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."
 # expectedImpact = what this barrier does to THIS file's task (goal + scripted route); the judge should reproduce it:
 # block = a keyboard/screen-reader user cannot finish the task; degrade = can finish, with confusion or extra work;
 # none = not on the task path (the detectors should still find it). Rationale: docs/plans/10-eval-pipeline.md, 结果.
