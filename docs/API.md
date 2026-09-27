@@ -78,7 +78,8 @@ Content-Type: application/json
 | `goal` | 最终任务文本，可以直接用。只写"做什么"，不写"怎么做"（不含 click、button 之类）；卡号、邮箱等测试数据由后端从 `config/test-data/` 拼接，模型不写任何具体的值 |
 | `source` | `curated` = 演示站点预设的任务（`eval/groundtruth/`，不调用模型，结果固定）；`generated` = 模型根据起始页生成 |
 | `reason` | 一句英文，为什么选这个任务 |
-| `needs` | 这个任务用到的测试数据类别（`payment_card` / `email` / `name` / `address` / `phone`），`curated` 时为 `[]` |
+| `needs` | 这个任务实际拼接的测试数据类别（`payment_card` / `email` / `name` / `address` / `phone`），只会是站点配置 `needs` 里有的（shop 只有 `payment_card`）；`curated` 时为 `[]` |
+| `kind` | 只在 `generated` 时有（新增，可选）：任务类型，`purchase` / `search` / `cart_edit` / `newsletter` / `info`。同一次返回里各条的 `kind` 不重复；有 `purchase` 时它一定是第一条。站点配置里没有某类任务需要的数据时（例如 shop 没有邮箱 → 不会有 `newsletter`），这类建议会被丢弃 |
 
 - 预设任务不需要浏览器，立即返回；生成任务要打开起始页并调用一次模型，大约 5–15 秒。
 - 生成任务的模型调用和其他调用一样走 LLM 缓存（`.cache/llm`，按起始页的网址、标题和页面文字）。服务器用默认的 `LLM_CACHE=readwrite` 或 `readonly` 运行时，同一个页面第二次起直接返回第一次生成的结果（1–3 秒，每次相同）；只有 `LLM_CACHE=off` 才每次都重新生成。

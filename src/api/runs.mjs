@@ -220,7 +220,7 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {}, sugg
     } finally {
       clearTimeout(timer);
     }
-    send(res, 200, { suggestions: result.suggestions.map(({ goal, source, reason, needs }) => ({ goal, source, reason, needs })) });
+    send(res, 200, { suggestions: result.suggestions.map(({ goal, source, reason, needs, kind }) => ({ goal, source, reason, needs, ...(kind ? { kind } : {}) })) });
   }
 
   async function route(req, res) {

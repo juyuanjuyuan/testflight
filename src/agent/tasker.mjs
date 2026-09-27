@@ -15,6 +15,10 @@ const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 
 /** Kinds of test data a goal may need; each has a sentence in config/test-data/default.json. */
 export const DATA_KINDS = ['payment_card', 'email', 'name', 'address', 'phone'];
+/** What kind of task a suggestion is; the suggestions of one reply have distinct kinds, purchase first. */
+export const TASK_KINDS = ['purchase', 'search', 'cart_edit', 'newsletter', 'info'];
+// Test data a kind cannot do without (local mode): dropped when the site config does not offer it, so the model never has to write a value.
+const KIND_NEEDS = { purchase: ['payment_card'], newsletter: ['email'], search: [], cart_edit: [], info: [] };
 /** Words that describe HOW (UI steps) rather than WHAT: they would leak page structure to the planner. */
 export const STEP_WORDS = ['click', 'tap', 'press', 'tab', 'scroll', 'button', 'link', 'menu', 'icon', 'hover', 'swipe'];
 const STEP_RE = new RegExp(`\\b(?:${STEP_WORDS.join('|')}|tabbing|tabbed|tapping|tapped)(?:s|es|ed|ing)?\\b`, 'i');
@@ -101,6 +105,7 @@ export function checkSuggestion(s) {
   if (typeof s.goal !== 'string' || !s.goal.trim()) return 'goal must be a non-empty string';
   if (typeof s.reason !== 'string') return 'reason must be a string';
   if (!Array.isArray(s.needs)) return 'needs must be an array';
+  if (!TASK_KINDS.includes(s.kind)) return `kind must be one of ${TASK_KINDS.join(', ')}`;
   if (s.goal.length > MAX_GOAL_CHARS) return `goal is too long (at most ${MAX_GOAL_CHARS} characters)`;
   const step = s.goal.match(STEP_RE);
   if (step) return `goal describes a UI step ("${step[0]}"): say what to achieve, not how`;
@@ -116,14 +121,19 @@ function usable(data, { sentences, needs: siteNeeds }, mode) {
   const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
   if (!list.length) return { ok: [], errors: ['reply must be {"suggestions":[…]} with at least one suggestion'] };
   const ok = [], errors = [];
+  const available = siteNeeds ?? DATA_KINDS;
   for (const s of list) {
     let err = checkSuggestion(s);
-    const needs = err ? [] : [...new Set(s.needs)].filter((k) => !siteNeeds || siteNeeds.includes(k));
+    if (!err && ok.some((o) => o.kind === s.kind)) err = `kind ${s.kind} repeats an earlier suggestion (each kind at most once)`;
+    const missing = err || mode === 'real' ? [] : KIND_NEEDS[s.kind].filter((k) => !available.includes(k));
+    if (missing.length) err = `kind ${s.kind} needs ${missing.join(', ')}, which this site's test data does not offer`;
+    const needs = err ? [] : [...new Set([...KIND_NEEDS[s.kind], ...s.needs])].filter((k) => available.includes(k));
     const goal = err ? null : buildGoal({ goal: s.goal, needs }, sentences, mode);
     if (!err && goal.length > MAX_GOAL_CHARS) err = `goal with its test data is too long (at most ${MAX_GOAL_CHARS} characters)`;
     if (err) errors.push(`"${String(s?.goal).slice(0, 80)}": ${err}`);
-    else ok.push({ goal, source: 'generated', reason: s.reason.slice(0, 200), needs });
+    else ok.push({ goal, source: 'generated', reason: s.reason.slice(0, 200), needs, kind: s.kind });
   }
+  ok.sort((a, b) => Number(b.kind === 'purchase') - Number(a.kind === 'purchase')); // the demo uses the first one
   return { ok, errors };
 }
 
@@ -133,13 +143,13 @@ function usable(data, { sentences, needs: siteNeeds }, mode) {
  * generate: skip the presets even on a demo site (live demo of generated tasks). Throws when no usable task comes back.
  * client: fake LLM client (tests only).
  * @param {{url:string, title?:string, pageText?:string|null, mode?:'local'|'real', siteKey?:string|null, generate?:boolean, stats?:object, client?:object}} o
- * @returns {Promise<{suggestions:{goal:string, source:'curated'|'generated', reason:string, needs:string[]}[], testDataProfile:string|null}>}
+ * @returns {Promise<{suggestions:{goal:string, source:'curated'|'generated', reason:string, needs:string[], kind?:string}[], testDataProfile:string|null}>}
  */
 export async function suggestTasks({ url, title = '', pageText = null, mode = 'local', siteKey = null, generate = false, stats, client }) {
   const curated = mode === 'real' || generate ? [] : curatedTasks(siteKey, url);
   if (curated.length) return { suggestions: curated, testDataProfile: null };
   const data = loadTestData(siteKey);
-  const obs = { url, title, pageText, mode, dataKinds: DATA_KINDS, maxSuggestions: MAX_SUGGESTIONS };
+  const obs = { url, title, pageText, mode, dataKinds: DATA_KINDS, taskKinds: TASK_KINDS, maxSuggestions: MAX_SUGGESTIONS };
   let user = JSON.stringify(obs), errors = [];
   for (let attempt = 0; attempt < 2; attempt++) {
     const { data: reply } = await chatJSON({ role: 'judge', system: SYSTEM, user, stats, client });

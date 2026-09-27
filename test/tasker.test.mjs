@@ -11,7 +11,7 @@ process.env.MODEL_PLANNER = 'fake-judge';
 const { ROOT } = await import('../src/paths.mjs');
 const { MAX_GOAL_CHARS } = await import('../src/contracts.mjs');
 const { typedValueInGoal } = await import('../src/agent/planner.mjs');
-const { suggestTasks, curatedTasks, checkSuggestion, loadTestData, siteKeyFromUrl, DATA_KINDS, STEP_WORDS } = await import('../src/agent/tasker.mjs');
+const { suggestTasks, curatedTasks, checkSuggestion, loadTestData, siteKeyFromUrl, DATA_KINDS, STEP_WORDS, TASK_KINDS } = await import('../src/agent/tasker.mjs');
 
 /** Fake OpenAI client: replies[i] is the JSON object the model "answers" on call i (last one repeats). */
 function fakeClient(replies) {
@@ -25,7 +25,7 @@ function fakeClient(replies) {
   };
 }
 const PAGE = { url: 'http://localhost:8080/shop/fixed/', title: 'Tote Shop', pageText: '[heading] Tote Shop\nCanvas Tote Bag\n$24' };
-const good = (goal = 'Buy a canvas tote bag', needs = ['payment_card']) => ({ goal, reason: 'Buying is the main job of a shop', needs });
+const good = (goal = 'Buy a canvas tote bag', needs = ['payment_card'], kind = 'purchase') => ({ goal, reason: 'Buying is the main job of a shop', needs, kind });
 
 test('demo site with preset tasks: curated goals from eval/groundtruth, the model is never called', async () => {
   const client = fakeClient([{ suggestions: [good()] }]);
@@ -89,7 +89,7 @@ test('generate: false (or left out) keeps the presets, the model is never called
 });
 
 test('generated: a site without its own profile uses config/test-data/default.json', async () => {
-  const client = fakeClient([{ suggestions: [good('Sign up for the newsletter', ['email'])] }]);
+  const client = fakeClient([{ suggestions: [good('Sign up for the newsletter', ['email'], 'newsletter')] }]);
   const r = await suggestTasks({ ...PAGE, siteKey: 'sites/testpage/patched', client });
   assert.equal(r.testDataProfile, 'default');
   const { sentences } = loadTestData(null);
@@ -97,7 +97,7 @@ test('generated: a site without its own profile uses config/test-data/default.js
 });
 
 test('checkSuggestion: step words (whole words, any case), digits, unknown data kinds, length', () => {
-  const ok = (goal, needs = []) => checkSuggestion({ goal, reason: 'r', needs });
+  const ok = (goal, needs = []) => checkSuggestion({ goal, reason: 'r', needs, kind: 'info' });
   assert.equal(ok('Buy a tablet'), null, '"tablet" is not the word "tab"');
   assert.equal(ok('Find the store opening hours'), null);
   for (const w of STEP_WORDS) assert.match(ok(`Buy a bag using the ${w.toUpperCase()}`), /step/i, w);
@@ -124,9 +124,10 @@ test('generated: all invalid → one retry that says why; still invalid → erro
 });
 
 test('generated: at most MAX_SUGGESTIONS, in the model\'s order', async () => {
-  const client = fakeClient([{ suggestions: ['Buy a bag', 'Buy a hat', 'Buy a mug', 'Buy a pen'].map((g) => good(g, [])) }]);
+  const client = fakeClient([{ suggestions: [['Buy a bag', 'purchase'], ['Find a hat', 'search'], ['Read the returns policy', 'info'], ['Empty the cart', 'cart_edit']]
+    .map(([g, kind]) => good(g, [], kind)) }]);
   const r = await suggestTasks({ ...PAGE, siteKey: 'sites/shop/fixed', client });
-  assert.deepEqual(r.suggestions.map((s) => s.goal), ['Buy a bag.', 'Buy a hat.', 'Buy a mug.']);
+  assert.deepEqual(r.suggestions.map((s) => s.goal), ['Buy a bag. ' + loadTestData('sites/shop/fixed').sentences.payment_card, 'Find a hat.', 'Read the returns policy.']);
 });
 
 test('real mode: no payment or personal data in the goal, and it stops before paying', async () => {
@@ -144,7 +145,7 @@ test('information barrier: the model sees only url, title and the AX page text (
   const client = fakeClient([{ suggestions: [good()] }]);
   await suggestTasks({ ...PAGE, siteKey: 'sites/shop/fixed', client, changes: [{ text: 'secret' }], screenshot: 'shots/0000.png', html: '<div>' });
   const sent = JSON.parse(client.calls[0]);
-  assert.deepEqual(Object.keys(sent).sort(), ['dataKinds', 'maxSuggestions', 'mode', 'pageText', 'title', 'url']);
+  assert.deepEqual(Object.keys(sent).sort(), ['dataKinds', 'maxSuggestions', 'mode', 'pageText', 'taskKinds', 'title', 'url']);
   assert.equal(sent.pageText, PAGE.pageText);
 });
 
@@ -272,4 +273,35 @@ test('generated: a site without config needs keeps every kind the model asked fo
   const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/testpage/fixed/', siteKey: 'sites/testpage/fixed', generate: true, client });
   assert.deepEqual(r.suggestions[0].needs, ['payment_card', 'email']);
   assert.ok(r.suggestions[0].goal.includes('test@example.com'));
+});
+
+test('kinds: unknown or missing kind is dropped; a repeated kind keeps only its first suggestion', async () => {
+  assert.match(checkSuggestion({ goal: 'Buy a bag', reason: 'r', needs: [] }), /kind/);
+  assert.match(checkSuggestion({ goal: 'Buy a bag', reason: 'r', needs: [], kind: 'shopping' }), /kind/);
+  assert.equal(checkSuggestion({ goal: 'Buy a bag', reason: 'r', needs: [], kind: 'purchase' }), null);
+  const client = fakeClient([{ suggestions: [good('Buy a canvas tote bag'), good('Buy a wool beanie'), good('Find a mug', [], 'search'), good('Find a hat', [], 'search')] }]);
+  const r = await suggestTasks({ ...PAGE, siteKey: 'sites/shop/fixed', client });
+  assert.deepEqual(r.suggestions.map((s) => s.kind), ['purchase', 'search']);
+  assert.deepEqual(r.suggestions.map((s) => s.goal.split('.')[0]), ['Buy a canvas tote bag', 'Find a mug']);
+  assert.ok(TASK_KINDS.includes('purchase') && TASK_KINDS.includes('newsletter'));
+});
+
+test('kinds: a kind whose data the site config does not have is dropped (shop has no email → no newsletter)', async () => {
+  const client = fakeClient([{ suggestions: [good('Sign up for the newsletter', ['email'], 'newsletter'), good(), good('Find a mug', [], 'search')] }]);
+  const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/shop/original/', siteKey: 'sites/shop/original', generate: true, client });
+  assert.deepEqual(r.suggestions.map((s) => s.kind), ['purchase', 'search']);
+  assert.ok(r.suggestions.every((s) => !s.goal.includes('example.com')));
+});
+
+test('kinds: purchase always comes first; a purchase gets its card even if the model forgot payment_card', async () => {
+  const client = fakeClient([{ suggestions: [good('Find a mug', [], 'search'), good('Read the returns policy', [], 'info'), good('Buy a canvas tote bag', [])] }]);
+  const r = await suggestTasks({ ...PAGE, url: 'http://localhost:8080/shop/original/', siteKey: 'sites/shop/original', generate: true, client });
+  assert.deepEqual(r.suggestions.map((s) => s.kind), ['purchase', 'search', 'info']);
+  assert.ok(typedValueInGoal('4000 0000 0000 0002', r.suggestions[0].goal));
+});
+
+test('kinds: the tasker prompt asks for a kind per suggestion, distinct kinds, purchase first', () => {
+  const prompt = fs.readFileSync(path.join(ROOT, 'src/agent/prompts/tasker.md'), 'utf8');
+  for (const k of TASK_KINDS) assert.ok(prompt.includes(k), k);
+  assert.match(prompt, /"kind"/);
 });
