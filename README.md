@@ -1,10 +1,12 @@
-# TODO: team name — task-level accessibility audit
+# ClearAccess — task-level accessibility audit
 
 We don't score pages. We check whether a screen-reader or keyboard user can actually **finish checkout**, show exactly where they get stuck, then fix the code and re-run the same task to prove the fix works.
 
+Give it a URL. An AI agent that hears only what a screen reader would say works through the site with the keyboard, the way a blind shopper would. Every step records what appeared on screen next to what the user actually heard, so a silent "Card declined" is caught the moment it happens. Blocking problems get a code fix, and the fix only counts if the same task then completes.
+
 Built at Test Flight, the Glasswing Ventures hackathon, September 26 and 27, 2026.
 
-Team: TODO Name (@github), Name (@github), Name (@github), Name (@github)
+Team: TODO team name — TODO Name (@github), Name (@github), Name (@github), Name (@github)
 
 
 ## The problem
@@ -21,6 +23,7 @@ Who has it: engineering, QA and legal at mid-size e-commerce and restaurant bran
 - **Primary:** mid-size e-commerce and restaurant brands. Subscription priced per site and per monitored critical flow (checkout, signup). Budget: QA/engineering, pulled by legal risk.
 - **Also:** accessibility audit firms (seats — automates their manual flow testing), public universities and local governments facing the April 2027 WCAG 2.1 AA deadline.
 - Pricing sits between rule-engine seats and per-project manual audits.
+- Customers audit **their own** sites, usually staging: they verify the domain, whitelist our runner, provide test accounts and test cards, and get fixes as pull requests that CI re-runs before merge.
 - Expansion: the same accessibility tree is what AI shopping agents read. "Can a non-visual user finish checkout?" is also "can an agent buy on your site?"
 
 We do not claim compliance certification or legal protection.
@@ -28,22 +31,23 @@ We do not claim compliance certification or legal protection.
 
 ## How it works
 
-```
-goal ─► planner (LLM, keyboard only) ─► runner (Playwright + CDP, records everything) ─► trace.jsonl
-                ▲  sees ONLY what assistive tech conveys                                      │
-                └───────────────────────── observation ◄──────────────────────────────────────┘
-trace ─► deterministic detectors ─► judge (LLM filters/labels, can't invent) ─► report ─► fixer (LLM) ─► rerun
-```
+![How ClearAccess audits a task: the agent hears only what a screen reader would say](docs/architecture.svg)
 
 **Perception parity.** After every keypress we record, deterministically, what appeared **on screen** and what **assistive tech conveyed**: the words an open-source virtual screen reader ([Guidepup](https://github.com/guidepup/virtual-screen-reader), MIT) running in the page actually said, e.g. `button, Pay` or `assertive: Card number is invalid`, plus focus role/name/description from the accessibility tree. Visible changes with no programmatic path to the user are reported with step, screenshot, element and WCAG criterion. Our own rules make the same call independently; the report's `stats.spokenAgreement` shows where the two agree (on the test page they agree everywhere except the step where the payment dialog opens: see Limits).
 
 **Where the AI does work rules can't:**
 1. **Planner** — operates any site toward a goal using only keyboard + screen-reader information. No per-site scripts to maintain. Its outcome doubles as "can a structure-only AI agent complete this purchase?"
 2. **Judge** — separates "added to cart" from a rotating promo banner, and grades each issue by *whether it blocks this task*, not by WCAG level. It can only label detector output — every finding traces back to recorded evidence.
-3. **Name quality** — "🛒" is a non-empty name (axe passes it); the judge decides it doesn't tell a blind user what the button does.
+3. **Name quality** — "🛒" is a non-empty name (axe passes it); a screen reader reads it as "shopping cart", which doesn't say whether the button adds to the cart or opens it.
 4. **Fix + verify** — generates a code fix, applies it to a copy of the site, re-runs the same task. A fix counts only if the task now completes.
+5. **Task suggestion** — give only a URL and it proposes what to test (a purchase first, then other kinds such as search or cart edits), from the same page text a screen-reader user gets.
 
-Architecture details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Guard rails, enforced in code rather than in prompts:**
+- The planner may only type values that appear word for word in the goal. Test data (e.g. payment test cards) is appended to the goal by code from `config/test-data/`, never written by a model.
+- Verdicts are three-valued: *can complete*, *cannot complete*, or *inconclusive* when the task itself lacked data, so a missing card number is never blamed on the website.
+- Real-site mode stops at checkout, refuses to type into card, CVV, expiry or password fields, and keeps no user-entered or autofilled values.
+
+Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), API: [`docs/API.md`](docs/API.md), report format: [`docs/REPORT_FORMAT.md`](docs/REPORT_FORMAT.md).
 
 
 ## Results so far
@@ -111,35 +115,63 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 
 ## What's real and what's mocked
 
-- **Real:** browser automation on real Chromium, accessibility-tree reads via CDP, all detectors, axe-core comparison, LLM calls (Sciforium: DeepSeek V4.1 Flash for the planner, GLM 5.3 Flash for judge/fixer).
-- **Synthetic:** the demo shop (`sites/shop`) and test page are ours, with planted barriers and a hand-fixed reference version. W3C Before-and-After Demonstration is used only to measure false positives.
-- **Real-site segment:** detection only — no fixes, stops before checkout, never types payment data; results are shown from a cached run and not committed to this repo.
-- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); when focus moves onto a dialog it says the dialog's name only, where NVDA/JAWS usually also read the dialog's text, so the planner may hear less there than a real user would (our rules count that text as heard; `stats.spokenAgreement` lists each such step); cross-origin iframes (e.g. Stripe) are invisible to us; focus visibility (D5) compares the focused element's own computed style with an unfocused copy of it, so a focus ring drawn only by a parent's `:focus-within` is reported as missing (left to the judge), and visually hidden inputs whose ring is drawn on a sibling label are not judged; at real scale, noise filtering on busy sites needs more tuning. In real-site mode the tool does not record or send what the user typed or the browser autofilled: field values are kept only for fields the agent typed into itself (never for sensitive ones), and field text is dropped from page text. Local per-step screenshots can still show it; they are never sent to a model or committed.
+- **Real:** browser automation on real Chromium, accessibility-tree reads via CDP, the virtual screen reader's output, all detectors, the axe-core comparison, and every LLM call (Sciforium, DeepSeek V4.1 Flash for planner, judge, fixer and task suggestion). The web app drives the real API end to end: start an audit, watch it live, inspect findings, fix and re-test.
+- **Synthetic:** the demo shop (`sites/shop`) and test page are ours, with planted barriers and a hand-fixed reference version; product images are our own SVG illustrations. The W3C Before-and-After Demonstration is used only to measure false positives.
+- **Real-site segment:** detection only — no fixes, stops before checkout, never types payment data; results are shown from a cached run and not committed to this repo. In one pre-run on a large retailer, "Add to Bag" opened a confirmation panel while focus fell to the page body, so a screen-reader user heard nothing.
+- **Limits:** a virtual screen reader is not NVDA/JAWS (we say "no programmatic way to be announced"); when focus moves onto a dialog it says the dialog's name only, where NVDA/JAWS usually also read the dialog's text, so the planner may hear less there than a real user would (our rules count that text as heard; `stats.spokenAgreement` lists each such step); cross-origin iframes (e.g. Stripe) are invisible to us; text printed inside images needs a visual check we haven't built (the one barrier we miss); focus visibility (D5) compares the focused element's own computed style with an unfocused copy of it, so a focus ring drawn only by a parent's `:focus-within` is reported as missing (left to the judge), and visually hidden inputs whose ring is drawn on a sibling label are not judged; the planner moves with Tab and does not browse like an experienced screen-reader user, so on large sites it is slow and our verdicts lean strict; the judge tends to rate emoji-only names as blocking where we expect degrading; suggested tasks can vary between runs; at real scale, noise filtering on busy sites needs more tuning. The web app audits only this server's own sites; real sites run from the command line, by design, because the runner really operates the target. In real-site mode the tool does not record or send what the user typed or the browser autofilled: field values are kept only for fields the agent typed into itself (never for sensitive ones), and field text is dropped from page text. Local per-step screenshots can still show it; they are never sent to a model or committed.
 
 
 ## Running it
 
 ```bash
-cp .env.example .env            # put your keys in .env, it never gets committed
+cp .env.example .env            # Sciforium key and model strings (with the /deployments/<id>/ prefix); never committed
 npm install
 npx playwright install chromium # or set CHROME_BIN to a local Chromium
-npm test                        # runs on recorded traces, no browser or keys needed
-npm run serve                   # serves sites/ on http://localhost:8080
+npm test                        # recorded traces only, no browser or keys needed
+npm run serve                   # sites, reports and API on http://127.0.0.1:8080 (local only)
 
+# web app (second terminal)
+cd FRONTEND && npm install && npm run dev      # http://127.0.0.1:8443, proxies /api, /runs, /fixtures to 8080
+```
+
+Command line:
+
+```bash
 # deterministic run, no LLM:
 node cli.mjs audit --url http://localhost:8080/testpage/original/ --goal "Buy the canvas tote bag" \
   --script eval/keys.testpage.json --no-judge
-# add --trace to any audit to debug it step by step (or drop the zip on https://trace.playwright.dev, parsed locally):
-npx playwright show-trace runs/<id>/trace.zip
-# autonomous run with planner + judge:
+# autonomous run with planner + judge (omit --goal to let it pick the task):
 node cli.mjs audit --url http://localhost:8080/shop/original/ --goal "Buy a canvas tote bag" --site sites/shop/original
 node cli.mjs fix   --run runs/<id>
 node cli.mjs rerun --run runs/<id>
+node cli.mjs suggest --url http://localhost:8080/shop/original/ --generate
+# add --trace to any audit to debug it step by step (or drop the zip on https://trace.playwright.dev, parsed locally):
+npx playwright show-trace runs/<id>/trace.zip
+# real site (detection only): open a separate Chrome, clear any captcha, then press Enter when asked
+scripts/real-chrome.sh https://example.com/
+node cli.mjs audit --mode real --cdp http://localhost:9222 --goal "Search for a tote bag and add one to the cart"
+# evaluation tables above:
+node eval/run.mjs --replay eval/traces
 ```
 
+CI (`.github/workflows/a11y-audit.yml`) audits the fixed shop on every push and fails the check on any blocking finding; the report lands in the job summary.
 
-## Brought in from before the weekend
 
-**Third-party component:** the virtual screen reader is [`@guidepup/virtual-screen-reader`](https://github.com/guidepup/virtual-screen-reader) (Guidepup, MIT), used unchanged to simulate what a screen reader announces. What we built on top: the per-step comparison of what appeared on screen with what the screen reader conveyed, the planner that only ever hears that output (information barrier), and the fix-and-verify loop.
+## Where it goes next
 
-TODO — if the ~100-line feasibility script was written before Saturday, commit it unchanged as "prior work" first and describe it here. Focus-visibility detection will reuse keyboard-a11y-tester (MIT) — TODO: add the exact link and what we changed. Open-source libraries (Playwright, axe-core) don't need listing.
+- Verified domains instead of "local sites only", so customers run audits on their own staging from the web app.
+- Fixes delivered as pull requests to the customer's repo, re-tested by the same CI check before merge.
+- Browse-mode actions for the planner (read the next line, jump to a heading), to model experienced screen-reader users.
+- A visual check for text inside images.
+- A real-screen-reader verification mode (NVDA / VoiceOver via Guidepup) for the steps that matter most.
+
+
+## Built this weekend / third-party components
+
+Prior work: none. We did a small feasibility spike before the weekend to check the approach; none of that code is in this repo, and everything here was built during Test Flight.
+
+Third-party components, used unchanged:
+- [`@guidepup/virtual-screen-reader`](https://github.com/guidepup/virtual-screen-reader) (Guidepup, MIT) simulates what a screen reader announces. What we built on top: the per-step comparison of what appeared on screen with what the screen reader conveyed, the planner that only ever hears that output (information barrier), and the fix-and-verify loop.
+- [Playwright](https://playwright.dev) drives Chromium; [axe-core](https://github.com/dequelabs/axe-core) is the static baseline we compare against; [Ajv](https://ajv.js.org) validates reports against `docs/report.schema.json` in tests only.
+- The web app uses React and Vite.
+- `sites/bad/` is an unmodified local copy of the W3C Before and After Demonstration ("after" version), redistributed under the W3C Document and Software Licenses (see `sites/bad/README.md`), used only to measure false positives.
