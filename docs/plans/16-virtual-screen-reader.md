@@ -7,7 +7,7 @@
 
 **先读：** `AGENTS.md`（信息隔离）、`docs/ARCHITECTURE.md` §4、`src/agent/observation.mjs`、`src/runner/session.mjs`、`src/runner/recorder.js`、`src/contracts.mjs`、`test/pipeline.test.mjs`
 
-**可以改：** `package.json`（新增这一个依赖）、`src/runner/**`、`src/agent/observation.mjs`、`src/agent/prompts/planner.md`、`src/contracts.mjs`（只加可选字段）、`fixtures/testpage-*`、`test/`、`AGENTS.md` 与 `docs/CODING_STANDARDS.md` 的依赖白名单、`docs/ARCHITECTURE.md`、`README.md`
+**可以改：** `package.json`（新增这一个依赖）、`src/runner/**`、`src/agent/observation.mjs`、`src/agent/prompts/planner.md`、`src/contracts.mjs`（只加可选字段）、`fixtures/testpage-*`、`test/`、`AGENTS.md` 与 `docs/CODING_STANDARDS.md` 的依赖白名单、`docs/ARCHITECTURE.md`、`README.md`、`src/report/build.mjs`（只加字段）、`docs/report.schema.json`、`docs/REPORT_FORMAT.md`、`docs/report.example.json`
 **不要改：** `viewer/`、`sites/shop/`；`report.json` 只能新增字段
 
 ## 已验证的可行性（2026-09-26）
@@ -42,7 +42,7 @@
 2. 先写测试：`heardInStep` 在有 `spokenSource` 时使用 `spoken`；没有时回退到规则推算。
 3. 实现注入和每步记录；`contracts.mjs` 的 Step 注释里加上 `spokenSource?`、`spokenError?`。
 4. 重新生成 `fixtures/testpage-original` 和 `fixtures/testpage-fixed`，更新相关断言；`npm test`、`npm run smoke` 通过。
-5. 实现 `stats.spokenAgreement`，在两个 fixture 上确认一致率。
+5. 实现 `stats.spokenAgreement`，在两个 fixture 上确认一致率。`spoken` 和 `spokenAgreement` 进入 report.json 时，同步更新 `docs/report.schema.json`、`REPORT_FORMAT.md` 和 `report.example.json`（新字段在 schema 里必须是可选的，`npm test` 的 `test/report-schema.test.mjs` 会检查）。
 6. 修正文档里写错的包名：搜索 `virtual-screenreader`（少了连字符），全部改成 `virtual-screen-reader`。
 7. README 的 How it works 和 Brought in / 第三方组件部分写明：虚拟读屏器来自 Guidepup（MIT），用于模拟读屏播报；我们自己做的是逐步对比"屏幕上出现的"和"读屏获知的"、信息隔离的 planner、修复验证闭环。
 8. 在本文件"结果"一节记录：每步增加的耗时、两个 fixture 上的一致率、需要前端配合的地方（例如 viewer 可以把 `spoken` 原文显示在右栏）。

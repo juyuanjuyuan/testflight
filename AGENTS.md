@@ -25,7 +25,7 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 4. **Real-site mode**: never type into payment/password fields, stop at checkout (enforced in `src/runner/guard.mjs`).
    Never commit real-site runs or name companies in the repo.
 5. **Secrets**: keys only in `.env` (gitignored). Never print keys in logs.
-6. ESM JavaScript, Node ≥ 20. Allowed deps: playwright, axe-core, openai, dotenv, yaml. Ask before adding others.
+6. ESM JavaScript, Node ≥ 20. Allowed deps: playwright, axe-core, openai, dotenv, yaml; devDependencies (tests only, never imported from `src/`): ajv, ajv-formats. Ask before adding others.
 7. Keep `main` green: run `npm test` before pushing. Judges read `main` at 14:00 Sunday.
 8. No silent failures: every `catch` rethrows or records the degradation in the output (see CODING_STANDARDS §3).
 9. Library code under `src/` never uses `console.*` and never uses `process.cwd()`; use a `log` callback and `src/paths.mjs`.
@@ -34,6 +34,7 @@ If the plan is wrong or blocked, edit the plan file and say so instead of improv
 12. Frontend is owned by teammates. Never modify `viewer/` or `sites/shop/`. The only interface to the frontend is `report.json`
     (built by `src/report/build.mjs`): changes to it must be additive only — never rename or remove a field.
     If a backend change needs a frontend change, write it down in the relevant plan's results section instead of doing it.
+13. report.json is the frontend contract. Any change to what src/report/build.mjs (or compare.mjs, fixes, stats) puts into report.json must, in the same commit, update docs/report.schema.json, docs/REPORT_FORMAT.md and docs/report.example.json. Additive only: never rename or remove a field; new fields must be optional in the schema. npm test enforces this.
 
 ## Handy commands
 ```bash

@@ -16,6 +16,7 @@
 - 模块之间只通过 `src/contracts.mjs` 定义的结构交换数据。新增字段只能是可选的，且要同步更新注释、fixture 和测试。
 - **在边界处校验所有外部输入**：LLM 输出（planner 的 Action、judge 的判定、fixer 的 edits）、trace 文件、命令行参数。校验失败要给出能看懂的原因，不要让 `undefined` 流进下游。
 - 每种产物只有一个生成出口：`report.json` 只由 `report/build.mjs` 生成，`trace.jsonl` 只由 runner 写入。
+- **report.json 是和前端之间的契约。** `src/report/build.mjs`（以及 `compare.mjs`、fixes、stats）往 report.json 里放的内容有任何变化，都要在同一个 commit 里同步更新 `docs/report.schema.json`、`docs/REPORT_FORMAT.md` 和 `docs/report.example.json`。只能新增：不改名、不删字段；新字段在 schema 里必须是可选的。`npm test`（`test/report-schema.test.mjs`）会检查。
 - 数值阈值（时间窗口、步数上限、噪音次数等）集中放在 `contracts.mjs`，不要在各处写魔法数字。
 
 ## 3. 错误处理
@@ -38,7 +39,7 @@
 
 ## 5. 依赖与安全
 
-- 允许的依赖：playwright、axe-core、openai、dotenv、yaml。新增依赖先在群里说一声。
+- 允许的依赖：playwright、axe-core、openai、dotenv、yaml。devDependencies（仅测试使用，`src/` 不得引用）：ajv、ajv-formats。新增依赖先在群里说一声。
 - key 只放在 `.env`，不打印、不写进日志、不进 trace 或缓存文件名。
 - 真实网站的运行结果和公司名永远不提交；`guard.mjs` 的限制只能加强，不能放宽。
 

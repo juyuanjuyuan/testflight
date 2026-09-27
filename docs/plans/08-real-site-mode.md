@@ -6,7 +6,7 @@
 
 **先读：** `docs/ARCHITECTURE.md` §10–11、原《工程架构》文档的"真实网站模式"一节、`src/runner/session.mjs`、`src/runner/guard.mjs`、`src/audit.mjs`
 
-**可以改：** `src/audit.mjs`、`src/runner/session.mjs`、`src/runner/guard.mjs`、`cli.mjs`、新建 `scripts/real-chrome.sh`
+**可以改：** `src/audit.mjs`、`src/runner/session.mjs`、`src/runner/guard.mjs`、`cli.mjs`、新建 `scripts/real-chrome.sh`；做 `shotSize` 时另加 `src/contracts.mjs`（只加可选字段）、`src/report/build.mjs`、`fixtures/testpage-*`、`test/`、`docs/report.schema.json`、`docs/REPORT_FORMAT.md`、`docs/report.example.json`
 **不要改：** 放宽 `guard.mjs` 的任何限制
 
 ## 步骤
@@ -32,4 +32,4 @@
 
 - 如果 WSL 连不上 Windows 那边的 Chrome（WSL2 NAT 网络的问题），就直接在 WSL 里用 WSLg 启动 Chrome，不要折腾网络配置。
 - 被反爬拦截时如实记录，换下一个网站。
-- 真实网站模式下截图尺寸不固定（连的是用户自己的 Chrome，窗口大小和 devicePixelRatio 都不受控，本地模式固定为 1280×800、DPR 1）。每一步要记录截图的宽高，作为 Step 的**可选**字段（例如 `shotSize: {w, h, dpr}`，按 `docs/ARCHITECTURE.md` §3 的规则在 `contracts.mjs`、fixture 和测试里同步），并由 `report/build.mjs` 带到 `timeline[]`。**需要前端配合：** viewer 按这个实际尺寸把 `focusRect` / `seen[].rect`（CSS 像素）换算到截图上，而不是假定截图就是 1280×800。本计划不改 `viewer/`，做完后在“结果”一节写明新字段名和含义，交给前端。
+- 真实网站模式下截图尺寸不固定（连的是用户自己的 Chrome，窗口大小和 devicePixelRatio 都不受控，本地模式固定为 1280×800、DPR 1）。每一步要记录截图的宽高，作为 Step 的**可选**字段（例如 `shotSize: {w, h, dpr}`，按 `docs/ARCHITECTURE.md` §3 的规则在 `contracts.mjs`、fixture 和测试里同步），并由 `report/build.mjs` 带到 `timeline[]`；同步更新 `docs/report.schema.json`、`REPORT_FORMAT.md` 和 `report.example.json`（新字段在 schema 里必须是可选的，`npm test` 的 `test/report-schema.test.mjs` 会检查）。**需要前端配合：** viewer 按这个实际尺寸把 `focusRect` / `seen[].rect`（CSS 像素）换算到截图上，而不是假定截图就是 1280×800。本计划不改 `viewer/`，做完后在“结果”一节写明新字段名和含义，交给前端。

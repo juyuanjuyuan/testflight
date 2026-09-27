@@ -6,14 +6,14 @@
 
 **先读：** `docs/ARCHITECTURE.md` §8、`src/fix/*.mjs`、`src/agent/prompts/fixer.md`、`src/report/compare.mjs`、`src/report/build.mjs`
 
-**可以改：** `src/fix/**`、`src/agent/prompts/fixer.md`、`src/report/compare.mjs`
+**可以改：** `src/fix/**`、`src/agent/prompts/fixer.md`、`src/report/compare.mjs`、`docs/report.schema.json`、`docs/REPORT_FORMAT.md`、`docs/report.example.json`
 **不要改：** `src/fix/apply.mjs` 里的文案保护逻辑（只能加强，不能放宽）、`sites/testpage/original/`、`sites/testpage/fixed/`
 
 ## 步骤
 
 1. 在 original 上跑一次带 judge 的 audit（goal 同 03），得到 `runs/<id>`。
 2. `node cli.mjs fix --run runs/<id> --site sites/testpage/original`。检查 `sites/testpage/patched/` 和 `runs/<id>/fixes.json`：每条 block 问题是否 `applied ≥ 1`、有没有被保护规则拒绝的 edit。
-3. **补功能**：`runFix` 结束后重新生成 `report.json`（用同目录下的 `trace.jsonl`、更新后的 `findings.json`、`axe.json`、`meta.json` 调 `buildReport` + `writeReport`），这样 findings 里带 `fix.edits`，viewer 才能显示 diff。
+3. **补功能**：`runFix` 结束后重新生成 `report.json`（用同目录下的 `trace.jsonl`、更新后的 `findings.json`、`axe.json`、`meta.json` 调 `buildReport` + `writeReport`），这样 findings 里带 `fix.edits`，viewer 才能显示 diff。report.json 里 `fixes` 和 `findings[].fix` 从此有值：同步更新 `docs/report.schema.json`、`REPORT_FORMAT.md` 和 `report.example.json`（新字段在 schema 里必须是可选的，`npm test` 的 `test/report-schema.test.mjs` 会检查）。
 4. `node cli.mjs rerun --run runs/<id>`（URL 会自动把 `/original/` 换成 `/patched/`）。看输出里的 `closedLoop` 和每条问题的 resolved/persists/new。
 5. 把 fixer 的 edits 和 `sites/testpage/fixed/index.html` 对照，不一致就调 `fixer.md`。
 
