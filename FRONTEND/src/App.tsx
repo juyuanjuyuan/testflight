@@ -118,7 +118,6 @@ export default function App() {
         <button type="button" className="suggest-button" disabled={suggesting || busy || !validUrl} onClick={() => void suggest()}>{suggesting ? "Finding suggestions…" : "Suggest tasks"}</button>
         <div className="task-suggestions" aria-live="polite">{suggestions.map((s, i) => <button type="button" key={i} disabled={busy} onClick={() => { setGoal(s.goal); setSuggestions([]); }}><b>AI-suggested task</b><p>{s.goal}</p><small>{s.reason}</small></button>)}</div>
         <button className="hero-button" type="submit" disabled={busy || !validUrl}><span>{busy ? "Starting…" : "Start audit"}</span><Icon name="arrow" /></button>
-        <p className="launch-note">Web audits currently support the backend's local test sites. Real-site audits are started from the backend terminal and can be viewed in Run history.</p>
       </form></section>}
       {view === "history" && <section className="dashboard-screen"><div className="dashboard-heading"><div><span className="result-label">AUDIT WORKSPACE</span><h1>Run history</h1></div><button className="text-button" onClick={() => setHistoryRevision((n) => n + 1)}>Refresh</button></div>
         {historyError && <p className="notice" role="alert">{historyError}</p>}{!history && !historyError && <p>Loading runs…</p>}

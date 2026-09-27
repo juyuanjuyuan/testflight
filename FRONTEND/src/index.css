@@ -806,7 +806,6 @@ a.main-action { text-decoration: none; }
 .live-workspace .task-suggestions b { color: var(--lime); font-size: 12px; }
 .live-workspace .task-suggestions p { font-size: 14px; margin: 8px 0; }
 .live-workspace .task-suggestions small { color: #a5afa5; }
-.live-workspace .launch-note { line-height: 1.8; }
 .live-workspace .history-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, .45fr) 24px; gap: 24px; width: 100%; padding: 24px; margin: 12px 0; border: 1px solid var(--line); background: var(--panel); text-align: left; border-radius: 12px; cursor: pointer; }
 .live-workspace .history-row:hover, .live-workspace .task-suggestions button:hover { border-color: #76944d; }
 .live-workspace .history-row p { color: #a5afa5; font-size: 13px; margin: 10px 0; }
