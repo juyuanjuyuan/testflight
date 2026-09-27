@@ -52,66 +52,60 @@ Fake shop (3 task flows), the small test page, and the W3C Before-and-After Demo
 original (planted barriers) and hand-fixed version. One recorded key script per flow, so every tool sees the same page states.
 Barriers were planted by a teammate who had read the detector code (see `sites/shop/README.md`), so some overfitting is possible.
 
-**Detection: planted barriers vs tools**
+**Detection rate: planted barriers, ours vs axe (judge off)**
 
 | dataset | variant | tool | planted | detected | missed | false positives |
 |---|---|---|---|---|---|---|
 | shop-main | original | ours (judge off) | 8 | 7 | B3† | 0 |
-| shop-main | original | ours (judge on) | 8 | 7 | B3† | 0 |
 | shop-main | original | axe (WCAG rules) | 8 | 0 | B1 B2 B3† B4 B5 B6 B7 B8 | 0 |
 | shop-main | fixed | ours (judge off) | 0 | 0 | – | 0 |
-| shop-main | fixed | ours (judge on) | 0 | 0 | – | 0 |
 | shop-main | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
 | shop-second | original | ours (judge off) | 4 | 4 | – | 0 |
-| shop-second | original | ours (judge on) | 4 | 4 | – | 0 |
 | shop-second | original | axe (WCAG rules) | 4 | 0 | B5 B8 B9 B10 | 0 |
 | shop-second | fixed | ours (judge off) | 0 | 0 | – | 0 |
-| shop-second | fixed | ours (judge on) | 0 | 0 | – | 0 |
 | shop-second | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
 | shop-popup | original | ours (judge off) | 1 | 1 | – | 0 |
-| shop-popup | original | ours (judge on) | 1 | 1 | – | 0 |
 | shop-popup | original | axe (WCAG rules) | 1 | 0 | B11 | 0 |
 | shop-popup | fixed | ours (judge off) | 0 | 0 | – | 0 |
-| shop-popup | fixed | ours (judge on) | 0 | 0 | – | 0 |
 | shop-popup | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
 | testpage | original | ours (judge off) | 6 | 6 | – | 0 |
-| testpage | original | ours (judge on) | 6 | 5 | T5 | 0 |
 | testpage | original | axe (WCAG rules) | 6 | 0 | T1 T2 T3 T4 T5 T6 | 0 |
 | testpage | fixed | ours (judge off) | 0 | 0 | – | 0 |
-| testpage | fixed | ours (judge on) | 0 | 0 | – | 0 |
 | testpage | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
-| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 3 |
-| w3c-bad | fixed | ours (judge on) | 0 | 0 | – | 3 |
+| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 0 |
 | w3c-bad | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
-| **total** | | ours (judge off) | 19 | 18 | 1 | 3 |
-| **total** | | ours (judge on) | 19 | 17 | 2 | 3 |
-| **total** | | axe (WCAG rules) | 19 | 0 | 19 | 0 |
+| **total** | | ours (judge off) | 19 | 18/19 (95%) | 1 | 0 |
+| **total** | | axe (WCAG rules) | 19 | 0/19 (0%) | 19 | 0 |
 
 † vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors' job; whether they matter is the judge's.
 Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
 axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
 w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.
 keyboard-a11y-tester: not included in this comparison.
 
-**Ablation: same trace, judge off vs on**
+**Impact accuracy: same trace, judge on vs off**
 
-| dataset | variant | candidates | FP judge off | FP judge on | detected off → on | dropped by judge | judge errors |
-|---|---|---|---|---|---|---|---|
-| shop-main | original | 9 | 0 | 0 | 7/8 → 7/8 | 0 | 0 |
-| shop-main | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
-| shop-second | original | 6 | 0 | 0 | 4/4 → 4/4 | 1 | 0 |
-| shop-second | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
-| shop-popup | original | 2 | 0 | 0 | 1/1 → 1/1 | 0 | 0 |
-| shop-popup | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
-| testpage | original | 7 | 0 | 0 | 6/6 → 5/6 | 1 | 0 |
-| testpage | fixed | 0 | 0 | 0 | 0/0 → 0/0 | 0 | 0 |
-| w3c-bad | fixed | 3 | 3 | 3 | 0/0 → 0/0 | 0 | 0 |
-| **total** | | 27 | 3 | 3 | 18 → 17 | 2 | 0 |
+| dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |
+|---|---|---|---|---|---|---|---|---|
+| shop-main | original | 7 | 5/7 (71%) | 7/7 (100%) | B1 block→degrade, B7 block→degrade | – | 0 → 0 | 0 |
+| shop-main | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-second | original | 4 | 2/4 (50%) | 2/4 (50%) | B5 none→degrade, B8 none→degrade | B5 none→degrade, B8 none→degrade | 0 → 0 | 0 |
+| shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
+| shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| testpage | original | 6 | 3/6 (50%) | 6/6 (100%) | T1 block→degrade, T3 block→degrade, T5 none→block | – | 0 → 0 | 0 |
+| testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| **total** | | 18 | 11/18 (61%) | 16/18 (89%) | | | 0 → 0 | 0 |
+
+For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
+**What the judge is for:** it never adds findings and does not raise the detection count; its job is to rate each finding's impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.
 
 Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.
 
-Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge column needs `.env`).
-`node eval/run.mjs` (no flag) records every flow afresh in Chromium: the judge-off and axe rows come out the same; the judge-on rows can differ (see above).
+Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge columns need `.env`).
+`node eval/run.mjs` (no flag) records every flow afresh in Chromium: the judge-off and axe rows come out the same; the judge-on columns can differ (see above).
 
 
 ## What's real and what's mocked

@@ -128,7 +128,7 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 - 没有 key 时跳过 judge 列并提示：`SCIFORIUM_API_KEY= node eval/run.mjs --replay eval/traces` 退出码 0，打印提示，只输出 judge 关闭和 axe 两列，消融表显示 skipped。
 - `npm test`：145 个全部通过；`npm run smoke`：9 个用例全部 ok。
 
-## 后续（2026-09-27，处理上面"发现的问题"第 2、3、4 条）
+## 后续（2026-09-27，处理上面"发现的问题"第 2、3、4 条；第 3 条的"judge 没有减少误报"改为分开统计检出和分级）
 
 ### 1. D4 跳转链接误报（第 4 条）
 
@@ -168,3 +168,80 @@ Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge colum
 - **B1 / T1**：block 还是 degrade？表情符号 🛒 读屏会读成 "shopping cart"，用户可能猜得到；testpage 上 T1 甚至不是必经步骤。
 - **shop-second 的 B5 / B8**：只是 Tab 经过、不操作的控件，算 none 还是 degrade？
 - **T3 / T4**：按"录制路线"（短卡号）是 block；按"goal 里给的正确卡号"两者都碰不到，应该是 none。现在按录制路线填。
+
+### 3. `eval/run.mjs` 分开统计检出和分级
+
+- **检出率**：只用 judge 关闭的结果（包括 expectedImpact 为 none 的障碍）对比 axe。表里去掉了"ours (judge on)"这一行，合计行加上百分比。
+- **分级准确率**：新增 `gradeRun()`（`eval/score.mjs`，测试在 `test/eval-score.test.mjs`）：对检测器找到的每个障碍，取报给它的影响等级（多条 finding 命中同一个障碍时取最严重的，`none` 表示判为无关），和 `expectedImpact` 比。检测器没找到的障碍（B3）不参与分级，它在检出率里已经算作漏检。judge 关闭时用的是各检测器的固定默认等级（`judge.mjs` 的 `DEFAULT_IMPACT`），作为对照。
+- **误报**：统计方法不变，放在检出表（judge 关）和分级表的 "FP judge off → on" 列。
+- 旧的消融表（"detected off → on"、"dropped by judge"）被分级表取代；`results.json` 里仍保留 `dropped`、`llmCalls`、`cacheHits`。
+- README 的 Results 换成这两张表，表下说明 judge 的作用是按任务判断影响，不是提高检出数。
+
+#### 结果表（`node eval/run.mjs --replay eval/traces` 的原样输出，连跑两次完全一致，judge 全部命中缓存）
+
+#### Detection rate: planted barriers vs tools (judge off)
+
+| dataset | variant | tool | planted | detected | missed | false positives |
+|---|---|---|---|---|---|---|
+| shop-main | original | ours (judge off) | 8 | 7 | B3† | 0 |
+| shop-main | original | axe (WCAG rules) | 8 | 0 | B1 B2 B3† B4 B5 B6 B7 B8 | 0 |
+| shop-main | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-main | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-second | original | ours (judge off) | 4 | 4 | – | 0 |
+| shop-second | original | axe (WCAG rules) | 4 | 0 | B5 B8 B9 B10 | 0 |
+| shop-second | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-second | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| shop-popup | original | ours (judge off) | 1 | 1 | – | 0 |
+| shop-popup | original | axe (WCAG rules) | 1 | 0 | B11 | 0 |
+| shop-popup | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| shop-popup | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| testpage | original | ours (judge off) | 6 | 6 | – | 0 |
+| testpage | original | axe (WCAG rules) | 6 | 0 | T1 T2 T3 T4 T5 T6 | 0 |
+| testpage | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| testpage | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | ours (judge off) | 0 | 0 | – | 0 |
+| w3c-bad | fixed | axe (WCAG rules) | 0 | 0 | – | 0 |
+| **total** | | ours (judge off) | 19 | 18/19 (95%) | 1 | 0 |
+| **total** | | axe (WCAG rules) | 19 | 0/19 (0%) | 19 | 0 |
+
+† vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors' job; whether they matter is the judge's.
+Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
+axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
+w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.
+keyboard-a11y-tester: not included in this comparison.
+
+#### Impact accuracy: same trace, judge on vs off
+
+| dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |
+|---|---|---|---|---|---|---|---|---|
+| shop-main | original | 7 | 5/7 (71%) | 7/7 (100%) | B1 block→degrade, B7 block→degrade | – | 0 → 0 | 0 |
+| shop-main | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-second | original | 4 | 2/4 (50%) | 2/4 (50%) | B5 none→degrade, B8 none→degrade | B5 none→degrade, B8 none→degrade | 0 → 0 | 0 |
+| shop-second | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| shop-popup | original | 1 | 1/1 (100%) | 1/1 (100%) | – | – | 0 → 0 | 0 |
+| shop-popup | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| testpage | original | 6 | 3/6 (50%) | 6/6 (100%) | T1 block→degrade, T3 block→degrade, T5 none→block | – | 0 → 0 | 0 |
+| testpage | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| w3c-bad | fixed | 0 | – | – | – | – | 0 → 0 | 0 |
+| **total** | | 18 | 11/18 (61%) | 16/18 (89%) | | | 0 → 0 | 0 |
+
+For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow's task. Judge off = each detector's fixed default level, shown as the baseline.
+The judge never adds findings and does not raise the detection count: its job is to rate each finding's impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.
+
+Judge-on numbers depend on the model (`MODEL_JUDGE`); verdicts are cached in `.cache/llm`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.
+
+Reproduce: `node eval/run.mjs --replay eval/traces` (no browser; the judge columns need `.env`).
+
+#### 解读
+
+- 检出 18/19（95%），axe 0/19；误报从 3 降到 0（第 1 步的 D4 修复）。
+- 分级准确率：judge 关 11/18（61%）→ judge 开 16/18（89%）。默认等级错在：B1、B7、T1、T3 应为 block 却给了 degrade；T5 应为 none 却给了 block。judge 把这 5 个都纠正了。
+- judge 开启后剩下的 2 个不一致是 shop-second 的 B5、B8（expectedImpact 填的 none，judge 给了 degrade），正好是上面标 ⚠️ 的两处。如果你确认它们应该算 degrade，分级准确率会变成 18/18。
+- 标 ⚠️ 的 B1、T1、T3、T4 在 judge 开启时和我填的一致；如果你把它们改掉，这几个会变成不一致。
+- judge 的判定全部来自缓存：这次修复只让 w3c-bad 的候选从 3 个变成 0 个，其他数据集的 judge 输入没变。所以**没有重新录制 `eval/traces/`**（理由见第 1 节）。
+
+#### 验收
+
+- `npm test`：152 个全部通过；`npm run smoke`：9 个用例全部 ok。
+- `node eval/run.mjs --replay eval/traces`：退出码 0，输出和 README 一致；`SCIFORIUM_API_KEY=` 时 judge 开启的列显示 skipped，退出码 0。

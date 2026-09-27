@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// Plan 10: one command → comparison table (ours vs axe) and the judge on/off ablation.
+// Plan 10: one command → detection table (ours vs axe) and impact-accuracy table (judge on vs off).
 // Each flow is audited once with its recorded key script and --no-judge, so every tool sees the same page states;
 // the judge then runs over that same trace (analyze()), which is the ablation. Output: runs/eval/<time>-eval/.
+// Detection = the detectors found the barrier (judge off; barriers expected to be irrelevant count too).
+// Impact accuracy = the level given to each detected barrier (none = irrelevant) matches the ground truth's expectedImpact:
+// the judge's job is to rate impact on the task, not to find more barriers.
 //   node eval/run.mjs                          record every flow in a real browser, then score
 //   node eval/run.mjs --replay <dir>           score flows recorded earlier (eval/traces, or a runs/eval/<id> dir), no browser
 //   node eval/run.mjs --save-traces <dir>      also copy each flow's trace.jsonl/axe.json/meta.json to <dir>/<flow>/
@@ -16,7 +19,7 @@ import { audit, analyze, newRunDir } from '../src/audit.mjs';
 import { readTrace } from '../src/contracts.mjs';
 import { createStaticServer, listen } from '../src/server.mjs';
 import { ROOT, RUNS_DIR } from '../src/paths.mjs';
-import { scoreRun } from './score.mjs';
+import { scoreRun, gradeRun } from './score.mjs';
 
 process.env.LLM_CACHE = 'readwrite';
 const PORT = Number(process.env.EVAL_PORT || 8092); // fixed: URLs are part of the judge prompt
@@ -35,7 +38,7 @@ const DATASETS = [
   { name: 'testpage', url: '/testpage/fixed/', keys: 'keys.testpage.fixed.json', gt: 'testpage-fixed.yaml' },
   { name: 'w3c-bad', url: '/bad/after/home.html', keys: 'keys.bad.after.json', gt: 'bad-after.yaml' },
 ];
-const TOOLS = ['ours (judge off)', 'ours (judge on)', 'axe (WCAG rules)'];
+const TOOLS = ['ours (judge off)', 'axe (WCAG rules)'];
 
 const readYaml = (f) => YAML.parse(fs.readFileSync(path.join(GT_DIR, f), 'utf8'));
 const readJSON = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -75,7 +78,7 @@ async function judgeOffRun(d, { goal, gt, label }, ctx) {
   return runDir;
 }
 
-/** Judge-off run (recorded or replayed), then the judge over that same trace; scored for ours off/on and axe. */
+/** Judge-off run (recorded or replayed), then the judge over that same trace; detection for ours/axe, impact grading off/on. */
 async function runDataset(d, ctx) {
   const gt = readYaml(d.gt);
   const goal = gt.goal || readYaml(d.goalFrom).goal;
@@ -84,8 +87,9 @@ async function runDataset(d, ctx) {
   const runDir = await judgeOffRun(d, { goal, gt, label }, ctx);
   const groundtruth = path.join(GT_DIR, d.gt);
   const row = (tool, dir, t) => ({ ...scoreRun({ runDir: dir, groundtruth, tool: t }), dataset: d.name, tool });
-  const rows = [row(TOOLS[0], runDir, 'ours'), row(TOOLS[2], runDir, 'axe')];
-  const ablation = { dataset: d.name, variant, off: rows[0], candidates: readJSON(path.join(runDir, 'candidates.json')).length };
+  const rows = [row(TOOLS[0], runDir, 'ours'), row(TOOLS[1], runDir, 'axe')];
+  const ablation = { dataset: d.name, variant, off: { ...rows[0], ...gradeRun({ runDir, groundtruth }) },
+    candidates: readJSON(path.join(runDir, 'candidates.json')).length };
   if (ctx.judgeOn) {
     const judgeDir = path.join(runDir, 'judge');
     fs.mkdirSync(judgeDir);
@@ -93,8 +97,7 @@ async function runDataset(d, ctx) {
     const stats = {};
     const { findings } = await analyze({ trace: readRunTrace(runDir), goal, meta: { ...meta, ablationOf: path.relative(ROOT, runDir) },
       runDir: judgeDir, judgeEnabled: true, axe: readJSON(path.join(runDir, 'axe.json')), stats });
-    rows.splice(1, 0, row(TOOLS[1], judgeDir, 'ours'));
-    Object.assign(ablation, { on: rows[1], dropped: findings.filter((f) => f.impact === 'none').length,
+    Object.assign(ablation, { on: { ...row('ours (judge on)', judgeDir, 'ours'), ...gradeRun({ runDir: judgeDir, groundtruth }) }, dropped: findings.filter((f) => f.impact === 'none').length,
       judgeErrors: stats.judgeErrors?.length || 0, llmCalls: stats.calls || 0, cacheHits: stats.cacheHits || 0 });
   }
   if (ctx.save) {
@@ -112,6 +115,8 @@ function bestPracticeNodes(runDir) {
   return axe.violations.filter((v) => !v.tags.some((t) => /^wcag\d/.test(t))).reduce((n, v) => n + v.nodes.length, 0);
 }
 
+const pct = (n, d) => (d ? `${n}/${d} (${Math.round((100 * n) / d)}%)` : '–');
+
 function detectionTable(results) {
   const mark = (ids, vision) => ids.map((id) => (vision.includes(id) ? `${id}†` : id)).join(' ') || '–';
   const lines = ['| dataset | variant | tool | planted | detected | missed | false positives |', '|---|---|---|---|---|---|---|'];
@@ -120,46 +125,55 @@ function detectionTable(results) {
   }
   for (const tool of TOOLS) {
     const rows = results.flatMap((r) => r.rows).filter((s) => s.tool === tool);
-    if (!rows.length) continue;
     const sum = (k) => rows.reduce((n, s) => n + (Array.isArray(s[k]) ? s[k].length : s[k]), 0);
-    lines.push(`| **total** | | ${tool} | ${sum('planted')} | ${sum('hits')} | ${sum('misses')} | ${sum('falsePositives')} |`);
+    lines.push(`| **total** | | ${tool} | ${sum('planted')} | ${pct(sum('hits'), sum('planted'))} | ${sum('misses')} | ${sum('falsePositives')} |`);
   }
   return lines.join('\n');
 }
 
-function ablationTable(results) {
-  const lines = ['| dataset | variant | candidates | FP judge off | FP judge on | detected off → on | dropped by judge | judge errors |', '|---|---|---|---|---|---|---|---|'];
+const disagreements = (g) => g.graded.filter((x) => x.given !== x.expected).map((x) => `${x.id} ${x.expected}→${x.given}`).join(', ') || '–';
+
+// judge off = the deterministic default level per detector (judge.mjs DEFAULT_IMPACT), the baseline the judge must beat
+function impactTable(results, judgeOn) {
+  const on = (a, f) => (judgeOn ? f(a.on) : 'skipped');
+  const lines = ['| dataset | variant | detected barriers | agree, judge off (defaults) | agree, judge on | judge off: expected→given | judge on: expected→given | FP judge off → on | judge errors |',
+    '|---|---|---|---|---|---|---|---|---|'];
   for (const { ablation: a } of results) {
-    lines.push(`| ${a.dataset} | ${a.variant} | ${a.candidates} | ${a.off.falsePositives} | ${a.on.falsePositives} | ${a.off.hits}/${a.off.planted} → ${a.on.hits}/${a.on.planted} | ${a.dropped} | ${a.judgeErrors} |`);
+    const n = a.off.graded.length;
+    lines.push(`| ${a.dataset} | ${a.variant} | ${n} | ${pct(a.off.agree, n)} | ${on(a, (g) => pct(g.agree, n))} | ${disagreements(a.off)} | ${on(a, disagreements)} | ${a.off.falsePositives} → ${on(a, (g) => g.falsePositives)} | ${judgeOn ? a.judgeErrors : '–'} |`);
   }
   const sum = (f) => results.reduce((n, r) => n + f(r.ablation), 0);
-  lines.push(`| **total** | | ${sum((a) => a.candidates)} | ${sum((a) => a.off.falsePositives)} | ${sum((a) => a.on.falsePositives)} | ${sum((a) => a.off.hits)} → ${sum((a) => a.on.hits)} | ${sum((a) => a.dropped)} | ${sum((a) => a.judgeErrors)} |`);
+  const n = sum((a) => a.off.graded.length);
+  lines.push(`| **total** | | ${n} | ${pct(sum((a) => a.off.agree), n)} | ${judgeOn ? pct(sum((a) => a.on.agree), n) : 'skipped'} | | | ${sum((a) => a.off.falsePositives)} → ${judgeOn ? sum((a) => a.on.falsePositives) : 'skipped'} | ${judgeOn ? sum((a) => a.judgeErrors) : '–'} |`);
   return lines.join('\n');
 }
 
 function render(results, { judgeOn, replay }) {
   const vision = [...new Set(results.flatMap((r) => r.visionOnly))];
   const bp = results.map((r) => `${r.rows[0].dataset}/${r.rows[0].variant} ${r.bestPractice ?? 'n/a'}`).join(', ');
-  const out = ['### Detection: planted barriers vs tools', '', detectionTable(results), '',
+  const out = ['### Detection rate: planted barriers vs tools (judge off)', '', detectionTable(results), '',
     `† vision-only barrier (${vision.join(', ') || 'none'}): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.`,
+    'Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors\' job; whether they matter is the judge\'s.',
     'Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.',
     `axe best-practice rule nodes, not counted above: ${bp}.`,
     'w3c-bad = W3C Before-and-After Demonstration, "after" (accessible) version: nothing planted, so it only measures false positives.',
-    'keyboard-a11y-tester: not included in this comparison.', ''];
+    'keyboard-a11y-tester: not included in this comparison.', '',
+    '### Impact accuracy: same trace, judge on vs off', '', impactTable(results, judgeOn), '',
+    'For every barrier the detectors found, the impact level we report for it (block / degrade / none = irrelevant to this task; the most severe if several findings hit it) is compared with `expectedImpact` in `eval/groundtruth/`, i.e. what the barrier does to that flow\'s task. Judge off = each detector\'s fixed default level, shown as the baseline.',
+    'The judge never adds findings and does not raise the detection count: its job is to rate each finding\'s impact on the task (including marking task-irrelevant ones as none). False positives are counted as in the detection table; a finding the judge rates none is not counted as reported.'];
   if (judgeOn) {
-    out.push('### Ablation: same trace, judge off vs on', '', ablationTable(results), '',
-      `Judge-on numbers depend on the model (\`MODEL_JUDGE\`); verdicts are cached in \`.cache/llm\`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.`);
+    out.push('', `Judge-on numbers depend on the model (\`MODEL_JUDGE\`); verdicts are cached in \`.cache/llm\`, so replaying the same recording on this machine gives the same numbers; another machine or model may differ slightly. A fresh recording can also differ: the demo pages' rotating banner lands in different steps, so the judge sees a slightly different prompt.`);
   } else {
-    out.push('### Ablation: skipped', '', 'No judge key in `.env` (SCIFORIUM_API_KEY + MODEL_JUDGE): the judge-on column and the ablation table were skipped.');
+    out.push('', 'No judge key in `.env` (SCIFORIUM_API_KEY + MODEL_JUDGE): the judge-on columns were skipped.');
   }
-  out.push('', replay ? `Reproduce: \`node eval/run.mjs --replay ${path.relative(ROOT, replay)}\` (no browser; the judge column needs \`.env\`).`
-    : `Reproduce: \`node eval/run.mjs\` (records in Chromium, serving \`sites/\` on port ${PORT}; the judge column needs \`.env\`).`);
+  out.push('', replay ? `Reproduce: \`node eval/run.mjs --replay ${path.relative(ROOT, replay)}\` (no browser; the judge columns need \`.env\`).`
+    : `Reproduce: \`node eval/run.mjs\` (records in Chromium, serving \`sites/\` on port ${PORT}; the judge columns need \`.env\`).`);
   return out.join('\n');
 }
 
 async function main() {
   const ctx = { ...parseArgs(process.argv.slice(2)), judgeOn: hasJudgeKey() };
-  if (!ctx.judgeOn) console.error('note: no SCIFORIUM_API_KEY/MODEL_JUDGE in .env — skipping the judge-on column and the ablation table');
+  if (!ctx.judgeOn) console.error('note: no SCIFORIUM_API_KEY/MODEL_JUDGE in .env — skipping the judge-on columns');
   ctx.evalDir = newRunDir(path.join(RUNS_DIR, 'eval'), ctx.replay ? 'eval-replay' : 'eval');
   const server = ctx.replay ? null : await listen(createStaticServer(), PORT);
   ctx.base = `http://localhost:${PORT}`;

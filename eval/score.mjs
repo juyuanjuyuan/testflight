@@ -33,3 +33,24 @@ export function scoreTable(rows) {
   return ['| dataset | variant | tool | planted | detected | missed | false positives |', '|---|---|---|---|---|---|---|',
     ...rows.map((r) => `| ${r.dataset} | ${r.variant} | ${r.tool} | ${r.planted} | ${r.hits} | ${r.misses.join(' ') || '–'} | ${r.falsePositives} |`)].join('\n');
 }
+
+const SEVERITY = { none: 0, degrade: 1, block: 2 };
+
+/**
+ * Impact grading for one run: for every barrier the detectors found, the level the findings give it (the most severe
+ * when several findings hit it; none = judged irrelevant) vs the ground truth's expectedImpact.
+ * Barriers no finding hits are `ungraded` (a detection miss, scored by scoreRun), not wrong.
+ */
+export function gradeRun({ runDir, groundtruth }) {
+  const barriers = YAML.parse(fs.readFileSync(groundtruth, 'utf8')).barriers || [];
+  const missing = barriers.filter((b) => !(b.expectedImpact in SEVERITY)).map((b) => b.id);
+  if (missing.length) throw new Error(`${groundtruth}: barriers ${missing.join(' ')} need expectedImpact (block|degrade|none)`);
+  const findings = JSON.parse(fs.readFileSync(path.join(runDir, 'findings.json'), 'utf8'));
+  const given = new Map();
+  for (const f of findings) {
+    const id = f.evidence.barrierId;
+    if (id && (!given.has(id) || SEVERITY[f.impact] > SEVERITY[given.get(id)])) given.set(id, f.impact);
+  }
+  const graded = barriers.filter((b) => given.has(b.id)).map((b) => ({ id: b.id, expected: b.expectedImpact, given: given.get(b.id) }));
+  return { graded, agree: graded.filter((g) => g.given === g.expected).length, ungraded: barriers.filter((b) => !given.has(b.id)).map((b) => b.id) };
+}
