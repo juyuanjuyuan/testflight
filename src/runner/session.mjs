@@ -14,6 +14,7 @@ export const RECORDER_CONFIG = { CHANGE_WINDOW_MS, NOISE_GAP_MS: CHANGE_WINDOW_M
 // cap on D6 candidates per stuck step: real sites have many cursor:pointer cards, the judge filters the rest
 const MAX_UNREACHABLE = 20;
 const CONFIG_SCRIPT = `window.__A11Y_CONFIG = ${JSON.stringify(RECORDER_CONFIG)};`;
+const TRACE_FILE = 'trace.zip';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Enable the CDP accessibility domain; without it every focus read is wrong, so fail loudly. */
@@ -44,10 +45,10 @@ export async function pickTab(browser) {
   return pages[visible.indexOf(true)] ?? pages[0];
 }
 
-async function connectReal(cdp) {
+async function connectReal(browserType, cdp) {
   const endpoint = cdp || process.env.CDP_ENDPOINT;
   if (!endpoint) throw new Error('real mode needs --cdp http://localhost:9222 (or CDP_ENDPOINT in .env); start Chrome with scripts/real-chrome.sh');
-  try { return await chromium.connectOverCDP(endpoint); } catch (e) {
+  try { return await browserType.connectOverCDP(endpoint); } catch (e) {
     throw new Error(`cannot attach to Chrome at ${endpoint} (is scripts/real-chrome.sh running?): ${e.message.split('\n')[0]}`);
   }
 }
@@ -60,16 +61,32 @@ export async function waitForLoad(page) {
   }
 }
 
+// --trace is a debugging aid: when Playwright cannot trace (e.g. the human's Chrome over CDP) the run goes on
+// and the reason ends up in meta.json as traceError.
+async function startTrace(ctx) {
+  try { await ctx.tracing.start({ screenshots: true, snapshots: true, sources: false }); return { trace: TRACE_FILE }; } catch (e) {
+    return { traceError: `trace not started: ${e.message.split('\n')[0]}` };
+  }
+}
+
+async function stopTrace(ctx, runDir) {
+  try { await ctx.tracing.stop({ path: path.join(runDir, TRACE_FILE) }); return { trace: TRACE_FILE }; } catch (e) {
+    return { traceError: `trace not saved: ${e.message.split('\n')[0]}` };
+  }
+}
+
 /**
  * Real mode attaches to the human's Chrome: with `url` it navigates the visible tab there first; then it awaits
  * waitForUser (human clears captcha/login, nothing is recorded meanwhile) and, without `url`, takes the tab visible then.
- * @param {{url?:string, runDir:string, mode?:'local'|'real', cdp?:string, headless?:boolean, axe?:boolean,
- *          waitForUser?:()=>Promise<void>}} o
+ * trace: record a Playwright trace (after waitForUser) to runDir/trace.zip; close() returns {trace:'trace.zip'} or
+ * {traceError} ({} without trace). browserType replaces playwright's chromium (tests only).
+ * @param {{url?:string, runDir:string, mode?:'local'|'real', cdp?:string, headless?:boolean, axe?:boolean, trace?:boolean,
+ *          waitForUser?:()=>Promise<void>, browserType?:object}} o
  */
-export async function openSession({ url, runDir, mode = 'local', cdp, headless = true, axe = true, waitForUser }) {
+export async function openSession({ url, runDir, mode = 'local', cdp, headless = true, axe = true, trace = false, waitForUser, browserType = chromium }) {
   let browser, page, owned = true;
   if (mode === 'real') {
-    browser = await connectReal(cdp);
+    browser = await connectReal(browserType, cdp);
     owned = false;
     if (url) { page = await pickTab(browser); await page.goto(url, { waitUntil: 'load' }); }
     await waitForUser?.();
@@ -79,12 +96,13 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     await page.evaluate(CONFIG_SCRIPT);
     await page.evaluate(RECORDER);
   } else {
-    browser = await chromium.launch({ headless, executablePath: process.env.CHROME_BIN || undefined });
+    browser = await browserType.launch({ headless, executablePath: process.env.CHROME_BIN || undefined });
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await ctx.addInitScript(CONFIG_SCRIPT);
     await ctx.addInitScript(RECORDER);
     page = await ctx.newPage();
   }
+  let traced = trace ? await startTrace(page.context()) : {};
   const cdpSession = await page.context().newCDPSession(page);
   await enableAX(cdpSession);
 
@@ -152,8 +170,10 @@ export async function openSession({ url, runDir, mode = 'local', cdp, headless =
     },
     axeResults: () => mergeAxe(axeRuns),
     async close() {
+      if (traced.trace) traced = await stopTrace(page.context(), runDir); // before close: the zip is written by this browser connection
       if (!owned) await cdpSession.detach().catch(() => {}); // cleanup only: the run is already recorded, and a tab the human closed can't be detached
       await browser.close(); // real mode: only drops our CDP connection, the human's Chrome and tabs stay open
+      return traced;
     },
   };
 }

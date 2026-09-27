@@ -30,7 +30,8 @@ const summary = (r) => console.log(`\nSR user can complete: ${r.verdicts.screenR
 const USAGE = `usage:
   node cli.mjs audit  --url <url> --goal "<task>" [--out runs/] [--script keys.json] [--no-judge] [--headed] [--site sites/shop/original]
                       [--fail-on block] [--run-dir <existing dir>] [--progress]            # --progress: keep <runDir>/progress.json live
-  node cli.mjs audit  --mode real --cdp http://localhost:9222 --goal "<task>" [--url <url>] [--out runs/real]
+                      [--trace]                                   # Playwright trace → <runDir>/trace.zip (npx playwright show-trace)
+  node cli.mjs audit  --mode real --cdp http://localhost:9222 --goal "<task>" [--url <url>] [--out runs/real] [--trace]
                       # takes over the visible tab of scripts/real-chrome.sh; waits for Enter; stops at checkout
   node cli.mjs replay --trace <trace.jsonl> --goal "<task>" [--out runs/] [--no-judge]     # detectors+judge+report, no browser
   node cli.mjs fix    --run <runDir> [--site sites/shop/original] [--patched sites/shop/patched] [--findings F2,F4]
@@ -46,7 +47,7 @@ async function main() {
     const dir = args['run-dir'] ? path.resolve(args['run-dir']) : args.progress ? newRunDir(out, args.label || 'audit') : undefined;
     const real = args.mode === 'real';
     const { runDir, report } = await audit({ url: real ? args.url : need('url'), goal: need('goal'), out, runDir: dir, script, mode: args.mode, cdp: args.cdp,
-      judgeEnabled: !args['no-judge'], headless: !args.headed, site: args.site, label: args.label, log: console.log,
+      judgeEnabled: !args['no-judge'], headless: !args.headed, trace: !!args.trace, site: args.site, label: args.label, log: console.log,
       onProgress: args.progress ? createProgressWriter(dir) : undefined, waitForUser: real ? waitForEnter : undefined });
     summary(report); console.log(`→ ${runDir}/report.json`);
     if (args['fail-on'] === 'block' && report.counts.block > 0) process.exit(1);

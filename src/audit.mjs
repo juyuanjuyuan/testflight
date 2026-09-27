@@ -38,11 +38,12 @@ export async function analyze({ trace, goal, meta, runDir, judgeEnabled = true, 
 /**
  * url is optional in real mode (the tab the human has open is audited; meta.url records where it actually started).
  * @param {{url?:string, goal:string, out?:string, runDir?:string, mode?:'local'|'real', cdp?:string, script?:object[],
- *          judgeEnabled?:boolean, headless?:boolean, label?:string, site?:string, log?:(msg:string)=>void,
+ *          judgeEnabled?:boolean, headless?:boolean, trace?:boolean, label?:string, site?:string, log?:(msg:string)=>void,
  *          onProgress?:(p:{state:string, trace?:object[], error?:string, maxSteps:number, url:string|null, goal:string})=>void, openSession?:Function,
  *          waitForUser?:()=>Promise<void>}} o
  * runDir: an existing dir to use (the HTTP API creates it first); default a new one under `out`.
  * onProgress: called with state running (after each step, screenshot on disk) → analyzing → done (after report.json) | failed.
+ * trace: Playwright trace to <runDir>/trace.zip (debugging); meta.json records trace or traceError.
  * openSession: replaces the browser session (tests only).
  * waitForUser (real mode): resolved once the human has cleared captcha/login; the agent loop starts after it.
  */
@@ -69,8 +70,8 @@ export async function audit(o) {
 async function execute(o, runDir, trace, log, onProgress, { maxSteps, startedAt }) {
   const tracePath = path.join(runDir, 'trace.jsonl');
   const stats = {};
-  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false, waitForUser: o.waitForUser });
-  let axe = null;
+  const s = await (o.openSession || openSession)({ url: o.url, runDir, mode: o.mode, cdp: o.cdp, headless: o.headless !== false, trace: !!o.trace, waitForUser: o.waitForUser });
+  let axe = null, traced = {};
   const push = (step) => {
     const err = validateStep(step);
     if (err) throw new Error(`runner produced invalid step ${step.i}: ${err}`);
@@ -93,11 +94,14 @@ async function execute(o, runDir, trace, log, onProgress, { maxSteps, startedAt 
     }
   } finally {
     axe = s.axeResults();
-    await s.close();
+    traced = (await s.close()) ?? {}; // a replacement session may return nothing
   }
+  if (traced.trace) log(`playwright trace → ${path.join(runDir, traced.trace)}  (npx playwright show-trace <file>)`);
+  if (traced.traceError) log(`playwright trace: ${traced.traceError}`);
   fs.writeFileSync(path.join(runDir, 'axe.json'), JSON.stringify(axe, null, 2));
   const meta = { url: o.mode === 'real' ? trace[0].url : o.url, mode: o.mode || 'local', site: o.site || null, script: !!o.script, startedAt, maxSteps };
-  fs.writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify({ ...meta, goal: o.goal }, null, 2));
+  // trace/traceError stay in meta.json: report.json (built from meta) is the frontend contract
+  fs.writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify({ ...meta, goal: o.goal, ...traced }, null, 2));
   onProgress({ state: 'analyzing', trace });
   return analyze({ trace, goal: o.goal, meta, runDir, judgeEnabled: o.judgeEnabled !== false, axe, stats, log });
 }
