@@ -410,3 +410,111 @@ test('GET /api/runs: a failed run with no report is listed as failed; a missing 
     fs.mkdirSync(runsDir); // withApi removes it again
   });
 });
+
+// ---- plan 18: goal optional, POST /api/tasks/suggest ----
+
+test('POST /api/runs without goal: planning_task (goal null) before the response; the child gets no --goal', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ runsDir, post, site }) => {
+    for (const body of [{ url: site() }, { url: site(), goal: null }]) {
+      const r = await post('/api/runs', body);
+      assert.equal(r.status, 202, JSON.stringify(r.body));
+      const dir = path.join(runsDir, r.body.runDir);
+      const p = readProgress(dir);
+      assert.ok(validateProgress(p), JSON.stringify(validateProgress.errors));
+      assert.equal(p.state, 'planning_task');
+      assert.equal(p.goal, null);
+      assert.equal(p.url, site());
+      const { argv } = fake.calls.at(-1);
+      assert.ok(!argv.includes('--goal'));
+      assert.equal(argv[argv.indexOf('--site') + 1], 'sites/testpage/original');
+      // the child (cli audit) takes it from here: running with the chosen goal → done
+      const write = createProgressWriter(dir);
+      write({ state: 'running', trace: [], url: site(), goal: 'Buy the canvas tote bag' });
+      assert.ok(validateProgress(readProgress(dir)));
+      write({ state: 'done', trace: [] });
+      fake.calls.at(-1).exit({ code: 0, signal: null, stderr: '' });
+      await tick();
+      assert.equal(readProgress(dir).state, 'done');
+      assert.equal(readProgress(dir).goal, 'Buy the canvas tote bag');
+    }
+  }, fake);
+});
+
+test('POST /api/runs without goal: task generation fails in the child → failed with its reason', async () => {
+  const fake = fakeSpawner();
+  await withApi(async ({ post, site }) => {
+    await post('/api/runs', { url: site() });
+    fake.calls[0].exit({ code: 1, signal: null, stderr: 'error: Could not work out a task for this page. Please describe one. (x) (DEBUG=1 for details)\n' });
+    await tick();
+    const p = readProgress(fake.calls[0].runDir);
+    assert.equal(p.state, 'failed');
+    assert.match(p.error, /Could not work out a task for this page/);
+    assert.ok(validateProgress(p));
+  }, fake);
+});
+
+/** A bare /api server with an injected suggest function (the real one opens a browser and calls the model). */
+async function withSuggestApi(fn, { suggest, suggestTimeoutMs }) {
+  const { createRunsApi } = await import('../src/api/runs.mjs');
+  const http = await import('node:http');
+  const runsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'api-runs-'));
+  const server = http.createServer(createRunsApi({ runsDir, spawnRun: fakeSpawner().spawnRun, ownPort: () => server.address().port, suggest, suggestTimeoutMs }));
+  await listen(server, 0);
+  const port = server.address().port;
+  const post = async (body) => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks/suggest`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return { status: res.status, body: await res.json() };
+  };
+  try { await fn({ port, post, site: (rel = 'shop/fixed/') => `http://localhost:${port}/${rel}` }); } finally {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(runsDir, { recursive: true, force: true });
+  }
+}
+
+test('POST /api/tasks/suggest: curated demo site → 200 preset tasks (no browser, no model)', async () => {
+  await withApi(async ({ port }) => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks/suggest`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: `http://localhost:${port}/shop/original/` }) });
+    assert.equal(res.status, 200);
+    const { suggestions } = await res.json();
+    assert.ok(suggestions.length >= 1);
+    for (const s of suggestions) assert.deepEqual(Object.keys(s).sort(), ['goal', 'needs', 'reason', 'source']);
+    assert.equal(suggestions[0].source, 'curated');
+    assert.match(suggestions[0].goal, /^Buy a canvas tote bag\./);
+  });
+});
+
+test('POST /api/tasks/suggest: passes url + site to the tasker; same URL checks as POST /api/runs; wrong method 405', async () => {
+  const calls = [];
+  const suggest = async (o) => { calls.push(o); return { suggestions: [{ goal: 'Buy a bag.', source: 'generated', reason: 'r', needs: [] }], testDataProfile: 'shop' }; };
+  await withSuggestApi(async ({ port, post, site }) => {
+    const ok = await post({ url: site() });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.body, { suggestions: [{ goal: 'Buy a bag.', source: 'generated', reason: 'r', needs: [] }] });
+    assert.deepEqual(calls, [{ url: site(), siteKey: 'sites/shop/fixed' }]);
+    for (const [body, code] of [[{}, 'invalid_url'], [{ url: 'https://example.com/' }, 'real_site_cli_only'], [{ url: site('nope/x/') }, 'unknown_site']]) {
+      const r = await post(body);
+      assert.equal(r.status, 400);
+      assert.equal(r.body.error.code, code);
+    }
+    assert.equal(calls.length, 1);
+    const get = await fetch(`http://127.0.0.1:${port}/api/tasks/suggest`);
+    assert.equal(get.status, 405);
+    assert.equal((await get.json()).error.code, 'method_not_allowed');
+  }, { suggest });
+});
+
+test('POST /api/tasks/suggest: too slow → 504 suggest_timeout; tasker error → 502 suggest_failed', async () => {
+  await withSuggestApi(async ({ post, site }) => {
+    const r = await post({ url: site() });
+    assert.equal(r.status, 504);
+    assert.equal(r.body.error.code, 'suggest_timeout');
+  }, { suggest: () => new Promise(() => {}), suggestTimeoutMs: 50 });
+  await withSuggestApi(async ({ post, site }) => {
+    const r = await post({ url: site() });
+    assert.equal(r.status, 502);
+    assert.equal(r.body.error.code, 'suggest_failed');
+    assert.match(r.body.error.message, /Could not work out a task for this page/);
+  }, { suggest: async () => { throw new Error('tasker: no usable task after a retry'); } });
+});

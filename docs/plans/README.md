@@ -30,7 +30,7 @@
 | [ ] | [15 Playwright Trace（开发调试用）](15-playwright-trace.md) | 01 | 30 分钟 | 周六 21:00 |
 | [ ] | [16 接入 Guidepup Virtual Screen Reader](16-virtual-screen-reader.md) | 03 | 1.5–2 小时 | 周六 23:00 |
 | [x] | [17 HTTP API 与实时进度](17-http-api.md)（P0 → P1 → P2） | 04 | P0 2 小时 / P1 1 小时 / P2 45 分钟 | P0 周六 23:30、P1 周日 10:00 |
-| [ ] | [18 自动生成任务（只填网址也能审计）](18-auto-task.md) | 17 | 1.5 小时 | 周日 10:30 |
+| [x] | [18 自动生成任务（只填网址也能审计）](18-auto-task.md) | 17 | 1.5 小时 | 周日 10:30 |
 | [ ] | [12 demo 回放与演练](12-demo-rehearsal.md) | 以上全部（含 14、15、16） | 1 小时 | 周日 12:30 |
 | [ ] | [13 （可选）视觉层检查](13-optional-vision.md) | 12 | — | 仅当主线全部完成 |
 

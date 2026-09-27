@@ -1,6 +1,7 @@
 # HTTP API 与 progress.json（给前端）
 
 对应前端的需求文档 `docs/frontend/BACKEND_CHANGES.md`，后端计划 17。**P0**（启动运行 + 实时进度）、**P1**（修复和复测，以及报告里的 `fixPolicy`）、**P2**（运行列表，报告里的 `meta.startedAt` / `finishedAt` / `maxSteps` 和 `timeline[].t`）都已完成。
+计划 18 之后：`POST /api/runs` 的 `goal` 变为可选（不传时先自动确定任务，progress 多一个状态 `planning_task`），并新增 `POST /api/tasks/suggest`（§2.1）。**前端需要能显示 `planning_task` 状态。**
 
 所有接口都由 `npm run serve`（默认 8080 端口）提供，和 `/runs`、`/fixtures`、`/viewer` 是同一个服务器。`report.json` 仍然是唯一的最终结果，格式见 `REPORT_FORMAT.md`。
 
@@ -11,6 +12,7 @@
 | `maxSteps` 示例是 30 | 实际是 **40**（`src/contracts.mjs` 的 `MAX_STEPS`，第 0 步 `start` 不计入）；命令行跑的真实网站模式是 **80**（`MAX_STEPS_REAL`） | 以代码为准 |
 | `mode` 由后端按网址判断 | 网页上**只能审计本服务器提供的站点**：主机是 `localhost` 或 `127.0.0.1`、协议是 `http`、端口就是这个服务器的端口，并且路径的前两段对应 `sites/` 下的一个目录（例如 `/shop/original/`）。其他网址返回 `400`，code `real_site_cli_only`；本服务器上不存在的站点返回 `400`，code `unknown_site` | 真实网站需要人先在 Chrome 里处理验证码，再在终端按回车，网页上做不到。真实网站照常用命令行跑 |
 | 服务器监听所有网卡 | **只监听 127.0.0.1** | 接口能让服务器启动浏览器访问网址，不能让同一网络里的其他人调用。WSL 到 Windows 的 localhost 转发不受影响；Vite 代理请指向 `http://localhost:8080` 或 `http://127.0.0.1:8080` |
+| `goal` 必填 | **可选**（计划 18）：不传时后端先确定任务（演示站点用预设任务，其他站点由 AI 生成），progress 先是 `planning_task`，见 §2 | 用户只填网址也能审计 |
 | 请求体只有 `url`、`goal` | 另有可选的 `script`（见 §2），前端正常使用时不要传 | demo 和测试用的确定性运行，不调用模型 |
 | 错误状态码 400/404/409/500 | 另有 `405`（方法不对）；请求体超过 16KB 也是 `400`（code `body_too_large`） | 保持在前端文档的状态码范围内 |
 | progress.json 示例里 `step` 总是数字 | 还没有任何步骤时 `step` 是 `null` | 第 0 步（打开页面）也要一两秒 |
@@ -36,13 +38,47 @@ Content-Type: application/json
 | 字段 | 要求 |
 |---|---|
 | `url` | 必填，见 §1：只接受本服务器上的站点 |
-| `goal` | 必填，去掉空白后不能为空，最多 500 个字符 |
+| `goal` | 可选。传了就不能为空（去掉空白后），最多 500 个字符。**不传（或传 `null`）时自动确定任务**，见下文 |
 | `script` | 可选。`eval/` 下已有的按键脚本文件名，例如 `"keys.testpage.json"`。传了之后按脚本按键，**不调用 planner 和 judge**（`meta.script: true`、`meta.judge: false`）。其他值一律 `400 invalid_script` |
 
-- 返回之前运行目录已经创建好，里面已经有第一版 `progress.json`（`state: "running"`、`timeline: []`），拿到 `runDir` 马上读不会 404。
+- 返回之前运行目录已经创建好，里面已经有第一版 `progress.json`（`state: "running"`、`timeline: []`；不传 `goal` 时是 `state: "planning_task"`、`goal: null`），拿到 `runDir` 马上读不会 404。
+- **不传 `goal`**：子进程打开起始页（第 0 步照常记录，所以 `planning_task` 时 `timeline` 里可能已经有第 0 步），用和 planner 第 0 步完全相同的信息（网址、标题、读屏能读到的页面文字）确定任务，把它写进 progress 的 `goal`，再进入 `running`。演示站点有预设任务时直接用预设（稳定、不调用模型）；否则由模型生成（会多花约 5–10 秒）。确定不了时写 `failed`，`error` 以 "Could not work out a task for this page. Please describe one." 开头。报告里 `meta.goalSource` / `goalReason` / `testDataProfile` 记录任务从哪里来（见 `REPORT_FORMAT.md`）。
+- 自动生成的任务每次可能不同（LLM 缓存也就用不上），demo 主流程请继续传固定的 `goal`。
 - 同一时间只有一个运行。已有运行时返回 `409 run_in_progress`（修复和复测也共用这个限制，见 §3）。
 - 审计在子进程里执行（`node cli.mjs audit … --run-dir <runDir> --progress`），它的输出记在运行目录的 `cli.log`，仅供后端排查，前端不要读。
 - 同一秒内启动两次，第二个目录名会带 `-2` 后缀，不会共用目录。
+
+## 2.1 `POST /api/tasks/suggest`：建议任务
+
+```
+POST /api/tasks/suggest
+Content-Type: application/json
+
+{ "url": "http://localhost:8080/shop/original/" }
+```
+
+→ `200`，同步返回（不创建运行目录）：
+
+```json
+{ "suggestions": [
+  { "goal": "Buy a canvas tote bag. Pay with card 4000 0000 0000 0002; if it is declined, use 4242 4242 4242 4242.",
+    "source": "curated", "reason": "Preset task of this demo site (main flow, eval/groundtruth/shop-main.yaml).", "needs": [] }
+] }
+```
+
+| 字段 | 说明 |
+|---|---|
+| `url` | 必填，检查和 `POST /api/runs` 完全相同（只接受本服务器的站点，错误码也相同） |
+| `suggestions` | 1–3 条，最重要的在前。前端可以展示出来让用户确认或修改，再把选中的 `goal` 传给 `POST /api/runs` |
+| `goal` | 最终任务文本，可以直接用。只写"做什么"，不写"怎么做"（不含 click、button 之类）；卡号、邮箱等测试数据由后端从 `config/test-data/` 拼接，模型不写任何具体的值 |
+| `source` | `curated` = 演示站点预设的任务（`eval/groundtruth/`，不调用模型，结果固定）；`generated` = 模型根据起始页生成 |
+| `reason` | 一句英文，为什么选这个任务 |
+| `needs` | 这个任务用到的测试数据类别（`payment_card` / `email` / `name` / `address` / `phone`），`curated` 时为 `[]` |
+
+- 预设任务不需要浏览器，立即返回；生成任务要打开起始页并调用一次模型，大约 5–15 秒。
+- 超过 90 秒（`SUGGEST_TIMEOUT_MS`）返回 `504 suggest_timeout`；模型两次都给不出合格的任务返回 `502 suggest_failed`。两种情况都请让用户自己填任务。
+- 不受"同一时间只有一个运行"的限制（它不写任何运行目录）。
+- 用户采用建议后，报告里的 `meta.goalSource` 是 `user`（任务是用户确认后提交的）；只有不传 `goal` 时才会是 `curated` / `generated`。
 
 ## 3. `POST /api/runs/<runDir>/fix`：修复（和复测）
 
@@ -96,7 +132,7 @@ GET /api/runs
 | `url` / `goal` | 有 `report.json` 时取 `meta.url` / `meta.goal`；运行中取 `progress.json` 的 `url` / `goal`，还不知道时为 `null` |
 | `generatedAt` | `report.json` 的 `meta.generatedAt`；还没有报告时为 `null`。修复后报告会重新生成，这个时间会更新 |
 | `screenReaderUserCanComplete` | `report.json` 的结论一；还没有报告时（运行中、分析中、没跑完就失败）为 `null`，不是 `false` |
-| `state` | 有 `progress.json` 就取它的 `state`（`running` / `analyzing` / `fixing` / `rerunning` / `done` / `failed`）。已经有报告、正在修复的运行是 `fixing` 或 `rerunning`，结论仍是审计的结论。没有 `progress.json` 的旧运行（命令行不带 `--progress` 跑的）是 `done` |
+| `state` | 有 `progress.json` 就取它的 `state`（`planning_task` / `running` / `analyzing` / `fixing` / `rerunning` / `done` / `failed`）。已经有报告、正在修复的运行是 `fixing` 或 `rerunning`，结论仍是审计的结论。没有 `progress.json` 的旧运行（命令行不带 `--progress` 跑的）是 `done` |
 | `skipped` | `runs/` 和 `runs/real/` 下**读不出来的目录**个数：既没有能解析的 `report.json`，也没有能解析的 `progress.json`（例如中途被杀、没开 `--progress` 的命令行运行，或者文件损坏）。这些目录不出现在 `runs` 里，也不会让接口报错 |
 
 - 按目录名倒序（目录名以开始时间开头，所以最新的在前），`runs/` 和 `runs/real/` 混在一起排。
@@ -128,13 +164,13 @@ GET /runs/<runDir>/progress.json
 
 | 字段 | 说明 |
 |---|---|
-| `state` | 审计：`running` → `analyzing` → `done`；修复（§3）：`fixing` →（复测时）`rerunning` → `done`。出错时 `failed` |
+| `state` | 审计：`running` → `analyzing` → `done`（不传 `goal` 时前面多一个 `planning_task`：正在确定任务，`goal` 还是 `null`）；修复（§3）：`fixing` →（复测时）`rerunning` → `done`。出错时 `failed` |
 | `step` | 最后一步的编号（= `timeline` 最后一项的 `i`），还没有步骤时为 `null` |
 | `maxSteps` | 步数上限（本地站点 40，真实网站模式 80）。请读这个字段，不要写死 |
 | `timeline` | 目前为止的所有步骤。和 `report.json` 的 `timeline[]` 由同一个函数生成；运行中 `findingIds` 一律是 `[]`，最终的 id 以 `report.json` 为准 |
 | `rerunDir` | 进入 `rerunning` 时写入复测运行的目录名，之后的 `done` / `failed` 保留它；此前为 `null`。复测目录在它写出之前就有 `progress.json` |
 | `error` | `state: "failed"` 时的一句话原因，可以直接显示；其他时候为 `null` |
-| `url` / `goal` | 审计的起始网址和任务（和 `report.json` 的 `meta.url` / `meta.goal` 相同），`report.json` 出来之前运行列表靠它们显示。还不知道时为 `null`（真实网站模式要等第 0 步之后才知道网址）；修复写的进度里一律是 `null`，请读 `report.json`。P2 之前写的 progress.json 里没有这两个字段 |
+| `url` / `goal` | 审计的起始网址和任务（和 `report.json` 的 `meta.url` / `meta.goal` 相同），`report.json` 出来之前运行列表靠它们显示。还不知道时为 `null`（真实网站模式要等第 0 步之后才知道网址；`planning_task` 时 `goal` 是 `null`）；修复写的进度里一律是 `null`，请读 `report.json`。P2 之前写的 progress.json 里没有这两个字段 |
 | `updatedAt` | 最后一次写入的时间 |
 
 ### 写入顺序保证
@@ -162,12 +198,14 @@ GET /runs/<runDir>/progress.json
 | 404 | `not_found` | 没有这个接口 |
 | 400 | `invalid_findings` | `findingIds` 不是非空数组、有重复，或者包含这次运行没有的 id |
 | 400 | `invalid_rerun` | `rerun` 不是 `true` / `false` |
-| 405 | `method_not_allowed` | 方法不对，例如 `DELETE /api/runs`、`GET …/fix` |
+| 405 | `method_not_allowed` | 方法不对，例如 `DELETE /api/runs`、`GET …/fix`、`GET /api/tasks/suggest` |
 | 409 | `run_not_finished` | 运行还没有 `report.json`（没跑完或失败了），没有东西可修 |
 | 409 | `real_site_no_fix` | 真实网站只检测，不修复 |
 | 409 | `not_fixable` | 这次运行没有可修复的站点源码（例如审计的是修复副本 `/…/patched/` 本身，请修复原来那次运行） |
 | 409 | `nothing_to_fix` | 没传 `findingIds`，而这次运行没有 `block` 问题 |
 | 409 | `run_in_progress` | 已有运行在进行中 |
+| 502 | `suggest_failed` | `/api/tasks/suggest`：模型给不出合格的任务（请让用户自己描述任务） |
+| 504 | `suggest_timeout` | `/api/tasks/suggest`：打开起始页 + 生成任务超过 90 秒 |
 | 500 | `internal_error` | 其他错误 |
 
 ## 7. 验收（前端文档第 8 节）
@@ -181,6 +219,14 @@ curl -s localhost:8080/runs/<runDir>/report.json
 ```
 
 去掉 `script` 就是 planner + judge 的真实运行（需要 `.env` 里的模型 key，大约 30 秒）。`npm run smoke` 里的 `api` 用例会自动跑一遍带 `script` 的流程，并检查结果和直接运行一致。
+
+计划 18（只填网址）：
+
+```bash
+curl -s -X POST localhost:8080/api/tasks/suggest -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/shop/original/"}'  # 预设任务
+curl -s -X POST localhost:8080/api/tasks/suggest -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/shop/fixed/"}'     # 生成任务（需要模型 key）
+curl -s -X POST localhost:8080/api/runs -H 'Content-Type: application/json' -d '{"url":"http://localhost:8080/testpage/fixed/"}'        # planning_task → running → … → done
+```
 
 P1（修复 + 复测，需要模型 key）：
 

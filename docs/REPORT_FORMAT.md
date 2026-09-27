@@ -49,6 +49,9 @@
 | `generatedAt` | 生成时间（ISO 格式） |
 | `startedAt` / `finishedAt` | 运行开始、分析结束的时间（ISO 格式），相减就是"本次审计用时"；修复后重新生成的报告保留审计的这两个时间（`generatedAt` 会更新）。真实网站模式的 `startedAt` 包含人在 Chrome 里处理验证码、按回车之前的时间。`replay` 生成的报告和旧报告里没有这两个字段 |
 | `maxSteps` | 步数上限（第 0 步 `start` 不计入）：本地站点 40，真实网站 80。可以显示"用了 14 / 40 步"。`replay` 生成的报告和旧报告里没有 |
+| `goalSource` | 任务从哪里来：`user` = 用户填的；`curated` = 演示站点的预设任务（`eval/groundtruth/`）；`generated` = 用户没填，AI 根据起始页生成。可以在任务旁边显示"AI 生成"之类的标记。`replay` 生成的报告和旧报告里没有 |
+| `goalReason` | 为什么选这个任务（一句英文）；用户填的任务为 `null`。没有 `goalSource` 时也没有 |
+| `testDataProfile` | 生成任务时拼进去的测试数据配置名（`config/test-data/<名字>.json`，例如 `default`、`shop`）；用户填的、预设的任务以及真实网站模式（不拼接任何支付和个人数据）为 `null`。没有 `goalSource` 时也没有 |
 
 ### verdicts：两个核心结论
 

@@ -1,16 +1,16 @@
 // /api/* for the frontend (docs/API.md). GET /api/runs lists runs (list.mjs), POST /api/runs starts an audit, POST /api/runs/<runDir>/fix a fix (+ rerun),
-// each in a child process; progress.json shows it live.
+// each in a child process; progress.json shows it live. POST /api/tasks/suggest proposes tasks for a URL (synchronous).
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, SITES_DIR, insideDir } from '../paths.mjs';
 import { newRunDir } from '../audit.mjs';
-import { readTrace } from '../contracts.mjs';
+import { readTrace, MAX_GOAL_CHARS, SUGGEST_TIMEOUT_MS } from '../contracts.mjs';
 import { siteDirs } from '../fix/commands.mjs';
 import { createProgressWriter, markFailedIfUnfinished, readProgress } from '../report/progress.mjs';
 import { listRuns } from './list.mjs';
+import { suggestForUrl } from './suggest.mjs';
 
 const MAX_BODY_BYTES = 16 * 1024;
-const MAX_GOAL_CHARS = 500;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 const NAME = /^[\w.-]+$/;
 const SCRIPT_FILE = /^keys\.[\w.-]+\.json$/;
@@ -65,7 +65,9 @@ function checkUrl(raw, ownPort) {
   return { url: raw, site: `sites/${a}/${b}` }; // meta.site: lets `fix` find the source folder later
 }
 
+// undefined/null → null: the audit picks a task itself (progress starts at planning_task)
 function checkGoal(goal) {
+  if (goal === undefined || goal === null) return null;
   if (typeof goal !== 'string' || !goal.trim()) throw bad('invalid_goal', 'Describe the task to try, for example "Buy the canvas tote bag".');
   if (goal.length > MAX_GOAL_CHARS) throw bad('invalid_goal', `The task description is too long (at most ${MAX_GOAL_CHARS} characters).`);
   return goal;
@@ -125,8 +127,9 @@ function checkRerun(rerun) {
 /**
  * Returns handle(req, res) for /api/*. spawnRun({runDir, argv}) → Promise<{code, signal, stderr}> (injected in tests);
  * ownPort() is this server's port (only its own sites are accepted); log records failures the HTTP client can't see.
+ * suggest({url, siteKey}) → Promise<{suggestions}> and suggestTimeoutMs: injectable for tests (the real one opens a browser).
  */
-export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
+export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {}, suggest = (o) => suggestForUrl({ ...o, log }), suggestTimeoutMs = SUGGEST_TIMEOUT_MS }) {
   let active = false;
 
   // One run at a time (audit, fix, rerun). start() writes the first progress.json and spawns (synchronously, so the
@@ -147,10 +150,10 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
     let runDir;
     exclusive(() => {
       runDir = newRunDir(runsDir, 'audit');
-      const argv = ['audit', '--url', url, '--goal', goal, '--run-dir', runDir, '--site', site, '--progress',
+      const argv = ['audit', '--url', url, ...(goal ? ['--goal', goal] : []), '--run-dir', runDir, '--site', site, '--progress',
         ...(script ? ['--script', script, '--no-judge'] : [])];
       try {
-        createProgressWriter(runDir)({ state: 'running', trace: [], url, goal });
+        createProgressWriter(runDir)({ state: goal ? 'running' : 'planning_task', trace: [], url, goal });
         return exited(spawnRun({ runDir, argv })).then((exit) => markFailedIfUnfinished(runDir, exitMessage('audit', exit)));
       } catch (e) {
         markFailedIfUnfinished(runDir, 'The audit could not be started.');
@@ -193,8 +196,32 @@ export function createRunsApi({ runsDir, spawnRun, ownPort, log = () => {} }) {
     send(res, 202, { runDir: path.basename(runDir) });
   }
 
+  // Not under the one-run lock: it records nothing. On timeout the page read/model call finishes in the background
+  // (readStartPage always closes its browser); only the answer is dropped.
+  async function suggestTasks(req, res) {
+    const body = await readJsonBody(req);
+    const { url, site } = checkUrl(body.url, ownPort());
+    let timer;
+    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new ApiError(504, 'suggest_timeout', 'Working out a task took too long. Please describe one.')), suggestTimeoutMs); });
+    let result;
+    try {
+      result = await Promise.race([suggest({ url, siteKey: site }), late]);
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      log(`suggest failed for ${url}: ${e.message}`);
+      throw new ApiError(502, 'suggest_failed', 'Could not work out a task for this page. Please describe one.');
+    } finally {
+      clearTimeout(timer);
+    }
+    send(res, 200, { suggestions: result.suggestions.map(({ goal, source, reason, needs }) => ({ goal, source, reason, needs })) });
+  }
+
   async function route(req, res) {
     const segs = new URL(req.url, 'http://x').pathname.split('/').filter(Boolean); // ['api', 'runs', …]
+    if (segs[1] === 'tasks' && segs[2] === 'suggest' && segs.length === 3) {
+      if (req.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to get task suggestions.');
+      return suggestTasks(req, res);
+    }
     if (segs[1] === 'runs' && segs.length === 2) {
       if (req.method === 'GET') return send(res, 200, await listRuns(runsDir));
       if (req.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use GET to list runs or POST to start one.');

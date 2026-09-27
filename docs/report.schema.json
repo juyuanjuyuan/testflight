@@ -20,7 +20,10 @@
         "replayOf": { "type": "string", "description": "Present when the report was rebuilt from an existing trace" },
         "startedAt": { "type": "string", "format": "date-time", "description": "When the run started. Real mode: includes the time the human spent clearing captcha/login before pressing Enter. Absent in replays and in reports built before plan 17 P2" },
         "finishedAt": { "type": "string", "format": "date-time", "description": "When the run's analysis finished (report written right after). finishedAt - startedAt = how long the audit took. Absent when startedAt is" },
-        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" }
+        "maxSteps": { "type": "integer", "minimum": 1, "description": "Step limit of the planner (step 0 'start' not counted): 40 local, 80 real mode. Show 'used N / maxSteps steps'. Absent in replays and older reports" },
+        "goalSource": { "enum": ["user", "curated", "generated"], "description": "Where goal came from: user = typed by the user; curated = preset task of a demo site (eval/groundtruth); generated = proposed by the AI from the start page (no goal given). Absent in replays and older reports" },
+        "goalReason": { "type": ["string", "null"], "description": "Why this task was chosen (curated/generated); null when the user gave it. Absent when goalSource is" },
+        "testDataProfile": { "type": ["string", "null"], "description": "Test-data profile whose values were appended to a generated goal (config/test-data/<name>.json, e.g. default, shop); null for user/curated goals and in real mode (no payment or personal data there). Absent when goalSource is" }
       }
     },
     "verdicts": { "$ref": "#/$defs/verdicts" },

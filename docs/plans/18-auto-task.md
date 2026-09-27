@@ -76,4 +76,24 @@
 
 ## 结果
 
-（完成后填写）
+**已完成（2026-09-27）。** `npm test` 122/122、`npm run smoke` 全部通过。
+
+实现：
+- `src/agent/tasker.mjs` + `prompts/tasker.md`：`suggestTasks()`。预设任务来自 `eval/groundtruth/*.yaml`（`site` 完全匹配、带 `url` 的预设只在网址一致时适用并排在前面）；否则走 judge 的模型路由，代码检查（`STEP_WORDS` 整词匹配，"tablet" 不会误伤；不能有数字；`needs` 只能是 `DATA_KINDS`；拼接后不超过 `MAX_GOAL_CHARS`），全部不合格重试一次，仍不合格报错。模型只收到 `url/title/pageText/mode/dataKinds/maxSuggestions`（有测试检查）。
+- `config/test-data/default.json`、`shop.json`：只有公开测试值（4242…、4000…0002、example.com），测试会检查。真实网站模式不拼接任何数据，改为追加 "Stop before paying or entering any personal details."。
+- `audit()`：没有 goal 时，第 0 步（打开页面）照常记录，然后用第 0 步的 url/标题/pageText 选任务——和 planner 第 0 步看到的完全一样，不额外开浏览器，真实网站模式也能用。progress：`planning_task` →（选定后写入 `goal`）`running` → `analyzing` → `done`；失败写 `failed`，error 以 "Could not work out a task for this page. Please describe one." 开头。
+- `meta` 新增可选 `goalSource` / `goalReason` / `testDataProfile`（schema、REPORT_FORMAT.md、report.example.json 已同步）。
+- API：`goal` 可选（`null` 也视为没传）；新增 `POST /api/tasks/suggest`（`src/api/suggest.mjs` 负责无头读取起始页）。预设站点不开浏览器；超时 `SUGGEST_TIMEOUT_MS`（90 秒）→ `504 suggest_timeout`；模型给不出任务 → `502 suggest_failed`（计划没规定这种情况的状态码，选了 502）。
+- CLI：`node cli.mjs suggest --url <url> [--site …] [--mode real]`；`audit` 不传 `--goal` 时自动选任务（本机演示站点即使没传 `--site` 也会按网址找预设）。
+- `contracts.mjs` 只加了常量：`MAX_GOAL_CHARS`（从 api/runs.mjs 移过来）、`MAX_SUGGESTIONS`、`SUGGEST_TIMEOUT_MS`。planner prompt 和输入值检查没有改。
+
+验收（在单独启动的 8091 端口服务器上跑，没有动 8080）：
+- `suggest` shop/original → 两条 `curated`（main、second）；testpage/original → 三条 `generated`，不含操作步骤，卡号来自 `default.json`（约 9 秒）。shop/fixed 没有预设（`shop-fixed.yaml` 没有 goal），也返回 `generated`，卡号来自 `shop.json`。
+- `POST /api/runs` 只传 url：testpage/fixed → `planning_task → running → done`，`goalSource: curated`；testpage/original → `planning_task → running → analyzing → done`，`goalSource: generated`、`testDataProfile: default`。
+
+**需要通知前端：** progress 新增状态 `planning_task`（此时 `goal` 为 `null`，timeline 可能已经有第 0 步），需要能显示；`POST /api/runs` 可以不传 `goal`；新接口 `POST /api/tasks/suggest`（见 API.md §2.1）；报告 `meta.goalSource` 可以用来显示"AI 生成的任务"。
+
+发现的问题（不在本计划的可改范围内，没有改）：
+- `eval/groundtruth/testpage.yaml` 的 `site` 是 `sites/testpage`，实际目录是 `sites/testpage/original`，所以 testpage/original 匹配不到预设，会走生成。
+- `testpage-fixed.yaml` 的预设任务 "Buy the canvas tote bag" 没有卡号：按脚本跑没问题，但由 planner 跑时会在付款处 stuck（planner 正确地拒绝编造卡号）。如果希望自动任务在 testpage 上跑通，需要在这两份 groundtruth 的 goal 里加上卡号（会影响 eval，需要 10 号计划的负责人确认）。
+

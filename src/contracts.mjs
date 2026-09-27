@@ -16,6 +16,10 @@ export const BASELINE_MS = 3500;
 export const LOAD_TIMEOUT_MS = 10_000;   // max wait for 'load' after a navigation; exceeding it is recorded as loadTimeout
 // per-attempt LLM timeout by role. The planner is short: a stalled call is cheaper to retry than to wait out.
 export const LLM_TIMEOUT_MS = { planner: 8_000, judge: 60_000, fixer: 60_000, vision: 60_000 };
+export const MAX_GOAL_CHARS = 500;       // task text, typed by the user or built by the tasker (API rejects longer)
+export const MAX_SUGGESTIONS = 3;       // tasks the tasker proposes per page
+// POST /api/tasks/suggest answers synchronously: page load + one model call with a retry must fit, else 504
+export const SUGGEST_TIMEOUT_MS = 90_000;
 
 export const ALLOWED_KEYS = [
   'Tab', 'Shift+Tab', 'Enter', 'Space', 'Escape',

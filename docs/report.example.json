@@ -7,6 +7,9 @@
     "startedAt": "2026-09-26T23:09:21.412Z",
     "maxSteps": 40,
     "goal": "Buy the canvas tote bag. Pay with card number 4242 4242.",
+    "goalSource": "user",
+    "goalReason": null,
+    "testDataProfile": null,
     "judge": true,
     "finishedAt": "2026-09-26T23:09:59.874Z",
     "generatedAt": "2026-09-26T23:10:00.000Z"

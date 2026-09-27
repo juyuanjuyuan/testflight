@@ -1,0 +1,10 @@
+{
+  "_comment": "Public test values only (card numbers from payment providers' test docs, example.com addresses). Never real data. Each sentence is appended verbatim to a generated goal, so the planner may type exactly these values.",
+  "sentences": {
+    "payment_card": "Pay with card 4242 4242 4242 4242, expiry 12/34, security code 123.",
+    "email": "Use the email address test@example.com.",
+    "name": "Use the name Test User.",
+    "address": "Use the address 1 Test Street, Testville, 10001.",
+    "phone": "Use the phone number 555 0100."
+  }
+}
