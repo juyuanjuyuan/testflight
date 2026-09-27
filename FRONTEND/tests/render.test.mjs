@@ -99,7 +99,7 @@ test("null verdict without a known reason is still inconclusive and separate fro
 test("inconclusive re-test comparisons are neither failures nor verified fixes", () => {
   const rerun = { runDir: "runs/child", before: inconclusive, after: inconclusive, closedLoop: false, status: [], introduced: [] };
   const html = renderToStaticMarkup(React.createElement(VerificationView, { report: { ...report, rerun } }));
-  assert.match(html, /The re-test was inconclusive\./);
+  assert.match(html, /No before-and-after comparison is possible\./);
   assert.equal(html.match(/<strong>Inconclusive<\/strong>/g)?.length, 2);
   assert.match(html, /Original audit · Inconclusive: the task is missing test data/);
   assert.match(html, /Re-test · Inconclusive: the task is missing test data/);
@@ -122,4 +122,20 @@ test("automatically appended test data is labelled next to the task with the use
   }
   const plain = renderToStaticMarkup(React.createElement(ReportView, { report: { ...report, meta: { ...report.meta, goalInput: "ignored" } }, runDir: "run-1", busy: false }));
   assert.doesNotMatch(plain, /Test data added automatically|Your original task/);
+});
+test("an inconclusive audit before the fix is reported as no comparison, not as a failed fix", () => {
+  for (const after of [verdict, { ...verdict, agentCanComplete: true, screenReaderUserCanComplete: true }, inconclusive]) {
+    const rerun = { runDir: "runs/child", before: inconclusive, after, closedLoop: false, status: [], introduced: [] };
+    const html = renderToStaticMarkup(React.createElement(VerificationView, { report: { ...report, rerun } }));
+    assert.match(html, /No before-and-after comparison is possible\./);
+    assert.match(html, /before the fix was inconclusive/);
+    assert.doesNotMatch(html, /FIX VERIFIED|still needs attention|remains completable|re-test was inconclusive/);
+  }
+});
+test("an inconclusive re-test after a definite audit is labelled as such", () => {
+  const rerun = { runDir: "runs/child", before: verdict, after: inconclusive, closedLoop: false, status: [], introduced: [] };
+  const html = renderToStaticMarkup(React.createElement(VerificationView, { report: { ...report, rerun } }));
+  assert.match(html, /The re-test was inconclusive\./);
+  assert.match(html, /<strong>Not completable<\/strong>.*<strong>Inconclusive<\/strong>/);
+  assert.doesNotMatch(html, /No before-and-after comparison/);
 });

@@ -11,7 +11,7 @@ export function isActive(state: string): boolean {
 export function verdictLabel(value: boolean | null | undefined, yes: string, no: string): string {
   return value === true ? yes : value === false ? no : "Inconclusive";
 }
-export function inconclusiveMessage(reason?: string | null): string {
+export function inconclusiveMessage(reason?: string): string {
   return reason === "missing_test_data"
     ? "Inconclusive: the task is missing test data (for example, a card number). Add it and run again."
     : "Inconclusive: the backend could not determine whether this task can be completed.";

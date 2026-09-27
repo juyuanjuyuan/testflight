@@ -10,9 +10,10 @@ export type TimelineStep = {
   screenshot?: string | null; shotSize?: ShotSize | null; findingIds: string[];
 };
 // Both outcomes are null when the backend cannot decide (see inconclusiveReason); null never means "cannot complete".
+// inconclusiveReason is only "missing_test_data" today; string keeps later reasons readable.
 export type Verdicts = {
   outcome: string; agentCanComplete: boolean | null; screenReaderUserCanComplete: boolean | null;
-  blockingFindings: string[]; unexplainedStuck: boolean; inconclusiveReason?: string | null;
+  blockingFindings: string[]; unexplainedStuck: boolean; inconclusiveReason?: string;
 };
 export type Edit = { file: string; old: string; new: string };
 export type Finding = {
@@ -31,7 +32,7 @@ export type AuditReport = {
   meta: { url?: string | null; goal: string; mode?: string; site?: string | null; script?: boolean; judge?: boolean;
     generatedAt?: string | null; startedAt?: string; finishedAt?: string; maxSteps?: number;
     goalSource?: string; goalReason?: string | null; testDataProfile?: string | null;
-    goalInput?: string; testDataAppended?: boolean };
+    goalInput?: string; testDataAppended?: true };
   verdicts: Verdicts; counts: { block: number; degrade: number; filteredOut: number; axeViolations: number | null; axeBestPractice?: number | null };
   timeline: TimelineStep[]; findings: Finding[]; fixes?: FixResult[] | null; rerun?: Rerun | null;
   fixPolicy?: { enforced: { id: string; rule: string }[]; instructed: { id: string; rule: string }[] };
