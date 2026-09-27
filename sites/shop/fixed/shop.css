@@ -1,0 +1,26 @@
+body{font-family:system-ui,sans-serif;margin:0;color:#222;background:#fafaf7}
+header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 2rem;background:#fff;border-bottom:1px solid #ddd}
+header .logo{font-weight:700;font-size:1.2rem}
+main{max-width:48rem;margin:1.5rem auto;padding:0 1rem}
+#promo{background:#f3e9d2;padding:.4rem 2rem;font-size:.9rem}
+.btn{display:inline-block;font:inherit;padding:.45rem .9rem;border:1px solid #1f4e5f;border-radius:6px;background:#1f4e5f;color:#fff;cursor:pointer}
+.btn.light{background:#fff;color:#1f4e5f}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;list-style:none;padding:0}
+.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:1rem}
+.card a{color:#1f4e5f;font-weight:600}
+.swatch{height:90px;border-radius:6px;margin-bottom:.6rem}
+.sale{max-width:100%;border-radius:12px}
+#toast{min-height:1.4em;color:#060;margin:.6rem 0}
+.modal{position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center}
+.modal[hidden]{display:none}
+.sheet{background:#fff;border-radius:8px;padding:1.4rem;min-width:22rem;position:relative}
+.sheet ul{list-style:none;padding:0}
+.sheet li{display:flex;gap:.5rem;align-items:center;margin:.5rem 0}
+.sheet li .name{flex:1}
+.qtybtn{font:inherit;width:2rem;border:1px solid #999;border-radius:4px;background:#fff;cursor:pointer}
+.x{position:absolute;top:.4rem;right:.6rem;font:inherit;font-size:1.3rem;border:0;background:none;cursor:pointer}
+.error{color:#b00;min-height:1.2em}
+.cols{display:grid;grid-template-columns:2fr 1fr;gap:2rem}
+aside{background:#fff;border:1px solid #ddd;border-radius:8px;padding:1rem}
+label{display:block;margin:.6rem 0 .2rem}
+input{font:inherit;padding:.35rem}

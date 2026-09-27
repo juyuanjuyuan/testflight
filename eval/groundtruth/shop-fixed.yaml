@@ -1,0 +1,4 @@
+# Fixed variant of the shop (both flows): nothing planted. Every finding here is a false positive.
+site: sites/shop/fixed
+variant: fixed
+barriers: []

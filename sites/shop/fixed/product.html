@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Product — Loomline Goods</title><link rel="stylesheet" href="shop.css"></head>
+<body>
+<header><span class="logo">Loomline Goods</span><button type="button" class="btn light" id="cartbtn">Cart</button></header>
+<div id="promo">Free shipping over $50</div>
+<main>
+  <div class="swatch" id="swatch"></div>
+  <h1 id="pname"></h1>
+  <p id="pprice"></p>
+  <button type="button" class="btn" id="add" aria-label="Add to cart" data-barrier="B1">🛒</button>
+  <div id="toast" role="status" data-barrier="B2"></div>
+  <p>Sturdy, washable and made to last. Ships in two business days.</p>
+  <a href="index.html">Back to all products</a>
+</main>
+<div class="modal" id="cart" role="dialog" aria-modal="true" aria-labelledby="cart-title" tabindex="-1" hidden>
+  <div class="sheet">
+    <h2 id="cart-title">Your cart</h2>
+    <ul></ul>
+    <p id="subtotal" role="status" data-barrier="B4"></p>
+    <button type="button" class="btn" id="gocheckout">Checkout</button>
+    <button type="button" class="btn light" id="keepshopping">Keep shopping</button>
+  </div>
+</div>
+<script src="shop.js"></script>
+<script>
+  initCart();
+  const p = PRODUCTS[new URLSearchParams(location.search).get('id')] || PRODUCTS.tote;
+  document.title = `${p.name} — Loomline Goods`;
+  pname.textContent = p.name;
+  pprice.textContent = money(p.price);
+  swatch.style.background = { tote: '#d9c7a3', beanie: '#8a4b3c', mug: '#9fb3b0' }[p.id];
+  add.addEventListener('click', () => { addToCart(p.id); toast.textContent = `${p.name} added to cart`; });
+</script>
+</body></html>

@@ -1,0 +1,18 @@
+[
+  {"kind":"press","key":"Tab","reason":"header cart button"},
+  {"kind":"press","key":"Enter","reason":"open the cart"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"find checkout"},
+  {"kind":"press","key":"Enter","reason":"go to checkout"},
+  {"kind":"press","key":"Tab","reason":"card field, not needed"},
+  {"kind":"press","key":"Tab","reason":"Pay, not yet"},
+  {"kind":"press","key":"Tab","reason":"find the coupon field"},
+  {"kind":"press","key":"Tab","reason":"a popup opened, look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Tab","reason":"look for a way out"},
+  {"kind":"press","key":"Escape","reason":"try to close the popup"},
+  {"kind":"stuck","reason":"popup has no keyboard exit; cannot reach the coupon field"}
+]

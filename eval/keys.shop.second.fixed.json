@@ -1,0 +1,21 @@
+[
+  {"kind":"press","key":"Tab","reason":"header cart button"},
+  {"kind":"press","key":"Enter","reason":"open the cart"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"cart controls"},
+  {"kind":"press","key":"Tab","reason":"find checkout"},
+  {"kind":"press","key":"Enter","reason":"go to checkout"},
+  {"kind":"press","key":"Tab","reason":"card field, not needed"},
+  {"kind":"press","key":"Tab","reason":"Pay, not yet"},
+  {"kind":"press","key":"Tab","reason":"find the coupon field"},
+  {"kind":"press","key":"Tab","reason":"a popup opened, look around"},
+  {"kind":"press","key":"Tab","reason":"look around"},
+  {"kind":"press","key":"Tab","reason":"look around"},
+  {"kind":"press","key":"Tab","reason":"look around"},
+  {"kind":"press","key":"Escape","reason":"close the popup"},
+  {"kind":"type","text":"SAVE10","reason":"enter the coupon"},
+  {"kind":"press","key":"Tab","reason":"find Apply"},
+  {"kind":"press","key":"Enter","reason":"apply the coupon"},
+  {"kind":"done","reason":"heard 'Coupon SAVE10 applied'"}
+]

@@ -49,3 +49,12 @@ node cli.mjs score --run runs/<id> --groundtruth eval/groundtruth/shop-fixed.yam
 
 - 最好由没写检测器的人埋障碍，并在 README 里如实说明，避免被质疑过拟合。
 - 页面上别出现真实品牌名和 logo。
+
+## 结果（已完成）
+
+- 页面：`index.html`（列表）→ `product.html?id=tote`（详情）→ 购物车弹窗（列表页、详情页都有）→ `checkout.html` → `confirmation.html`。购物车存在 sessionStorage 里，默认带一顶"上次留下"的 Wool Beanie，用来埋"删除后焦点丢失"。
+- 障碍：主流程 B1–B8（`shop-main.yaml`），第二流程 B9、B10（`shop-second.yaml`）。第二流程会经过购物车弹窗，所以共用障碍 B5 在两份文件里都登记了。
+- 按键脚本：主流程 original 和 fixed 共用 `eval/keys.shop.main.json`（23 步，没超过 MAX_STEPS=25）。第二流程在 original 上会卡死，所以 fixed 单独一份 `eval/keys.shop.second.fixed.json`。
+- 验收（--no-judge）：shop-main 检出 6/8，漏掉 B3（vision-only）和 B8（等 07）；shop-second 检出 2/3，漏掉 B10（等 06）；fixed 两条流程都是 0 误报，axe 0。两个版本的可见文字完全一样，脚本比较过。
+- **给 09 的噪音问题**：轮播横幅只放在列表页。recorder 只在 `start()` 做 2 秒空闲基线，页面跳转后的新页面没有基线。轮播放在详情页或结账页时，前几步会被 D1 报成 unannounced，fixed 上会出现误报。修法是跳转后也做一次基线，这属于 `src/`，所以这次没改。
+- 埋障碍的人也看过检测器代码，这一点已经在 `sites/shop/README.md` 里说明。

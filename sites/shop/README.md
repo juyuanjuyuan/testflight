@@ -13,3 +13,6 @@ Conventions (required for exact scoring and for the demo):
 - Keep the fixed version's visible text identical to the original (the fixer is forbidden from changing text).
 
 Serve: `npm run serve` → http://localhost:8080/shop/original/
+
+Honesty note: the barriers were planted by a teammate who had read the detector code (hackathon time), so some overfitting is possible.
+Barrier list and scripted routes: `eval/groundtruth/shop-*.yaml`, `eval/keys.shop.*.json`; details in `docs/plans/05-fake-shop.md`.

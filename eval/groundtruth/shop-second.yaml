@@ -1,0 +1,11 @@
+# Ground truth for sites/shop/original, SECOND flow only (see docs/plans/05-fake-shop.md). Blocking barriers live here.
+# Scripted route: eval/keys.shop.second.json (original, ends stuck) / eval/keys.shop.second.fixed.json (fixed).
+# The route passes through the cart dialog, so B5 (shared with the main flow) is listed here too.
+site: sites/shop/original
+variant: original
+flow: second
+goal: "Apply the coupon SAVE10 at checkout"
+barriers:
+  - { id: B5,  kind: weak-name,    wcag: ["4.1.2", "2.4.6"], impact: degrade, flow: second, detectable: ours, note: "shared with main: cart quantity buttons named '−' / '+'" }
+  - { id: B9,  kind: trap,         wcag: ["2.1.2"],          impact: block,   flow: second, detectable: ours, note: "checkout: 'Members only' popup opens on coupon focus; Tab bounces Email↔Join, Escape ignored, × is mouse-only" }
+  - { id: B10, kind: pointer-only, wcag: ["2.1.1"],          impact: block,   flow: second, detectable: ours, note: "checkout: coupon 'Apply' is a clickable <span>, never focusable (needs plan 06)" }

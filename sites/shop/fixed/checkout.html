@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkout — Loomline Goods</title><link rel="stylesheet" href="shop.css"></head>
+<body>
+<header><span class="logo">Loomline Goods</span></header>
+<div id="promo">Free shipping over $50</div>
+<main>
+  <h1>Checkout</h1>
+  <div class="cols">
+    <form id="payform" novalidate data-barrier="B8">
+      <label for="card">Card number</label>
+      <input id="card" inputmode="numeric" autocomplete="off" aria-describedby="carderr">
+      <p id="carderr" class="error" aria-live="assertive" data-barrier="B7"></p>
+      <button type="submit" class="btn" id="pay">Pay</button>
+    </form>
+    <aside>
+      <h2>Order summary</h2>
+      <ul id="lines"></ul>
+      <p id="total" aria-live="polite"></p>
+      <label for="coupon">Coupon code</label>
+      <input id="coupon" autocomplete="off">
+      <button type="button" class="btn light" id="apply" data-barrier="B10">Apply</button>
+      <p id="couponmsg" role="status"></p>
+    </aside>
+  </div>
+</main>
+<div class="modal" id="join" role="dialog" aria-modal="true" aria-labelledby="join-title" aria-describedby="join-desc" tabindex="-1" data-barrier="B9" hidden>
+  <div class="sheet">
+    <button type="button" class="x" id="joinclose" aria-label="Close">×</button>
+    <h2 id="join-title">Members only</h2>
+    <p id="join-desc">Coupons are for members. Join our list to unlock them.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="off">
+    <button type="button" class="btn" id="joinbtn">Join</button>
+  </div>
+</div>
+<script src="shop.js"></script>
+<script>
+  // Deterministic payment: the first test card is always declined, the second always succeeds.
+  const DECLINED = '4000000000000002', OK = '4242424242424242';
+  const cart = loadCart();
+  let discount = 0;
+  lines.replaceChildren(...cart.map((x) => Object.assign(document.createElement('li'), { textContent: `${x.name} × ${x.qty} ${money(x.price * x.qty)}` })));
+  const showTotal = () => { total.textContent = `Total ${money(subtotal(cart) * (1 - discount))}`; };
+  showTotal();
+
+  payform.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const n = card.value.replace(/\s/g, '');
+    if (n === OK) { sessionStorage.removeItem('cart'); location.href = 'confirmation.html'; return; }
+    carderr.textContent = n === DECLINED ? 'Card declined. Try another card.' : 'Card number is invalid.';
+    card.setAttribute('aria-invalid', 'true');
+  });
+
+  apply.addEventListener('click', () => {
+    if (coupon.value.trim().toUpperCase() === 'SAVE10') { discount = 0.1; couponmsg.textContent = 'Coupon SAVE10 applied: 10% off.'; }
+    else couponmsg.textContent = 'That coupon code is not valid.';
+    showTotal();
+  });
+
+  // Members-only popup, shown the first time the coupon field is focused. Escape, × or Join closes it.
+  let joinShown = false;
+  function closeJoin() { join.hidden = true; coupon.focus(); }
+  coupon.addEventListener('focus', () => {
+    if (joinShown) return;
+    joinShown = true;
+    join.hidden = false;
+    join.focus();
+  });
+  joinclose.addEventListener('click', closeJoin);
+  joinbtn.addEventListener('click', closeJoin);
+  join.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeJoin(); return; }
+    if (e.key !== 'Tab') return;
+    // keep focus inside the dialog; × and Escape are the way out
+    const f = [joinclose, email, joinbtn], k = f.indexOf(document.activeElement);
+    e.preventDefault();
+    const next = k < 0 ? (e.shiftKey ? f.length - 1 : 0) : (k + (e.shiftKey ? -1 : 1) + f.length) % f.length;
+    f[next].focus();
+  });
+</script>
+</body></html>

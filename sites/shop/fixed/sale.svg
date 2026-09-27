@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="120" viewBox="0 0 640 120">
+  <rect width="640" height="120" rx="12" fill="#1f4e5f"/>
+  <text x="32" y="56" font-family="Georgia, serif" font-size="34" font-weight="700" fill="#ffd166">SUMMER SALE</text>
+  <text x="32" y="94" font-family="system-ui, sans-serif" font-size="22" fill="#fff">All hats 20% off this week only</text>
+</svg>

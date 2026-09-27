@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Loomline Goods — Shop</title><link rel="stylesheet" href="shop.css"></head>
+<body>
+<header><span class="logo">Loomline Goods</span><button type="button" class="btn light" id="cartbtn">Cart</button></header>
+<div id="promo">Free shipping over $50</div>
+<main>
+  <img class="sale" src="sale.svg" alt="Summer sale: all hats 20% off this week only" data-barrier="B3">
+  <h1>All products</h1>
+  <ul class="grid">
+    <li class="card"><div class="swatch" style="background:#d9c7a3"></div><a href="product.html?id=tote">Canvas Tote Bag</a><p>$24.00</p></li>
+    <li class="card"><div class="swatch" style="background:#8a4b3c"></div><a href="product.html?id=beanie">Wool Beanie</a><p>$18.00</p></li>
+    <li class="card"><div class="swatch" style="background:#9fb3b0"></div><a href="product.html?id=mug">Stoneware Mug</a><p>$14.00</p></li>
+  </ul>
+</main>
+<div class="modal" id="cart" role="dialog" aria-modal="true" aria-labelledby="cart-title" tabindex="-1" hidden>
+  <div class="sheet">
+    <h2 id="cart-title">Your cart</h2>
+    <ul></ul>
+    <p id="subtotal" role="status" data-barrier="B4"></p>
+    <button type="button" class="btn" id="gocheckout">Checkout</button>
+    <button type="button" class="btn light" id="keepshopping">Keep shopping</button>
+  </div>
+</div>
+<script src="shop.js"></script>
+<script>initCart(); rotatePromo();</script>
+</body></html>
