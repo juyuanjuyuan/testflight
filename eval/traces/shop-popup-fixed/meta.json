@@ -3,10 +3,12 @@
   "mode": "local",
   "site": "sites/shop/fixed",
   "script": true,
-  "startedAt": "2026-09-27T04:56:00.603Z",
+  "startedAt": "2026-09-27T16:09:31.669Z",
   "maxSteps": 40,
   "goalSource": "user",
   "goalReason": null,
-  "testDataProfile": null,
-  "goal": "Open the Canvas Tote Bag product page"
+  "testDataProfile": "shop",
+  "goalInput": "Open the Canvas Tote Bag product page",
+  "testDataAppended": true,
+  "goal": "Open the Canvas Tote Bag product page. Pay with the test card 4000 0000 0000 0002. If it is declined, try 4242 4242 4242 4242."
 }
