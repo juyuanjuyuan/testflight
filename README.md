@@ -6,7 +6,7 @@ Give it a URL. An AI agent that hears only what a screen reader would say works 
 
 Built at Test Flight, the Glasswing Ventures hackathon, September 26 and 27, 2026.
 
-Team: TODO team name — TODO Name (@github), Name (@github), Name (@github), Name (@github)
+Team: Jet2Holiday — Juyuan Huang, Mingjun Wu, Jialu Xing, Yiran Liu
 
 
 ## The problem
@@ -81,7 +81,7 @@ Barriers were planted by a teammate who had read the detector code (see `sites/s
 | **total** | | ours (judge off) | 19 | 18/19 (95%) | 1 | 0 |
 | **total** | | axe (WCAG rules) | 19 | 0/19 (0%) | 19 | 0 |
 
-† vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
+Vision-only barrier (B3): text printed on an image; no keyboard/screen-reader rule can see it, so it is counted as a miss for us too.
 Detection counts every planted barrier, including those expected to be irrelevant to the task (expectedImpact none): finding them is the detectors' job; whether they matter is the judge's.
 Same trace for every tool (recorded key scripts `eval/keys.*.json`). axe counts only WCAG-tagged rules, per affected element; findings are matched to barriers by `data-barrier` id, unmatched = false positive.
 axe best-practice rule nodes, not counted above: shop-main/original 1, shop-main/fixed 1, shop-second/original 1, shop-second/fixed 1, shop-popup/original 1, shop-popup/fixed 1, testpage/original 7, testpage/fixed 5, w3c-bad/fixed 28.
