@@ -44,7 +44,8 @@ export function buildObservation(goal, trace) {
   const history = trace.slice(-6, -1).map((s) => ({
     did: s.action.kind === 'press' ? `press ${s.action.key}` : s.action.kind === 'type' ? `${s.action.replace ? 'replace with' : 'type'} "${clip(s.action.text, 40)}"` : s.action.kind,
     focus: describeFocus(s.focusAfter),
-    heard: heardInStep(s).slice(0, 3),
+    // a dialog announces all its lines at once; keeping only a few made the planner forget the cart held the tote
+    heard: heardInStep(s).slice(0, 12),
   }));
   return {
     goal,

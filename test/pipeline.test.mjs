@@ -71,6 +71,18 @@ test('INFORMATION BARRIER: planner never sees an unannounced error', () => {
   assert.ok(JSON.stringify(buildObservation('buy', fixed.slice(0, kf + 1))).includes('Card number is invalid'), 'announced text must reach planner');
 });
 
+test('planner history keeps what an opened dialog announced, not just its first lines', () => {
+  // Shop cart: the tote was the 7th line announced when the cart opened. With 3 lines kept, the planner forgot it
+  // one step later, decided it was never added and looped until MAX_STEPS.
+  const lines = ['Wool Beanie $18.00', 'Remove', '−', 'Qty 1', '+', 'Canvas Tote Bag $24.00', 'Subtotal $42.00', 'Checkout'];
+  const change = (text) => ({ text, selector: '#cart li', visible: true, inLiveRegion: false, focusMovedInto: true, referencedBy: [] });
+  const opened = { ...fixed[1], i: 1, changes: lines.map(change), spoken: [],
+    focusAfter: { ...fixed[1].focusAfter, role: 'dialog', name: 'Your cart', selector: '#cart' } };
+  const next = { ...fixed[2], i: 2, focusBefore: opened.focusAfter };
+  const { history } = buildObservation('buy', [fixed[0], opened, next]);
+  assert.ok(history.at(-1).heard.includes('Canvas Tote Bag $24.00'), JSON.stringify(history.at(-1).heard));
+});
+
 test('focusValue is the AX value of the focused field, not what the planner typed', () => {
   // A screen reader reads a textbox's value on focus; the runner records it from the AX tree as focusAfter.value.
   const withValue = (steps, value) => steps.map((s, n) => (n === steps.length - 1 ? { ...s, focusAfter: { ...s.focusAfter, value } } : s));
