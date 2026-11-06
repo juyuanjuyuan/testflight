@@ -190,3 +190,5 @@ Third-party components, used unchanged:
 - [Playwright](https://playwright.dev) drives Chromium; [axe-core](https://github.com/dequelabs/axe-core) is the static baseline we compare against; [Ajv](https://ajv.js.org) validates reports against `docs/report.schema.json` in tests only.
 - The web app uses React and Vite.
 - `sites/bad/` is an unmodified local copy of the W3C Before and After Demonstration ("after" version), redistributed under the W3C Document and Software Licenses (see `sites/bad/README.md`), used only to measure false positives.
+
+hooray
